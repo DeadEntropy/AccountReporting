@@ -10,6 +10,7 @@ default_path_out = r'D:\NicoFolder\BankAccount\LloydsData\Lloyds_Mortgage.csv'
 expected_columns = ['DATE', 'TRANSACTION', 'OUT(£)', 'IN(£)', 'BALANCE(£)']
 target_columns = ["Date", "Account", "Amount", "Subcategory", "Memo", "Currency"]
 
+
 def to_memo(row):
     if row['TRANSACTION'] == 'Interest':
         return 'Mortgage Interest'
@@ -19,23 +20,29 @@ def to_memo(row):
         return 'Mortgage Repayment'
     return row['TRANSACTION']
 
-    
-def load(path_in, account_name, currency):
-    df = pd.read_csv(path_in, parse_dates=[1])
-    assert set(df.columns) == set(expected_columns)
-    
+
+def can_handle(path_in):
+    df = pd.read_csv(path_in, nrows=1)
+    return set(df.columns) == set(expected_columns)
+
+
+def load(path_in, account_name = default_account_name, currency = default_currency):
+    df = pd.read_csv(path_in)
+    assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
+                                                     f'are [{", ".join(df.columns)}]. (Lloyds Mortgage)'
+
     df["OUT(£)"] = df["OUT(£)"].fillna(0)
     df["IN(£)"] = df["IN(£)"].fillna(0)
-    
+
     df_out = pd.DataFrame(columns=target_columns)
-    
-    df_out.Date = pd.to_datetime(df.DATE)
+
+    df_out.Date = pd.to_datetime(df.DATE, format='%d/%m/%Y')
     df_out.Account = account_name
     df_out.Currency = currency
     df_out.Amount = df["IN(£)"] - df["OUT(£)"]
     df_out.Subcategory = df.TRANSACTION
-    df_out.Memo = df.apply (lambda row: to_memo(row), axis=1)
-    
+    df_out.Memo = df.apply(lambda row: to_memo(row), axis=1)
+
     return df_out
 
 
@@ -54,5 +61,3 @@ def load_save(folder_in, account_name, currency, path_out):
 
 def load_save_default():
     load_save(default_folder_in, default_account_name, default_currency, default_path_out)
-    
-load_save_default()

@@ -6,20 +6,27 @@ default_currency = 'GBP'
 default_folder_in = r'D:\NicoFolder\BankAccount\LloydsData\RawData\CurrentAccount'
 default_path_out = r'D:\NicoFolder\BankAccount\LloydsData\Lloyds_Current.csv'
 
-expected_columns = ['Transaction Date', 'Transaction Type', 'Sort Code', 'Account Number', 'Transaction Description', 'Debit Amount', 'Credit Amount', 'Balance']
+expected_columns = ['Transaction Date', 'Transaction Type', 'Sort Code', 'Account Number', 'Transaction Description',
+                    'Debit Amount', 'Credit Amount', 'Balance']
 target_columns = ["Date", "Account", "Amount", "Subcategory", "Memo", "Currency"]
 
 
-def load(path_in, currency):
-    df = pd.read_csv(path_in, parse_dates=[1])
-    assert set(df.columns) == set(expected_columns)
+def can_handle(path_in):
+    df = pd.read_csv(path_in, nrows=1)
+    return set(df.columns) == set(expected_columns)
+
+
+def load(path_in, currency = default_currency):
+    df = pd.read_csv(path_in)
+    assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
+                                                     f'are [{", ".join(df.columns)}]. (Lloyds Current)'
     
     df["Debit Amount"] = df["Debit Amount"].fillna(0)
     df["Credit Amount"] = df["Credit Amount"].fillna(0)
     
     df_out = pd.DataFrame(columns=target_columns)
     
-    df_out.Date = pd.to_datetime(df["Transaction Date"])
+    df_out.Date = pd.to_datetime(df["Transaction Date"], format='%d/%m/%Y')
     df_out.Account = df["Sort Code"].astype(str) + " " + df["Account Number"].astype(str)
     df_out.Currency = currency
     df_out.Amount = df["Credit Amount"] - df["Debit Amount"]
@@ -44,5 +51,3 @@ def load_save(folder_in, currency, path_out):
 
 def load_save_default():
     load_save(default_folder_in, default_currency, default_path_out)
-    
-load_save_default()

@@ -9,18 +9,25 @@ default_path_out = r'D:\NicoFolder\BankAccount\NutmegData\Nutmeg_ISAs.csv'
 expected_columns = ['Date', 'Description', 'Pot', 'Amount (£)']
 target_columns = ["Date", "Account", "Amount", "Subcategory", "Memo", "Currency"]
 
-def load(path_in, currency):
-    df = pd.read_csv(path_in, sep=',', parse_dates=[1])
-    assert set(df.columns) == set(expected_columns)
+
+def can_handle(path_in):
+    df = pd.read_csv(path_in, nrows=1)
+    return set(df.columns) == set(expected_columns)
+
+
+def load(path_in, currency=default_currency):
+    df = pd.read_csv(path_in, sep=',')
+    assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
+                                                     f'are [{", ".join(df.columns)}]. (Nutmeg)'
 
     df_out = pd.DataFrame(columns=target_columns)
-    df_out.Date = pd.to_datetime(df["Date"])
-    df_out.Account = 'Nutmeg: ' + df['Pot'] 
-    df_out.Currency = default_currency
+    df_out.Date = pd.to_datetime(df["Date"], format='%d-%b-%y')
+    df_out.Account = 'Nutmeg: ' + df['Pot']
+    df_out.Currency = currency
     df_out.Amount = df["Amount (£)"]
     df_out.Subcategory = df["Description"]
     df_out.Memo = 'Nutmeg: ' + df['Pot']
-    
+
     return df_out
 
 
@@ -39,5 +46,3 @@ def load_save(folder_in, currency, path_out):
 
 def load_save_default():
     load_save(default_folder_in, default_currency, default_path_out)
-    
-load_save_default()
