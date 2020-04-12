@@ -7,7 +7,8 @@ from transforms import lloyds_current_transform as lloyds_curr
 from transforms import lloyds_mortgage_transform as lloyds_mort
 from transforms import nutmeg_isa_transform as nut_transform
 from transforms import revolut_transform as rev_transform
-from transforms import clone_transform as clone_transform
+from transforms import clone_transform
+from transforms import citi_transform
 
 default_path_in = r'D:\NicoFolder\BankAccount\Lake'
 default_path_out = r'D:\NicoFolder\BankAccount\lake_result.csv'
@@ -26,6 +27,8 @@ def load(file):
         return nut_transform.load(file)
     elif rev_transform.can_handle(file):
         return rev_transform.load(file)
+    elif citi_transform.can_handle(file):
+        return citi_transform.load(file)
     elif clone_transform.can_handle(file):
         return clone_transform.load(file)
     rev_transform.can_handle(file)

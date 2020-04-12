@@ -49,6 +49,7 @@ def load(path_in, account_name=default_account_name):
     df_out.Memo = df[" Description "] + df[" Notes"] + df[" Exchange Out"] + df[" Exchange In"]
     df_out.Memo = df_out.Memo.str.replace('£', 'GBP')
     df_out.Memo = df_out.Memo.str.replace('€', 'EUR')
+    df_out.Memo = df_out.Memo.str.replace(',', '')
 
     return df_out
 
