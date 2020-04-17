@@ -13,5 +13,6 @@ def load(path_in):
     assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
                                                      f'are [{", ".join(df.columns)}]. (Clone)'
 
+    df.Date = pd.to_datetime(df.Date, format='%d/%m/%Y')
     df.Date = pd.to_datetime(df.Date)
     return df
