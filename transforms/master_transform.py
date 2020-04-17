@@ -9,6 +9,7 @@ from transforms import nutmeg_isa_transform as nut_transform
 from transforms import revolut_transform as rev_transform
 from transforms import clone_transform
 from transforms import citi_transform
+from transforms import ubs_pension_transform
 
 default_path_in = r'D:\NicoFolder\BankAccount\Lake'
 default_path_out = r'D:\NicoFolder\BankAccount\lake_result.csv'
@@ -31,6 +32,8 @@ def load(file):
         return citi_transform.load(file)
     elif clone_transform.can_handle(file):
         return clone_transform.load(file)
+    elif ubs_pension_transform.can_handle(file):
+        return ubs_pension_transform.load(file)
     rev_transform.can_handle(file)
 
     raise ValueError(f'file {file} could not be processed by any of the loaders.')
