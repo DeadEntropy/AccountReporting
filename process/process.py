@@ -1,51 +1,11 @@
 import pandas as pd
-import datetime
 import re
-
-default_path_in = r'D:\NicoFolder\BankAccount\lake_result.csv'
-default_path_out = r'D:\NicoFolder\BankAccount\lake_result_processed.csv'
-
-new_columns = ['YearToDate', 'FiscalYear', 'AdjustedYear', 'AdjustedMonth', 'Year', 'Month', 'Day', 'Date', 'Account',
-               'Amount', 'Subcategory', 'Memo', 'Currency', 'MemoSimple', 'MemoMapped', 'Type', 'FullType', 'SubType',
-               'FullSubType', 'Week', 'MasterType', 'FullMasterType']
-expected_columns = ['Date', 'Account', 'Amount', 'Subcategory', 'Memo', 'Currency']
-
-default_map_path = r'D:\NicoFolder\BankAccount\Utils\MemoMapping.csv'
-default_map_missing_path = r'D:\NicoFolder\BankAccount\Utils\MemoMappingMissing.csv'
-default_type_missing_path = r'D:\NicoFolder\BankAccount\Utils\MemoTypeMissing.csv'
-
-default_type_map_path = r'D:\NicoFolder\BankAccount\Utils\TypeMapping.csv'
-default_full_type_map_path = r'D:\NicoFolder\BankAccount\Utils\FullTypeMapping.csv'
-default_full_subtype_map_path = r'D:\NicoFolder\BankAccount\Utils\FullSubTypeMapping.csv'
-default_full_master_type_map_path = r'D:\NicoFolder\BankAccount\Utils\FullMasterTypeMapping.csv'
-default_override_path = r'D:\NicoFolder\BankAccount\Utils\TypeOverrides.csv'
+from process.process_helper import get_adjusted_month, get_adjusted_year, get_fiscal_year, get_year_to_date
+import configparser
+import ast
 
 
-def get_adjusted_month(dt):
-    if dt.day > 20:
-        if dt.month < 12:
-            return dt.month + 1
-        return 1
-    return dt.month
-
-
-def get_adjusted_year(dt):
-    if dt.day > 20 and dt.month == 12:
-        return dt.year + 1
-    return dt.year
-
-
-def get_fiscal_year(dt):
-    if dt < datetime.datetime(dt.year, 4, 5):
-        return dt.year - 1
-    return dt.year
-
-
-def get_year_to_date(dt):
-    return int((datetime.date.today() - dt.date()).days / 365.25)
-
-
-def map_memo(memo_series, map_path=default_map_path):
+def map_memo(memo_series, map_path):
     mapping_df = pd.read_csv(map_path)
 
     mapping_df['Memo Mapped'] = mapping_df['Memo Mapped'].str.strip().str.upper()
@@ -85,9 +45,7 @@ def get_master_type(type, master_type_mapping, full_master_type_mapping):
         return 'N/A', 'N/A'
 
 
-def map_type(memo_series, map_type_path=default_type_map_path, map_full_type_path=default_full_type_map_path,
-             map_full_subtype_path=default_full_subtype_map_path,
-             map_full_master_type_path=default_full_master_type_map_path):
+def map_type(memo_series, map_type_path, map_full_type_path, map_full_subtype_path, map_full_master_type_path):
     mapping_df = pd.read_csv(map_type_path)
 
     mapping_df["Memo Mapped"] = mapping_df["Memo Mapped"].fillna('').str.strip().str.upper()
@@ -140,9 +98,7 @@ def map_type(memo_series, map_type_path=default_type_map_path, map_full_type_pat
     return type, full_type, subtype, full_subtype, master_type, full_master_type, list(set(type_missing))
 
 
-def apply_overrides(df, override_path=default_override_path, map_full_type_path=default_full_type_map_path,
-                    map_full_subtype_path=default_full_subtype_map_path,
-                    map_full_master_type_path=default_full_master_type_map_path):
+def apply_overrides(df, override_path, map_full_type_path, map_full_subtype_path, map_full_master_type_path):
     mapping_df = pd.read_csv(override_path, parse_dates=[0])
     mapping_df['Date'] = mapping_df['Date'].apply(lambda x: x.strftime('%d-%b-%Y'))
     mapping_df['MemoMapped'] = mapping_df['MemoMapped'].fillna('').str.strip().str.upper()
@@ -181,11 +137,13 @@ def apply_overrides(df, override_path=default_override_path, map_full_type_path=
     return df
 
 
-def process(path_in=default_path_in, ignore_overrides=False):
-    df = pd.read_csv(path_in, parse_dates=[0])
+def process(config, ignore_overrides=False):
+    df = pd.read_csv(config['IO']['path_aggregated'], parse_dates=[0])
+    expected_columns = [n.strip() for n in ast.literal_eval(config['Mapping']['expected_columns'])]
     assert set(df.columns) == set(expected_columns), 'Columns do not match expectation.'
 
-    df_out = pd.DataFrame(columns=new_columns)
+    new_columns = [n.strip() for n in ast.literal_eval(config['Mapping']['new_columns'])]
+    df_out = pd.DataFrame(columns=list(new_columns))
 
     df_out.Date = df.Date
     df_out.Account = df.Account.str.strip()
@@ -204,12 +162,15 @@ def process(path_in=default_path_in, ignore_overrides=False):
     df_out.MemoSimple = [re.sub('\*', '', re.sub(' +', ' ', s.split(' ON')[0])).replace(',', '').strip() for s in
                          df.Memo]
 
-    memo_mapped, map_missing = map_memo(df_out.MemoSimple, default_map_path)
+    memo_mapped, map_missing = map_memo(df_out.MemoSimple, config['Mapping']['path_map'])
     df_out.MemoMapped = memo_mapped
 
     type, full_type, subtype, full_subtype, master_type, full_master_type, type_missing = \
-        map_type(df_out.MemoMapped, default_type_map_path, default_full_type_map_path, default_full_subtype_map_path,
-                 default_full_master_type_map_path)
+        map_type(df_out.MemoMapped,
+                 config['Mapping']['path_map_type'],
+                 config['Mapping']['path_map_full_type'],
+                 config['Mapping']['path_map_full_subtype'],
+                 config['Mapping']['path_map_full_master_type'])
 
     df_out.Type = type
     df_out.FullType = full_type
@@ -217,7 +178,10 @@ def process(path_in=default_path_in, ignore_overrides=False):
     df_out.FullSubType = full_subtype
 
     if not ignore_overrides:
-        apply_overrides(df_out, default_override_path)
+        apply_overrides(df_out, config['Mapping']['path_override'],
+                        config['Mapping']['path_map_full_type'],
+                        config['Mapping']['path_map_full_subtype'],
+                        config['Mapping']['path_map_full_master_type'])
 
     df_out.MasterType = master_type
     df_out.FullMasterType = full_master_type
@@ -225,12 +189,15 @@ def process(path_in=default_path_in, ignore_overrides=False):
     return df_out, map_missing, type_missing
 
 
-def process_save(path_in=default_path_in, path_out=default_path_out):
-    df, map_missing, type_missing = process(path_in)
-    df.to_csv(path_out, index=False)
+def process_save():
+    config = configparser.ConfigParser()
+    config.read('../config/config.ini')
 
-    with open(default_map_missing_path, 'w') as outfile:
+    df, map_missing, type_missing = process(config)
+    df.to_csv(config['IO']['path_processed'], index=False)
+
+    with open(config['IO']['path_missing_map'], 'w') as outfile:
         outfile.write("\n".join(map_missing))
 
-    with open(default_type_missing_path, 'w') as outfile:
+    with open(config['IO']['path_missing_type'], 'w') as outfile:
         outfile.write("\n".join(type_missing))

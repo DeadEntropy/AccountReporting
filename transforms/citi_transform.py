@@ -1,18 +1,16 @@
+import configparser
+
 import pandas as pd
 import glob
 import os
 import re
-
-default_currency = 'USD'
-default_folder_in = r'D:\NicoFolder\BankAccount\CitiData\RawData'
-default_path_out = r'D:\NicoFolder\BankAccount\CitiData\Citi.csv'
-
-expected_columns = ['Unnamed: 0', 'Date', 'Description', 'Debit', 'Credit']
-target_columns = ["Date", "Account", "Amount", "Subcategory", "Memo", "Currency"]
+from config.config_helper import parse_list
+from transforms import static_data as sd
 
 
-def can_handle(path_in):
+def can_handle(path_in, config):
     df = pd.read_csv(path_in, nrows=1, index_col=False)
+    expected_columns = parse_list(config['expected_columns'])
     return set(df.columns) == set(expected_columns)
 
 
@@ -41,17 +39,18 @@ def simplify_memo(memo):
     return memo
 
 
-def load(path_in, currency=default_currency):
+def load(path_in, config):
     df = pd.read_csv(path_in, sep=',', index_col=False)
+    expected_columns = parse_list(config['expected_columns'])
     assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
                                                      f'are [{", ".join(df.columns)}]. (Citi)'
 
     df["Debit"] = df["Debit"].fillna(0)
     df["Credit"] = df["Credit"].fillna(0)
-    df_out = pd.DataFrame(columns=target_columns)
+    df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Date"], format='%m-%d-%Y')
     df_out.Account = 'Citi'
-    df_out.Currency = currency
+    df_out.Currency = config['default_currency']
     df_out.Amount = df['Credit'] - df['Debit']
     df_out.Subcategory = ''
     df_out.Memo = [simplify_memo(re.sub(' +', ' ', memo)).strip() for memo in df.Description]
@@ -59,18 +58,21 @@ def load(path_in, currency=default_currency):
     return df_out
 
 
-def load_save(folder_in, currency, path_out):
-    files = glob.glob(os.path.join(folder_in, '*.csv'))
+def load_save(config):
+    files = glob.glob(os.path.join(config['default_folder_in'], '*.csv'))
     print(f"found {len(files)} CSV files.")
     if len(files) == 0:
         return
 
-    df_list = [load(f, currency) for f in files]
+    df_list = [load(f, config['default_currency']) for f in files]
     for df_temp in df_list:
-        df_temp['count'] = df_temp.groupby(target_columns).cumcount()
+        df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
     df = pd.concat(df_list)
-    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(path_out, index=False)
+    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['default_path_out'], index=False)
 
 
 def load_save_default():
-    load_save(default_folder_in, default_currency, default_path_out)
+    config = configparser.ConfigParser()
+    config.read('../config/config.ini')
+
+    load_save(config['Citi'])
