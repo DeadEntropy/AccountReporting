@@ -52,7 +52,7 @@ def load_all(folder_in=default_path_in):
     return df.drop_duplicates().drop(['count'], axis=1)
 
 
-def load_save(folder_in, path_out):
+def load_save(folder_in = default_path_in, path_out = default_path_out):
     files = glob.glob(os.path.join(folder_in, '*.csv'))
     print(f"found {len(files)} CSV files.")
     if len(files) == 0:
