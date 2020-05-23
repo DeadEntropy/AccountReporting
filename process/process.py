@@ -16,7 +16,10 @@ def map_memo(memo_series, map_path):
     map_missing = []
     for memo in memo_series.str.upper():
         if memo in mapping.keys():
-            memo_mapped.append(mapping[memo].strip())
+            try:
+                memo_mapped.append(mapping[memo].strip())
+            except AttributeError:
+                raise AttributeError(f'Failed to strip {memo}: {mapping[memo]}. Please ensure the value is a string.')
         else:
             memo_mapped.append('N/A')
             map_missing.append(memo)

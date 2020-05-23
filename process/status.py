@@ -16,4 +16,4 @@ def last_update_save():
     config = configparser.ConfigParser()
     config.read('../config/config.ini')
 
-    last_update(config['IO']['path_aggregated']).to_csv(config['IO']['path_processed'])
+    last_update(config['IO']['path_aggregated']).to_csv(config['IO']['path_last_updated'])

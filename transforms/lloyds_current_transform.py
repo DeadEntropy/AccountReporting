@@ -25,7 +25,7 @@ def load(path_in, config):
     df_out = pd.DataFrame(columns=sd.target_columns)
     
     df_out.Date = pd.to_datetime(df["Transaction Date"], format='%d/%m/%Y')
-    df_out.Account = df["Sort Code"].astype(str) + " " + df["Account Number"].astype(str)
+    df_out.Account = df["Sort Code"].astype(str).str.replace("'", "") + " " + df["Account Number"].astype(str)
     df_out.Currency = config['default_currency']
     df_out.Amount = df["Credit Amount"] - df["Debit Amount"]
     df_out.Subcategory = df["Transaction Type"]
