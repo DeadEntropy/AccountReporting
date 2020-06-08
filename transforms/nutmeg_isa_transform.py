@@ -15,7 +15,12 @@ def can_handle(path_in, config):
 
 def load(path_in, config):
     df = pd.read_csv(path_in, sep=',')
-    expected_columns = parse_list(config['expected_columns'])
+    try:
+        expected_columns = parse_list(config['expected_columns'])
+    except Exception:
+        print(config)
+        print(config['expected_columns'])
+        raise
     assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
                                                      f'are [{", ".join(df.columns)}]. (Nutmeg)'
 

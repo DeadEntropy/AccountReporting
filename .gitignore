@@ -1,3 +1,12 @@
 
 *.pyc
 *.iml
+.idea/dictionaries/nicol.xml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+notebooks/.ipynb_checkpoints/test_data_process-checkpoint.ipynb
+notebooks/.ipynb_checkpoints/test_data_transform-checkpoint.ipynb
+*.ini
+*.ini
