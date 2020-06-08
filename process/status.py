@@ -2,18 +2,22 @@ import pandas as pd
 import configparser
 
 
-def last_update(input_path):
-    df_input = pd.read_csv(input_path)
-    dic_last_update = {}
-    df_input['Date'] = pd.to_datetime(df_input['Date'])
-    for bank_acc in df_input.Account:
-        dic_last_update[bank_acc] = df_input[df_input.Account == bank_acc].Date.max()
+class LastUpdate:
 
-    return pd.DataFrame.from_dict(dic_last_update, orient='index', columns=['LastUpdate'])
+    def __init__(self, config=None):
+        if config is None:
+            self.config = configparser.ConfigParser()
+            self.config.read('../config/config.ini')
 
+    @staticmethod
+    def last_update(df_input):
+        dic_last_update = {}
+        df_input['Date'] = pd.to_datetime(df_input['Date'])
+        for bank_acc in df_input.Account:
+            dic_last_update[bank_acc] = df_input[df_input.Account == bank_acc].Date.max()
 
-def last_update_save():
-    config = configparser.ConfigParser()
-    config.read('../config/config.ini')
+        return pd.DataFrame.from_dict(dic_last_update, orient='index', columns=['LastUpdate'])
 
-    last_update(config['IO']['path_aggregated']).to_csv(config['IO']['path_last_updated'])
+    def last_update_save(self):
+        df_input = pd.read_csv(self.config['IO']['path_aggregated'])
+        self.last_update(df_input).to_csv(self.config['IO']['path_last_updated'])

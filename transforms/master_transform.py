@@ -14,55 +14,49 @@ from transforms import ubs_pension_transform
 from transforms import static_data as sd
 
 
-def load(file, config):
-    print(f'Loading {file}')
-    if barc.can_handle(file, config['Barclays']):
-        return barc.load(file, config['Barclays'])
-    elif lloyds_curr.can_handle(file, config['LloydsCurrent']):
-        return lloyds_curr.load(file, config['LloydsCurrent'])
-    elif lloyds_mort.can_handle(file, config['LloydsMortgage']):
-        return lloyds_mort.load(file, config['LloydsMortgage'])
-    elif nut_transform.can_handle(file, config['Nutmeg']):
-        return nut_transform.load(file, config['Nutmeg'])
-    elif rev_transform.can_handle(file, config['Revolut']):
-        return rev_transform.load(file, config['Revolut'])
-    elif citi_transform.can_handle(file, config['Citi']):
-        return citi_transform.load(file, config['Citi'])
-    elif clone_transform.can_handle(file):
-        return clone_transform.load(file)
-    elif ubs_pension_transform.can_handle(file, config['UbsPension']):
-        return ubs_pension_transform.load(file, config['UbsPension'])
-    rev_transform.can_handle(file, config['Revolut'])
+class Loader:
 
-    raise ValueError(f'file {file} could not be processed by any of the loaders.')
+    def __init__(self, config = None):
+        if config is None:
+            self.config = configparser.ConfigParser()
+            self.config.read('../config/config.ini')
 
+    def load(self, file):
+        # print(f'Loading {file}')
+        if barc.can_handle(file, self.config['Barclays']):
+            return barc.load(file, self.config['Barclays'])
+        elif lloyds_curr.can_handle(file, self.config['LloydsCurrent']):
+            return lloyds_curr.load(file, self.config['LloydsCurrent'])
+        elif lloyds_mort.can_handle(file, self.config['LloydsMortgage']):
+            return lloyds_mort.load(file, self.config['LloydsMortgage'])
+        elif nut_transform.can_handle(file, self.config['Nutmeg']):
+            return nut_transform.load(file, self.config['Nutmeg'])
+        elif rev_transform.can_handle(file, self.config['Revolut']):
+            return rev_transform.load(file, self.config['Revolut'])
+        elif citi_transform.can_handle(file, self.config['Citi']):
+            return citi_transform.load(file, self.config['Citi'])
+        elif clone_transform.can_handle(file):
+            return clone_transform.load(file)
+        elif ubs_pension_transform.can_handle(file, self.config['UbsPension']):
+            return ubs_pension_transform.load(file, self.config['UbsPension'])
+        rev_transform.can_handle(file, self.config['Revolut'])
 
-def load_all(config):
-    files = glob.glob(os.path.join(config['IO']['folder_lake'], '*.csv'))
-    print(f"found {len(files)} CSV files.")
-    if len(files) == 0:
-        return
+        raise ValueError(f'file {file} could not be processed by any of the loaders.')
 
-    df_list = [load(f, config) for f in files]
-    for df_temp in df_list:
-        df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
-    df = pd.concat(df_list)
-    return df.drop_duplicates().drop(['count'], axis=1)
+    def load_all(self):
+        files = glob.glob(os.path.join(self.config['IO']['folder_lake'], '*.csv'))
+        print(f"Loading {len(files)} CSV file(s).")
+        if len(files) == 0:
+            return
 
+        df_list = [self.load(f) for f in files]
+        for df_temp in df_list:
+            df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
+        df = pd.concat(df_list)
+        df = df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False)
+        return df.reset_index(drop=True)
 
-def load_save():
-    config = configparser.ConfigParser()
-    config.read('../config/config.ini')
-
-    files = glob.glob(os.path.join(config['IO']['folder_lake'], '*.csv'))
-    print(f"found {len(files)} CSV files.")
-    if len(files) == 0:
-        return
-
-    df_list = [load(f, config) for f in files]
-    for df_temp in df_list:
-        df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
-    df = pd.concat(df_list)
-    df = df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False)
-    df.Date = df.Date.apply(lambda x: x.strftime("%d-%b-%Y"))
-    df.to_csv(config['IO']['path_aggregated'], index=False)
+    def load_save(self):
+        df = self.load_all()
+        df.Date = df.Date.apply(lambda x: x.strftime("%d-%b-%Y"))
+        df.to_csv(self.config['IO']['path_aggregated'], index=False)
