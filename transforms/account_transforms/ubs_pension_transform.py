@@ -4,7 +4,7 @@ import pandas as pd
 import glob
 import os
 from config.config_helper import parse_list
-from transforms import static_data as sd
+from account_transforms import static_data as sd
 
 
 def can_handle(path_in, config):

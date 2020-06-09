@@ -3,15 +3,10 @@ import os
 import pandas as pd
 import configparser
 
-from transforms import barclays_transform as barc
-from transforms import lloyds_current_transform as lloyds_curr
-from transforms import lloyds_mortgage_transform as lloyds_mort
-from transforms import nutmeg_isa_transform as nut_transform
-from transforms import revolut_transform as rev_transform
-from transforms import clone_transform
-from transforms import citi_transform
-from transforms import ubs_pension_transform
-from transforms import static_data as sd
+from account_transforms import barclays_transform as barc, clone_transform, citi_transform, \
+    lloyds_mortgage_transform as lloyds_mort, revolut_transform as rev_transform, \
+    lloyds_current_transform as lloyds_curr, nutmeg_isa_transform as nut_transform, ubs_pension_transform, \
+    static_data as sd, vault_transform
 
 
 class Loader:
@@ -39,7 +34,8 @@ class Loader:
             return clone_transform.load(file)
         elif ubs_pension_transform.can_handle(file, self.config['UbsPension']):
             return ubs_pension_transform.load(file, self.config['UbsPension'])
-        rev_transform.can_handle(file, self.config['Revolut'])
+        elif vault_transform.can_handle(file, self.config['Vault']):
+            return vault_transform.load(file, self.config['Vault'])
 
         raise ValueError(f'file {file} could not be processed by any of the loaders.')
 

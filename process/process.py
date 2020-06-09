@@ -135,7 +135,11 @@ class Process:
                                              index=master_type_mapping_df['MasterType']).to_dict()
 
         for index, row in df.iterrows():
-            key = (row['Date'].strftime("%d-%b-%Y"), row['Account'].strip(), row['MemoMapped'].strip())
+            try:
+                key = (row['Date'].strftime("%d-%b-%Y"), row['Account'].strip(), row['MemoMapped'].strip())
+            except AttributeError:
+                print(row)
+                raise
             if key in dict_overrides.keys():
                 if dict_overrides[key][0] != '':
                     df.loc[index, 'Type'] = dict_overrides[key][0]
