@@ -5,7 +5,7 @@ import glob
 import os
 import re
 from config.config_helper import parse_list
-from transforms import static_data as sd
+from account_transforms import static_data as sd
 
 account_currency = {'20-26-77 47500711': 'EUR', '20-26-77 13105881': 'GBP', '20-26-77 83568083': 'GBP'}
 

@@ -1,5 +1,5 @@
 import pandas as pd
-from transforms import static_data as sd
+from account_transforms import static_data as sd
 
 
 def can_handle(path_in):
