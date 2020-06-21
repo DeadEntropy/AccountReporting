@@ -10,13 +10,17 @@ class LastUpdate:
             self.config.read('../config/config.ini')
 
     @staticmethod
-    def last_update(df_input):
+    def get_link(config, account):
+        return config['Status'][account.replace(' ', '').replace(':', '')]
+
+    def last_update(self, df_input):
         dic_last_update = {}
         df_input['Date'] = pd.to_datetime(df_input['Date'])
-        for bank_acc in df_input.Account:
-            dic_last_update[bank_acc] = df_input[df_input.Account == bank_acc].Date.max()
+        for bank_acc in df_input.Account.unique():
+            dic_last_update[bank_acc] = [df_input[df_input.Account == bank_acc].Date.max(),
+                                         self.get_link(self.config, bank_acc)]
 
-        return pd.DataFrame.from_dict(dic_last_update, orient='index', columns=['LastUpdate'])
+        return pd.DataFrame.from_dict(dic_last_update, orient='index', columns=['LastUpdate', 'Link'])
 
     def last_update_save(self):
         df_input = pd.read_csv(self.config['IO']['path_aggregated'])
