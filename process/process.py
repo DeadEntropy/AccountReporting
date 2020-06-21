@@ -21,11 +21,11 @@ class Process:
         self.mapping_override_df = pd.read_csv(self.config['Mapping']['path_override'], parse_dates=[0])
 
     def __del__(self):
-        self.map_simple.to_csv(self.config['Mapping']['path_map'] + "2", index=False)
-        self.map_main.to_csv(self.config['Mapping']['path_map_type'] + "2", index=False)
-        self.map_full_type.to_csv(self.config['Mapping']['path_map_full_type'] + "2", index=False)
-        self.map_full_subtype.to_csv(self.config['Mapping']['path_map_full_subtype'] + "2", index=False)
-        self.map_master.to_csv(self.config['Mapping']['path_map_full_master_type'] + "2", index=False)
+        self.map_simple.to_csv(self.config['Mapping']['path_map'], index=False)
+        self.map_main.to_csv(self.config['Mapping']['path_map_type'], index=False)
+        self.map_full_type.to_csv(self.config['Mapping']['path_map_full_type'], index=False)
+        self.map_full_subtype.to_csv(self.config['Mapping']['path_map_full_subtype'], index=False)
+        self.map_master.to_csv(self.config['Mapping']['path_map_full_master_type'], index=False)
 
     def map_memo(self, memo_series):
         self.map_simple['Memo Mapped'] = self.map_simple['Memo Mapped'].str.strip().str.upper()
