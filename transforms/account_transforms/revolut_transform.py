@@ -39,7 +39,7 @@ def load(path_in, config):
 
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Completed Date "].str.strip(), format='%d %b %Y')
-    df_out.Account = config['default_account_name'] + " " + currency
+    df_out.Account = config['account_name'] + " " + currency
     df_out.Currency = currency
     df_out.Amount = df[f" Paid In ({currency}) "] - df[f" Paid Out ({currency}) "]
     df_out.Subcategory = df[" Category"]
@@ -47,13 +47,14 @@ def load(path_in, config):
     df_out.Memo = df_out.Memo.str.replace('£', 'GBP')
     df_out.Memo = df_out.Memo.str.replace('€', 'EUR')
     df_out.Memo = df_out.Memo.str.replace(',', '')
+    df_out['AccountType'] = config['account_type']
 
     return df_out
 
 
 def load_save(config):
-    files = glob.glob(os.path.join(config['default_folder_in'], '*.csv'))
-    print(f"found {len(files)} CSV files in {config['default_folder_in']}.")
+    files = glob.glob(os.path.join(config['folder_in'], '*.csv'))
+    print(f"found {len(files)} CSV files in {config['folder_in']}.")
     if len(files) == 0:
         return
 
@@ -61,7 +62,7 @@ def load_save(config):
     for df_temp in df_list:
         df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
     df = pd.concat(df_list)
-    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['default_path_out'], index=False)
+    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['path_out'], index=False)
 
 
 def load_save_default():

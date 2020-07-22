@@ -26,17 +26,18 @@ def load(path_in, config):
     
     df_out.Date = pd.to_datetime(df["Transaction Date"], format='%d/%m/%Y')
     df_out.Account = df["Sort Code"].astype(str).str.replace("'", "") + " " + df["Account Number"].astype(str)
-    df_out.Currency = config['default_currency']
+    df_out.Currency = config['currency']
     df_out.Amount = df["Credit Amount"] - df["Debit Amount"]
     df_out.Subcategory = df["Transaction Type"]
     df_out.Memo = df["Transaction Description"]
+    df_out['AccountType'] = config['account_type']
     
     return df_out
 
 
 def load_save(config):
-    files = glob.glob(os.path.join(config['default_folder_in'], '*.csv'))
-    print(f"found {len(files)} CSV files in {config['default_folder_in']}.")
+    files = glob.glob(os.path.join(config['folder_in'], '*.csv'))
+    print(f"found {len(files)} CSV files in {config['folder_in']}.")
     if len(files) == 0:
         return
 
@@ -44,7 +45,7 @@ def load_save(config):
     for df_temp in df_list:
         df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
     df = pd.concat(df_list)
-    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['default_path_out'], index=False)
+    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['path_out'], index=False)
     
 
 def load_save_default():
