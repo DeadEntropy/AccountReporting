@@ -11,7 +11,10 @@ class LastUpdate:
 
     @staticmethod
     def get_link(config, account):
-        return config['Status'][account.replace(' ', '').replace(':', '')]
+        if config.has_option('Status', account.replace(' ', '').replace(':', '')):
+            return config['Status'][account.replace(' ', '').replace(':', '')]
+        print(f'Could not find a valid link for account "{account}" in the "Status" section of the config')
+        return None
 
     def last_update(self, df_input):
         dic_last_update = {}
