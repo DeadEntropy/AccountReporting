@@ -50,25 +50,26 @@ def load(path_in, config):
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Date"], format='%m-%d-%Y')
     df_out.Account = 'Citi'
-    df_out.Currency = config['default_currency']
+    df_out.Currency = config['currency']
     df_out.Amount = df['Credit'] - df['Debit']
     df_out.Subcategory = ''
     df_out.Memo = [simplify_memo(re.sub(' +', ' ', memo)).strip() for memo in df.Description]
+    df_out['AccountType'] = config['account_type']
 
     return df_out
 
 
 def load_save(config):
-    files = glob.glob(os.path.join(config['default_folder_in'], '*.csv'))
+    files = glob.glob(os.path.join(config['folder_in'], '*.csv'))
     print(f"found {len(files)} CSV files.")
     if len(files) == 0:
         return
 
-    df_list = [load(f, config['default_currency']) for f in files]
+    df_list = [load(f, config['currency']) for f in files]
     for df_temp in df_list:
         df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
     df = pd.concat(df_list)
-    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['default_path_out'], index=False)
+    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['path_out'], index=False)
 
 
 def load_save_default():

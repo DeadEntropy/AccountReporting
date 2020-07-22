@@ -1,4 +1,5 @@
 import configparser
+import ast
 
 import pandas as pd
 import glob
@@ -6,8 +7,6 @@ import os
 import re
 from config.config_helper import parse_list
 from account_transforms import static_data as sd
-
-account_currency = {'20-26-77 47500711': 'EUR', '20-26-77 13105881': 'GBP', '20-26-77 83568083': 'GBP'}
 
 
 def can_handle(path_in, config):
@@ -25,15 +24,17 @@ def load(path_in, config):
     df_out = df.drop('Number', axis=1)
     
     df_out.Date = pd.to_datetime(df_out.Date, format='%d/%m/%Y')
-    df_out['Currency'] = [account_currency[acc] for acc in df_out.Account]
+    account_currencies = ast.literal_eval(config['account_currencies'])
+    df_out['Currency'] = [account_currencies[acc] for acc in df_out.Account]
     df_out['Memo'] = [re.sub(' +', ' ', memo) for memo in df_out.Memo]
-    
+    df_out['AccountType'] = config['account_type']
+
     return df_out
 
 
 def load_save(config):
-    files = glob.glob(os.path.join(config['default_folder_in'], '*.csv'))
-    print(f"found {len(files)} CSV files in {config['default_folder_in']}.")
+    files = glob.glob(os.path.join(config['folder_in'], '*.csv'))
+    print(f"found {len(files)} CSV files in {config['folder_in']}.")
     if len(files) == 0:
         return
 
@@ -41,7 +42,7 @@ def load_save(config):
     for df_temp in df_list:
         df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
     df = pd.concat(df_list)
-    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['default_path_out'], index=False)
+    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['path_out'], index=False)
     
 
 def load_save_default():

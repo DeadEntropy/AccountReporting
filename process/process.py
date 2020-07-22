@@ -169,6 +169,7 @@ class Process:
 
         df_out.Date = df.Date
         df_out.Account = df.Account.str.strip()
+        df_out.AccountType = df.AccountType.str.strip()
         df_out.Amount = df.Amount
         df_out.Subcategory = df.Subcategory.str.strip()
         df_out.Memo = df.Memo.str.strip()

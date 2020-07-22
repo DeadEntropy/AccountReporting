@@ -34,18 +34,19 @@ def load(path_in, config):
     df_out = pd.DataFrame(columns=sd.target_columns)
 
     df_out.Date = pd.to_datetime(df.DATE, format='%d/%m/%Y')
-    df_out.Account = config['default_account_name']
-    df_out.Currency = config['default_currency']
+    df_out.Account = config['account_name']
+    df_out.Currency = config['currency']
     df_out.Amount = df["IN(£)"] - df["OUT(£)"]
     df_out.Subcategory = df.TRANSACTION
     df_out.Memo = df.apply(lambda row: to_memo(row), axis=1)
+    df_out['AccountType'] = config['account_type']
 
     return df_out
 
 
 def load_save(config):
-    files = glob.glob(os.path.join(config['default_folder_in'], '*.csv'))
-    print(f"found {len(files)} CSV files in {config['default_folder_in']}.")
+    files = glob.glob(os.path.join(config['folder_in'], '*.csv'))
+    print(f"found {len(files)} CSV files in {config['folder_in']}.")
     if len(files) == 0:
         return
 
@@ -53,7 +54,7 @@ def load_save(config):
     for df_temp in df_list:
         df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
     df = pd.concat(df_list)
-    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['default_path_out'],
+    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['path_out'],
                                                                                              index=False)
 
 

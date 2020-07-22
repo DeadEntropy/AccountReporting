@@ -14,4 +14,6 @@ def load(path_in):
 
     df.Date = pd.to_datetime(df.Date, format='%d/%m/%Y')
     df.Date = pd.to_datetime(df.Date)
+
+    df['AccountType'] = 'flat'
     return df
