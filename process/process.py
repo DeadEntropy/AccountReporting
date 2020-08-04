@@ -175,6 +175,7 @@ class Process:
         df_out.Subcategory = df.Subcategory.str.strip()
         df_out.Memo = df.Memo.str.strip()
         df_out.Currency = df.Currency
+        df_out.SourceFile = df.SourceFile
 
         df_out.Day = df.Date.dt.day
         df_out.Month = df.Date.dt.month
@@ -205,7 +206,9 @@ class Process:
 
         df_out.FacingAccount = ''
         iat = IatIdentification(self.config)
+        df_out = iat.remove_duplicate(df_out)
         df_out = iat.map_iat(df_out)
+        df_out = iat.map_iat_fx(df_out)
 
         return df_out
 
