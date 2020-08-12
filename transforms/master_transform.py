@@ -17,6 +17,11 @@ class Loader:
             self.config.read('../config/config.ini')
 
     def load(self, file):
+        df = self.load_internal(file)
+        df['SourceFile'] = os.path.basename(file)
+        return df
+
+    def load_internal(self, file):
         # print(f'Loading {file}')
         if barc.can_handle(file, self.config['Barclays']):
             return barc.load(file, self.config['Barclays'])

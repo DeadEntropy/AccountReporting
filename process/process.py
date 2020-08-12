@@ -2,6 +2,7 @@ import pandas as pd
 import re
 from process.process_helper import get_adjusted_month, get_adjusted_year, get_fiscal_year, get_year_to_date, \
     get_missing_map, get_missing_type
+from process.iat_identification import IatIdentification
 import configparser
 import ast
 
@@ -174,6 +175,7 @@ class Process:
         df_out.Subcategory = df.Subcategory.str.strip()
         df_out.Memo = df.Memo.str.strip()
         df_out.Currency = df.Currency
+        df_out.SourceFile = df.SourceFile
 
         df_out.Day = df.Date.dt.day
         df_out.Month = df.Date.dt.month
@@ -201,6 +203,12 @@ class Process:
 
         df_out.MasterType = master_type
         df_out.FullMasterType = full_master_type
+
+        df_out.FacingAccount = ''
+        iat = IatIdentification(self.config)
+        df_out = iat.remove_duplicate(df_out)
+        df_out = iat.map_iat(df_out)
+        df_out = iat.map_iat_fx(df_out)
 
         return df_out
 
