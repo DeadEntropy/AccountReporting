@@ -71,8 +71,8 @@ class Process:
 
     def map_type(self, memo_series):
         self.map_main["Memo Mapped"] = self.map_main["Memo Mapped"].fillna('').str.strip().str.upper()
-        self.map_main["Type"] = self.map_main["Type"].fillna('').str.strip()
-        self.map_main["SubType"] = self.map_main["SubType"].fillna('').str.strip()
+        self.map_main["Type"] = self.map_main["Type"].fillna('').str.strip().str.upper()
+        self.map_main["SubType"] = self.map_main["SubType"].fillna('').str.strip().str.upper()
 
         self.map_full_type['MasterType'] = self.map_full_type['MasterType'].fillna('').str.strip()
 

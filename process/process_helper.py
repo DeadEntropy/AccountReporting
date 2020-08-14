@@ -40,7 +40,7 @@ def get_missing_map(memo, mapping):
         except ValueError:
             pass
             # Check if something very similar already exists
-            suggested_values = difflib.get_close_matches(value.upper(), list(mapping.values()), 1)
+            suggested_values = difflib.get_close_matches(value.upper(), list([str(x) for x in mapping.values()]), 1)
             if len(suggested_values)>0 and suggested_values.count(value) == 0:
                 replace = input(f'this is similar to already existing value: "{suggested_values[0]}", '
                                 f'use that instead? (y/n)')
@@ -49,7 +49,7 @@ def get_missing_map(memo, mapping):
     else:
         value = input(f'Please enter the mapping for "{memo}:').upper()
         # Check if something very similar already exists
-        suggested_values = difflib.get_close_matches(value, list(mapping.values()), 1)
+        suggested_values = difflib.get_close_matches(value, list([str(x) for x in mapping.values()]), 1)
         if len(suggested_values)>0 and suggested_values.count(value) == 0:
             replace = input(f'this is similar to already existing value: "{suggested_values[0]}", '
                             f'use that instead? (y/n)')
