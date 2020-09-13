@@ -4,7 +4,7 @@ import pandas as pd
 
 
 class IatIdentification:
-    iat_types = ['SA', 'IAT', 'W_IN', 'W_OUT', 'SC', 'R', 'MC', 'O', 'FR', 'TAX', 'FPC']
+    iat_types = ['SA', 'IAT', 'W_IN', 'W_OUT', 'SC', 'R', 'MC', 'O', 'FR', 'TAX', 'FPC', 'FLC', 'FLL']
     iat_fx_types = ['FX']
 
     def __init__(self, config=None):
@@ -22,13 +22,12 @@ class IatIdentification:
         smallest_elt = 0
         indices_to_remove = []
         for index, row in df.iterrows():
-            df_offsetting = df[(abs(df['Date'] - row['Date']) < pd.Timedelta(7, 'D'))
-                               & (df['Account'] == row['Account'])
-                               & (df['Amount'] == -row['Amount'])
-                               & (df['Currency'] == row['Currency'])
-                               & (df['MemoMapped'] == row['MemoMapped'])
-                               & (df.index < index)
-                               & (df.index > smallest_elt)]
+            df_date_match = df[(df['Account'] == row['Account'])]
+            df_date_match = df_date_match[(df_date_match['Amount'] == -row['Amount'])]
+            df_date_match = df_date_match[(abs(df_date_match['Date'] - row['Date']) < pd.Timedelta(7, 'D'))]
+            df_offsetting = df_date_match[(df_date_match['MemoMapped'] == row['MemoMapped'])
+                                          & (df_date_match.index < index)
+                                          & (df_date_match.index > smallest_elt)]
 
             if len(df_offsetting) >= 1:  # There is one or more offsetting transaction
                 indices_to_remove.append(df_offsetting.index[0])
@@ -50,7 +49,7 @@ class IatIdentification:
                                & (df['Account'] != row['Account'])
                                & (df['Currency'] == row['Currency'])
                                & (df['FacingAccount'] == '')
-                               & (df['Type'].str.upper().isin(self.iat_types) )]
+                               & (df['Type'].str.upper().isin(self.iat_types))]
 
             df_to_explore_offsetting = df_to_explore[df_to_explore['Amount'] == -row['Amount']]
             if len(df_to_explore_offsetting) >= 1:  # There is one or more offsetting transaction
