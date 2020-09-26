@@ -161,7 +161,15 @@ class Process:
 
         return df
 
-    def process(self, df, ignore_overrides=False):
+    def remove_offsetting(self, df):
+        iat = IatIdentification(self.config)
+        df_out = iat.remove_duplicate(df)
+        df_out = iat.map_iat(df_out)
+        df_out = iat.map_iat_fx(df_out)
+
+        return df_out
+
+    def extend(self, df, ignore_overrides=False):
         expected_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['expected_columns'])]
         assert set(df.columns) == set(expected_columns), 'Columns do not match expectation.'
 
@@ -205,11 +213,12 @@ class Process:
         df_out.FullMasterType = full_master_type
 
         df_out.FacingAccount = ''
-        iat = IatIdentification(self.config)
-        df_out = iat.remove_duplicate(df_out)
-        df_out = iat.map_iat(df_out)
-        df_out = iat.map_iat_fx(df_out)
 
+        return df_out
+
+    def process(self, df, ignore_overrides=False):
+        df_out = self.extend(df, ignore_overrides)
+        df_out = self.remove_offsetting(df_out)
         return df_out
 
     def process_save(self):

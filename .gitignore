@@ -12,3 +12,5 @@ notebooks/.ipynb_checkpoints/test_data_transform-checkpoint.ipynb
 *.ini
 notebooks/.ipynb_checkpoints/full_analysis-checkpoint.ipynb
 *.csv
+notebooks/.ipynb_checkpoints/flat_costs-checkpoint.ipynb
+*checkpoint.ipynb
