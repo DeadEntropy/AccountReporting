@@ -19,62 +19,90 @@ class IatIdentification:
         new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
         assert set(list(df.columns)) == set(new_columns), 'columns do not match expectation.'
 
-        smallest_elt = 0
-        indices_to_remove = []
-        for index, row in df.iterrows():
-            df_date_match = df[(df['Account'] == row['Account'])]
-            df_date_match = df_date_match[(df_date_match['Amount'] == -row['Amount'])]
-            df_date_match = df_date_match[(abs(df_date_match['Date'] - row['Date']) < pd.Timedelta(7, 'D'))]
-            df_offsetting = df_date_match[(df_date_match['MemoMapped'] == row['MemoMapped'])
-                                          & (df_date_match.index < index)
-                                          & (df_date_match.index > smallest_elt)]
+        df['IDX'] = df.index
+        ndf = pd.merge(left=df, right=df, on=('Account', 'Memo', 'AccountType', 'Currency'), how='inner')
+        out = ndf[(ndf.Amount_x == (-1) * ndf.Amount_y)
+                  & (ndf.Date_x - ndf.Date_y < pd.Timedelta(7, 'D'))
+                  & (ndf.IDX_x < ndf.IDX_y)
+                  & (ndf.Amount_x != 0)]
 
-            if len(df_offsetting) >= 1:  # There is one or more offsetting transaction
-                indices_to_remove.append(df_offsetting.index[0])
-                indices_to_remove.append(index)
-                smallest_elt = df_offsetting.index[0]
+        duplicate_couples = list(zip(list(out.IDX_x.values), list(out.IDX_y.values)))
+        df.drop('IDX', axis=1, inplace=True)
 
-        return df.drop(indices_to_remove)
+        offsetting_rows = []
+        for dup in duplicate_couples:
+            if dup[0] in offsetting_rows:
+                continue
+            if dup[1] in offsetting_rows:
+                continue
+            offsetting_rows.append(dup[0])
+            offsetting_rows.append(dup[1])
+
+        return df.drop(offsetting_rows)
 
     def map_iat(self, df):
         print('mapping transactions between accounts...')
         new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
         assert set(list(df.columns)) == set(new_columns), 'columns do not match expectation.'
 
-        for index, row in df[df.Type.str.upper().isin(self.iat_types)].iterrows():
-            if df.loc[index, 'FacingAccount'] != '':
+        df['IDX'] = df.index
+        df_mini = df[df.Type.str.upper().isin(self.iat_types)][
+            ['AccountType', 'Currency', 'Type', 'IDX', 'Date', 'Account', 'Amount']]
+        ndf = pd.merge(left=df_mini, right=df_mini, on='Currency', how='inner')
+        out = ndf[(ndf.Amount_x == (-1) * ndf.Amount_y)
+                  & (abs(ndf.Date_x - ndf.Date_y) < pd.Timedelta(7, 'D'))
+                  & (ndf.Account_x != ndf.Account_y)
+                  & (ndf.Amount_x != 0)]
+        iat_transfers = list(zip(list(out.IDX_x.values), list(out.IDX_y.values)))
+        df.drop('IDX', axis=1, inplace=True)
+
+        iat_transfers_unique = []
+        offsetting_rows = []
+        for dup in iat_transfers:
+            if dup[0] in offsetting_rows:
                 continue
+            if dup[1] in offsetting_rows:
+                continue
+            iat_transfers_unique.append(dup)
+            offsetting_rows.append(dup[0])
+            offsetting_rows.append(dup[1])
 
-            df_to_explore = df[(abs(df['Date'] - row['Date']) < pd.Timedelta(7, 'D'))
-                               & (df['Account'] != row['Account'])
-                               & (df['Currency'] == row['Currency'])
-                               & (df['FacingAccount'] == '')
-                               & (df['Type'].str.upper().isin(self.iat_types))]
-
-            df_to_explore_offsetting = df_to_explore[df_to_explore['Amount'] == -row['Amount']]
-            if len(df_to_explore_offsetting) >= 1:  # There is one or more offsetting transaction
-                df.loc[df_to_explore_offsetting.index[0], 'FacingAccount'] = row['Account']
-                df.loc[index, 'FacingAccount'] = df.loc[df_to_explore_offsetting.index[0], 'Account']
+        for dup in iat_transfers_unique:
+            df.loc[dup[0], 'FacingAccount'] = df.loc[dup[1], 'Account']
+            df.loc[dup[1], 'FacingAccount'] = df.loc[dup[0], 'Account']
 
         return df
 
     def map_iat_fx(self, df):
-        print('mapping fx transactions between accounts...')
+        print('mapping transactions between accounts...')
         new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
         assert set(list(df.columns)) == set(new_columns), 'columns do not match expectation.'
 
-        for index, row in df[df.Type.str.upper().isin(self.iat_fx_types)].iterrows():
-            if df.loc[index, 'FacingAccount'] != '':
+        df['IDX'] = df.index
+        df_mini = df[df.Type.str.upper().isin(self.iat_fx_types)][
+            ['AccountType', 'Currency', 'Type', 'IDX', 'Date', 'Account', 'Amount']]
+        df_mini['dummy_key'] = 1
+        ndf = pd.merge(left=df_mini, right=df_mini, how='inner',on='dummy_key').drop('dummy_key', axis=1)
+        out = ndf[(abs(ndf.Date_x - ndf.Date_y) < pd.Timedelta(7, 'D'))
+                  & (ndf.Account_x != ndf.Account_y)
+                  & (ndf.Currency_x != ndf.Currency_y)
+                  & (ndf.Amount_x != 0)]
+        iat_transfers = list(zip(list(out.IDX_x.values), list(out.IDX_y.values)))
+        df.drop('IDX', axis=1, inplace=True)
+
+        iat_transfers_unique = []
+        offsetting_rows = []
+        for dup in iat_transfers:
+            if dup[0] in offsetting_rows:
                 continue
+            if dup[1] in offsetting_rows:
+                continue
+            iat_transfers_unique.append(dup)
+            offsetting_rows.append(dup[0])
+            offsetting_rows.append(dup[1])
 
-            df_to_explore = df[(df['Date'] == row['Date'])
-                               & (df['Account'] != row['Account'])
-                               & (df['Currency'] != row['Currency'])
-                               & (df['FacingAccount'] == '')
-                               & (df['Type'].str.upper().isin(self.iat_fx_types))]
-
-            if len(df_to_explore) >= 1:  # There is one or more offsetting transaction
-                df.loc[df_to_explore.index[0], 'FacingAccount'] = row['Account']
-                df.loc[index, 'FacingAccount'] = df.loc[df_to_explore.index[0], 'Account']
+        for dup in iat_transfers_unique:
+            df.loc[dup[0], 'FacingAccount'] = df.loc[dup[1], 'Account']
+            df.loc[dup[1], 'FacingAccount'] = df.loc[dup[0], 'Account']
 
         return df
