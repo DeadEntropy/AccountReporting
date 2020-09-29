@@ -8,6 +8,5 @@
 *.csv
 *.ipynb
 env
-notebooks
 *.ini
-*.ipynb
+notebooks
