@@ -1,4 +1,3 @@
-
 *.pyc
 *.iml
 .idea/dictionaries/nicol.xml
@@ -6,11 +5,9 @@
 .idea/misc.xml
 .idea/modules.xml
 .idea/vcs.xml
-notebooks/.ipynb_checkpoints/test_data_process-checkpoint.ipynb
-notebooks/.ipynb_checkpoints/test_data_transform-checkpoint.ipynb
-*.ini
-*.ini
-notebooks/.ipynb_checkpoints/full_analysis-checkpoint.ipynb
 *.csv
-notebooks/.ipynb_checkpoints/flat_costs-checkpoint.ipynb
-*checkpoint.ipynb
+*.ipynb
+env
+notebooks
+*.ini
+*.ipynb

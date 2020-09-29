@@ -1,5 +1,5 @@
-from process import process, status
-from transforms import master_transform
+from bkanalysis.process import process, status
+from bkanalysis.transforms import master_transform
 
 
 mt = master_transform.Loader()
