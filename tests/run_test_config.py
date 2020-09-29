@@ -3,7 +3,7 @@ import configparser
 
 
 config = configparser.ConfigParser()
-config.read('../config/config.ini')
+config.read('config/config.ini')
 print(config['Mapping']['expected_columns'])
 expected_columns = ast.literal_eval(config['Mapping']['expected_columns'])
 print(type(expected_columns))

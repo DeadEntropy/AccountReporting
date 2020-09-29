@@ -10,7 +10,7 @@ class IatIdentification:
     def __init__(self, config=None):
         if config is None:
             self.config = configparser.ConfigParser()
-            self.config.read('../config/config.ini')
+            self.config.read('config/config.ini')
         else:
             self.config = config
 

@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import configparser
 
-from account_transforms import barclays_transform as barc, clone_transform, citi_transform, \
+from bkanalysis.transforms.account_transforms import barclays_transform as barc, clone_transform, citi_transform, \
     lloyds_mortgage_transform as lloyds_mort, revolut_transform as rev_transform, \
     lloyds_current_transform as lloyds_curr, nutmeg_isa_transform as nut_transform, ubs_pension_transform, \
     static_data as sd, vault_transform
@@ -11,10 +11,10 @@ from account_transforms import barclays_transform as barc, clone_transform, citi
 
 class Loader:
 
-    def __init__(self, config = None):
+    def __init__(self, config=None):
         if config is None:
             self.config = configparser.ConfigParser()
-            self.config.read('../config/config.ini')
+            self.config.read('config/config.ini')
 
     def load(self, file):
         df = self.load_internal(file)

@@ -1,10 +1,12 @@
 import configparser
+import ast
 
 import pandas as pd
 import glob
 import os
-from config.config_helper import parse_list
-from account_transforms import static_data as sd
+import re
+from bkanalysis.config.config_helper import parse_list
+from bkanalysis.transforms.account_transforms import static_data as sd
 
 
 def can_handle(path_in, config):
@@ -17,21 +19,16 @@ def load(path_in, config):
     df = pd.read_csv(path_in)
     expected_columns = parse_list(config['expected_columns'])
     assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
-                                                     f'are [{", ".join(df.columns)}]. (Lloyds Current)'
+                                                     f'are [{", ".join(df.columns)}]. (Barclays)'
     
-    df["Debit Amount"] = df["Debit Amount"].fillna(0)
-    df["Credit Amount"] = df["Credit Amount"].fillna(0)
+    df_out = df.drop('Number', axis=1)
     
-    df_out = pd.DataFrame(columns=sd.target_columns)
-    
-    df_out.Date = pd.to_datetime(df["Transaction Date"], format='%d/%m/%Y')
-    df_out.Account = df["Sort Code"].astype(str).str.replace("'", "") + " " + df["Account Number"].astype(str)
-    df_out.Currency = config['currency']
-    df_out.Amount = df["Credit Amount"] - df["Debit Amount"]
-    df_out.Subcategory = df["Transaction Type"]
-    df_out.Memo = df["Transaction Description"]
+    df_out.Date = pd.to_datetime(df_out.Date, format='%d/%m/%Y')
+    account_currencies = ast.literal_eval(config['account_currencies'])
+    df_out['Currency'] = [account_currencies[acc] for acc in df_out.Account]
+    df_out['Memo'] = [re.sub(' +', ' ', memo) for memo in df_out.Memo]
     df_out['AccountType'] = config['account_type']
-    
+
     return df_out
 
 
@@ -50,6 +47,6 @@ def load_save(config):
 
 def load_save_default():
     config = configparser.ConfigParser()
-    config.read('../config/config.ini')
+    config.read('config/config.ini')
 
-    load_save(config['LloydsCurrent'])
+    load_save(config['Barclays'])

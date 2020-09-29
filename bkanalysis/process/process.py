@@ -1,8 +1,8 @@
 import pandas as pd
 import re
-from process.process_helper import get_adjusted_month, get_adjusted_year, get_fiscal_year, get_year_to_date, \
+from bkanalysis.process.process_helper import get_adjusted_month, get_adjusted_year, get_fiscal_year, get_year_to_date, \
     get_missing_map, get_missing_type
-from process.iat_identification import IatIdentification
+from bkanalysis.process.iat_identification import IatIdentification
 import configparser
 import ast
 
@@ -12,7 +12,7 @@ class Process:
     def __init__(self, config=None):
         if config is None:
             self.config = configparser.ConfigParser()
-            self.config.read('../config/config.ini')
+            self.config.read('config/config.ini')
 
         self.map_simple = pd.read_csv(self.config['Mapping']['path_map'])
         self.map_main = pd.read_csv(self.config['Mapping']['path_map_type'])

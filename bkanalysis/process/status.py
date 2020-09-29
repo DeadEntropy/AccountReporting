@@ -7,7 +7,7 @@ class LastUpdate:
     def __init__(self, config=None):
         if config is None:
             self.config = configparser.ConfigParser()
-            self.config.read('../config/config.ini')
+            self.config.read('config/config.ini')
 
     @staticmethod
     def get_link(config, account):

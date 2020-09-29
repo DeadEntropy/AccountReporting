@@ -4,8 +4,8 @@ import pandas as pd
 import glob
 import os
 import re
-from config.config_helper import parse_list
-from account_transforms import static_data as sd
+from bkanalysis.config.config_helper import parse_list
+from bkanalysis.transforms.account_transforms import static_data as sd
 
 
 def can_handle(path_in, config):
@@ -65,7 +65,7 @@ def load_save(config):
     if len(files) == 0:
         return
 
-    df_list = [load(f, config['currency']) for f in files]
+    df_list = [load(f, config) for f in files]
     for df_temp in df_list:
         df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
     df = pd.concat(df_list)
@@ -74,6 +74,6 @@ def load_save(config):
 
 def load_save_default():
     config = configparser.ConfigParser()
-    config.read('../config/config.ini')
+    config.read('config/config.ini')
 
     load_save(config['Citi'])

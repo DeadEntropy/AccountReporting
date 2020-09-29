@@ -2,8 +2,8 @@ import pandas as pd
 import glob
 import os
 import configparser
-from config.config_helper import parse_list
-from account_transforms import static_data as sd
+from bkanalysis.config.config_helper import parse_list
+from bkanalysis.transforms.account_transforms import static_data as sd
 
 
 def to_memo(row):
@@ -60,6 +60,6 @@ def load_save(config):
 
 def load_save_default():
     config = configparser.ConfigParser()
-    config.read('../config/config.ini')
+    config.read('config/config.ini')
 
     load_save(config['LloydsMortgage'])
