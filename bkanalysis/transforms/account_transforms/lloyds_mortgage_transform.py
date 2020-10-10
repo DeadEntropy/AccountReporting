@@ -4,6 +4,10 @@ import os
 import configparser
 from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
+import re
+
+
+regex = re.compile('\((.*?)\)')
 
 
 def to_memo(row):
@@ -18,14 +22,17 @@ def to_memo(row):
 
 def can_handle(path_in, config):
     df = pd.read_csv(path_in, nrows=1)
-    expected_columns = parse_list(config['expected_columns'])
-    return set(df.columns) == set(expected_columns)
+
+    expected_columns = [re.sub(regex, '', s) for s in parse_list(config['expected_columns'])]
+    columns = [re.sub(regex, '', s) for s in df.columns]
+    return set(columns) == set(expected_columns)
 
 
 def load(path_in, config):
     df = pd.read_csv(path_in)
-    expected_columns = parse_list(config['expected_columns'])
-    assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
+    expected_columns = [re.sub(regex, '', s) for s in parse_list(config['expected_columns'])]
+    columns = [re.sub(regex, '', s) for s in df.columns]
+    assert set(columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
                                                      f'are [{", ".join(df.columns)}]. (Lloyds Mortgage)'
 
     df["OUT(£)"] = df["OUT(£)"].fillna(0)

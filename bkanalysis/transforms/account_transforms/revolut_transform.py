@@ -14,6 +14,7 @@ def can_handle(path_in, config):
     if len(df.columns) < 2:
         return False
 
+    currency = ''
     for ccy in parse_list(config['possible_currencies']):
         if ccy in df.columns[2]:
             currency = ccy
