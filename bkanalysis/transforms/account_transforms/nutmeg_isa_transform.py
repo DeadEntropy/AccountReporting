@@ -1,28 +1,34 @@
 import configparser
 import ast
-
 import pandas as pd
 import glob
 import os
 from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
+import re
+
+
+regex = re.compile('\((.*?)\)')
 
 
 def can_handle(path_in, config):
     df = pd.read_csv(path_in, nrows=1)
-    expected_columns = parse_list(config['expected_columns'])
-    return set(df.columns) == set(expected_columns)
+
+    expected_columns = [re.sub(regex, '', s) for s in parse_list(config['expected_columns'])]
+    columns = [re.sub(regex, '', s) for s in df.columns]
+    return set(columns) == set(expected_columns)
 
 
 def load(path_in, config):
     df = pd.read_csv(path_in, sep=',')
     try:
-        expected_columns = parse_list(config['expected_columns'])
+        expected_columns = [re.sub(regex, '', s) for s in parse_list(config['expected_columns'])]
     except Exception:
         print(config)
         print(config['expected_columns'])
         raise
-    assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
+    columns = [re.sub(regex, '', s) for s in df.columns]
+    assert set(columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
                                                      f'are [{", ".join(df.columns)}]. (Nutmeg)'
 
     df_out = pd.DataFrame(columns=sd.target_columns)

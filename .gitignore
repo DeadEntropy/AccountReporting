@@ -10,3 +10,4 @@
 env
 *.ini
 notebooks
+bkanalysis/ui
