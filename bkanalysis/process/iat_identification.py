@@ -15,7 +15,7 @@ class IatIdentification:
             self.config = config
 
     def remove_duplicate(self, df):
-        print('removing offsetting transactions...')
+        # print('removing offsetting transactions...')
         new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
         assert set(list(df.columns)) == set(new_columns), 'columns do not match expectation.'
 
@@ -41,7 +41,7 @@ class IatIdentification:
         return df.drop(offsetting_rows)
 
     def map_iat(self, df):
-        print('mapping transactions between accounts...')
+        # print('mapping transactions between accounts...')
         new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
         assert set(list(df.columns)) == set(new_columns), 'columns do not match expectation.'
 
@@ -74,7 +74,7 @@ class IatIdentification:
         return df
 
     def map_iat_fx(self, df):
-        print('mapping transactions between accounts...')
+        # print('mapping transactions between accounts...')
         new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
         assert set(list(df.columns)) == set(new_columns), 'columns do not match expectation.'
 
