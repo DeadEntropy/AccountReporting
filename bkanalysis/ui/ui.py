@@ -128,18 +128,83 @@ def project(df, currency='GBP', nb_years=11, projection_data={}):
 
     projection_x = [pd.Timestamp(piv['Date'].values[-1] + np.timedelta64(365 * i, 'D')) for i in r]
 
+    colours = ['#636EFA', '#abbeed', '#bdccf0']
+
     fig.add_trace(go.Scatter(x=projection_x, y=w_low_ex,
-                             fill=None, mode='lines', line_color='#bdccf0', showlegend=False))
+                             fill=None, mode='lines', line_color=colours[2], showlegend=False))
     fig.add_trace(go.Scatter(x=projection_x, y=w_up_ex,
-                             fill='tonexty', mode='lines', name='95% interval', line_color='#bdccf0'))
+                             fill='tonexty', mode='lines', name='95% interval', line_color=colours[2]))
 
     fig.add_trace(go.Scatter(x=projection_x, y=w_low,
-                             fill=None, mode='lines', line_color='#abbeed', showlegend=False))
+                             fill=None, mode='lines', line_color=colours[1], showlegend=False))
     fig.add_trace(go.Scatter(x=projection_x, y=w_up,
-                             fill='tonexty', mode='lines', name='80% interval', line_color='#abbeed'))
+                             fill='tonexty', mode='lines', name='80% interval', line_color=colours[1]))
 
     fig.add_trace(go.Scatter(x=projection_x, y=w,
-                             mode='lines+markers', name='expectation', line_color='#636EFA'))
+                             mode='lines+markers', name='expectation', line_color=colours[0]))
+
+    fig.update_layout(
+        title="Projected Wealth with confidence interval",
+        xaxis_title="Date")
+
+    return fig
+
+
+def project_compare(df, currency='GBP', nb_years=11, projection_data_1={}, projection_data_2={}):
+    projection_1 = get_current(df, ['AccountType', 'Currency', 'Account']).copy()
+    projection_1['Return'] = [try_get(projection_data_1, acc, [0, 0, 0])[0] for acc in projection_1.Account]
+    projection_1['Volatility'] = [try_get(projection_data_1, acc, [0, 0, 0])[1] for acc in projection_1.Account]
+    projection_1['Contribution'] = [try_get(projection_data_1, acc, [0, 0, 0])[2] for acc in projection_1.Account]
+
+    projection_1['Amount'] = convert_fx(projection_1, currency, 'Currency', 'Amount')
+    projection_1['Contribution'] = convert_fx(projection_1, currency, 'Currency', 'Contribution')
+
+    projection_2 = get_current(df, ['AccountType', 'Currency', 'Account']).copy()
+    projection_2['Return'] = [try_get(projection_data_2, acc, [0, 0, 0])[0] for acc in projection_2.Account]
+    projection_2['Volatility'] = [try_get(projection_data_2, acc, [0, 0, 0])[1] for acc in projection_2.Account]
+    projection_2['Contribution'] = [try_get(projection_data_2, acc, [0, 0, 0])[2] for acc in projection_2.Account]
+
+    projection_2['Amount'] = convert_fx(projection_2, currency, 'Currency', 'Amount')
+    projection_2['Contribution'] = convert_fx(projection_2, currency, 'Currency', 'Contribution')
+
+    r = range(0, nb_years)
+    (w1, w1_low, w1_up, w1_low_ex, w1_up_ex) = pj.project_full(projection_1, r)
+    (w2, w2_low, w2_up, w2_low_ex, w2_up_ex) = pj.project_full(projection_2, r)
+
+    if f'Amount_{currency}' not in df.columns:
+        df[f'Amount_{currency}'] = convert_fx(df, currency)
+
+    piv = pd.DataFrame(
+        pd.pivot_table(df, values=f'Amount_{currency}', index=['Date'], columns=[], aggfunc=sum).to_records())
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=piv['Date'], y=piv[f'Amount_{currency}'].cumsum(),
+                             mode='lines', name='wealth'))
+
+    projection_x = [pd.Timestamp(piv['Date'].values[-1] + np.timedelta64(365 * i, 'D')) for i in r]
+
+    colours1 = ['#636EFA', '#838bfb', '#b5bafd']
+
+    fig.add_trace(go.Scatter(x=projection_x, y=w1_low_ex,
+                             fill=None, mode='lines', line_color=colours1[2], showlegend=False))
+    fig.add_trace(go.Scatter(x=projection_x, y=w1_up_ex,
+                             fill='tonexty', mode='lines', name='95% interval', line_color=colours1[2]))
+    fig.add_trace(go.Scatter(x=projection_x, y=w1,
+                             mode='lines+markers', name='expectation', line_color=colours1[0]))
+
+    colours2 = ['#ffb84d', '#ffcc80', '#ffe0b3']
+
+    fig.add_trace(go.Scatter(x=projection_x, y=w2_low_ex,
+                             fill=None, mode='lines', line_color=colours2[2], showlegend=False))
+    fig.add_trace(go.Scatter(x=projection_x, y=w2_up_ex,
+                             fill='tonexty', mode='lines', name='95% interval', line_color=colours2[2]))
+    fig.add_trace(go.Scatter(x=projection_x, y=w2,
+                             mode='lines+markers', name='expectation', line_color=colours2[0]))
+
+    fig.update_layout(
+        title="Comparison of Projected Wealth with confidence interval",
+        xaxis_title="Date")
 
     return fig
 
