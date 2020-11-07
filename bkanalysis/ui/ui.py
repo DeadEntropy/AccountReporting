@@ -1,3 +1,4 @@
+# coding=utf8
 from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
 from bkanalysis.projection import projection as pj
@@ -8,6 +9,7 @@ import plotly.graph_objects as go
 import numpy as np
 import warnings
 import plotly.express as px
+import yfinance as yf
 warnings.filterwarnings("ignore")
 
 
@@ -60,7 +62,6 @@ def plot_wealth_1(df):
 
 
 def plot_wealth_2(df, freq='w', currency=None, date_range=None):
-
     if date_range is None:
         df_date_range = df
     elif len(date_range) == 2:
@@ -93,15 +94,71 @@ def plot_wealth_2(df, freq='w', currency=None, date_range=None):
     return fig
 
 
-def project(df, nb_years=11, projection_data='account_wealth_projection.csv'):
+def convert_fx(df, currency='GBP'):
+    if isinstance(currency, str):
+        df_ccy = df
+        fx_spots = {}
+        for ccy in df_ccy.Currency.unique():
+            if ccy == currency:
+                fx_spots[ccy] = 1.0
+            else:
+                ticker = f'{ccy}{currency}=X'
+                try:
+                    fx_spots[ccy] = yf.Ticker(ticker).history(period='1d').iloc[0].Close
+                except:
+                    raise Exception(f'failed to get fx spot for {ticker}.')
+
+        return df_ccy['Amount'] * [fx_spots[ccy] for ccy in df_ccy.Currency]
+    else:
+        raise Exception(f'currency is not set to a correct value ({currency}). Expected None or String.')
+
+
+def plot_wealth_3(df, freq='w', currency='GBP', date_range=None):
+    if date_range is None:
+        df_date_range = df
+    elif len(date_range) == 2:
+        df_date_range = df[(df.Date > date_range[0]) & (df.Date < date_range[1])]
+    else:
+        raise Exception(f'date_range is not set to a correct value ({date_range}). Expected None or String.')
+
+    df_ccy = df_date_range
+    if f'Amount_{currency}' not in df_ccy.columns:
+        df_ccy[f'Amount_{currency}'] = convert_fx(df_ccy, currency)
+
+    values = df_ccy.set_index('Date').groupby(pd.Grouper(freq=freq))[f'Amount_{currency}'].sum()
+    values.update(pd.Series(np.cumsum(values.values), index=values.index))
+    df_ccy['MemoDetailed'] = df_ccy.MemoMapped + ": " + df_ccy.Amount.map('{:,.0f}'.format)
+    df_agg = df_ccy[df_ccy.FacingAccount == ''].groupby(['Date', 'MemoDetailed']).agg({f'Amount_{currency}': sum})
+    g = df_agg[f'Amount_{currency}'].groupby(level=0, group_keys=False)
+    res = g.apply(lambda x: x.sort_values(ascending=False))
+    labels = pd.DataFrame(res.to_frame().to_records()).groupby(pd.Grouper(key='Date', freq=freq))[
+        'MemoDetailed'].apply(lambda x: '<br>'.join(x.unique()))
+
+    fig = go.Figure(data=go.Scatter(x=values.index, y=values.values, hovertext=labels))
+
+    fig.update_layout(
+        title="Total Wealth",
+        xaxis_title="Date")
+
+    return fig
+
+
+def project(df, currency='GBP', nb_years=11, projection_data='account_wealth_projection.csv'):
+    if currency != 'GBP':
+        raise Exception(f'This feature is not yet supported! please set currency to GBP.')
+
     projection = pd.read_csv(projection_data)
     r = range(0, nb_years)
     (w, w_low, w_up, w_low_ex, w_up_ex) = pj.project_full(projection, r)
 
     fig, ax = plt.subplots(figsize=(15, 7))
-    piv = pd.DataFrame(pd.pivot_table(df, values='Amount', index=['Date'], columns=[], aggfunc=sum).to_records())
 
-    ax.plot(piv['Date'], piv['Amount'].cumsum())
+    if f'Amount_{currency}' not in df.columns:
+        df[f'Amount_{currency}'] = convert_fx(df, currency)
+
+    piv = pd.DataFrame(pd.pivot_table(df, values=f'Amount_{currency}', index=['Date'], columns=[], aggfunc=sum).to_records())
+
+    ax.plot(piv['Date'], piv[f'Amount_{currency}'].cumsum())
     ax.plot([piv['Date'].values[-1] + np.timedelta64(365 * i, 'D') for i in r], w, '-o', color='b',
             label='Expected Wealth')
     ax.fill_between([piv['Date'].values[-1] + np.timedelta64(365 * i, 'D') for i in r], w_low, w_up, color='b',

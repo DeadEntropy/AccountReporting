@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/.gitignore" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Dockerfile" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/README.md" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/bkanalysis/transforms/master_transform.py" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/bkanalysis/ui/dash_app.py" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notebooks/account_wealth.csv" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notebooks/account_wealth_projection.csv" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notebooks/account_wealth_projection_1.csv" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notebooks/account_wealth_projection_investUS.csv" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notebooks/flat_costs.ipynb" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notebooks/full_analysis.ipynb" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notebooks/full_analysis_experimental.ipynb" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notebooks/full_analysis_ui.ipynb" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notebooks/plot_timeseries.ipynb" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/notebooks/wealth_forecast.ipynb" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/requirements.txt" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/setup.py" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tests/config/config.ini" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tests/config/example.ini" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tests/run_test_citi.py" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tests/run_test_config.py" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tests/run_test_defaults.py" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tests/run_test_full.py" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tests/run_test_master_default.py" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tests/run_test_process.py" charset="UTF-8" />
+    <file url="PROJECT" charset="UTF-8" />
+  </component>
+</project>
