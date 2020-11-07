@@ -9,10 +9,10 @@ from dash.dependencies import Input, Output, State
 import plotly.graph_objects as go
 from bkanalysis.ui import ui
 
-print("Running Dash App")
-_df = ui.load_csv(r'D:\NicoFolder\BankAccount\lake_result_processed.csv')
+print("Running Dash App On Docker")
+_df = ui.load_csv(r'lake_result_processed.csv')
 _range = pd.date_range(start=_df['Date'].min().strftime("%Y-%m-%d"),
-                       end=_df['Date'].max().strftime("%Y-%m-%d"), freq='m')
+                       end=_df['Date'].max().strftime("%Y-%m-%d"), freq='d')
 
 
 def _unix_time_ms(dt):
@@ -36,6 +36,7 @@ def _get_marks(date_range, nth):
 
 
 app = dash.Dash(__name__)
+application = app.server
 
 app.layout = html.Div([
     html.Div([
@@ -47,7 +48,7 @@ app.layout = html.Div([
                     {'label': 'Weekly', 'value': 'w'},
                     {'label': 'Monthly', 'value': 'm'}
                 ],
-                value='w'
+                value='d'
             )
         ], className="one column"),
         html.Div([
@@ -111,4 +112,5 @@ def update_sunburst(value):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    application.run(debug=True, host='0.0.0.0', port='80')
+    # app.run_server(debug=True)

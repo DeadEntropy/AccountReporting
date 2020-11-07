@@ -1,3 +1,4 @@
+# coding=utf8
 import pandas as pd
 import re
 from bkanalysis.process.process_helper import get_adjusted_month, get_adjusted_year, get_fiscal_year, get_year_to_date, \

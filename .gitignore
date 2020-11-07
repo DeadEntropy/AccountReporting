@@ -14,3 +14,5 @@ bkanalysis/ui/assets
 bkanalysis/ui/__init__.py
 bkanalysis/ui/application.py
 bkanalysis/ui/requirements.txt
+.venv
+.azure
