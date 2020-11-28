@@ -32,7 +32,7 @@ def load(path_in, config):
                                                      f'are [{", ".join(df.columns)}]. (Nutmeg)'
 
     df_out = pd.DataFrame(columns=sd.target_columns)
-    df_out.Date = pd.to_datetime(df["Date"], format='%d-%b-%y')
+    df_out.Date = pd.to_datetime(df.Date, format='%d-%b-%y')
     df_out.Account = 'Nutmeg: ' + df['Pot']
     df_out.Currency = config['currency']
     df_out.Amount = df["Amount (£)"]

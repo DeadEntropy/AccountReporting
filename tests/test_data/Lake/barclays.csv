@@ -1,0 +1,5 @@
+Number,Date,Account,Amount,Subcategory,Memo
+ ,27/11/2020,Account1,-10.0,Card,Merchant3
+ ,26/11/2020,Account1,-150,Card,Merchant2
+ ,25/11/2020,Account1,-20.0,Card,Merchant1
+ ,24/11/2020,Account1,200.0,Card,Income1
