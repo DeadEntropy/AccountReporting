@@ -1,0 +1,6 @@
+DATE,TRANSACTION,OUT(£),IN(£),BALANCE(£)
+30/10/2020,Interest,99,,0
+25/10/2020,Direct Debit,,1000,0
+30/09/2020,Interest,100,,0
+25/09/2020,Direct Debit,,1000,0
+25/08/2020,New advance,10000,,10000

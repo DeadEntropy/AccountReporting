@@ -16,6 +16,8 @@ class Loader:
         if config is None:
             self.config = configparser.ConfigParser()
             self.config.read('config/config.ini')
+        else:
+            self.config = config
 
     def load(self, file):
         df = self.load_internal(file)
@@ -45,9 +47,22 @@ class Loader:
 
         raise ValueError(f'file {file} could not be processed by any of the loaders.')
 
-    def load_all(self):
-        files = glob.glob(os.path.join(self.config['IO']['folder_lake'], '*.csv'))
+    @staticmethod
+    def get_files(folder_lake, root=None):
+        print(f'Loading files from {os.path.abspath(folder_lake)}.')
+        if root is None:
+            files = glob.glob(os.path.join(folder_lake, '*.csv'))
+        else:
+            files = glob.glob(os.path.join(root, folder_lake, '*.csv'))
+
         print(f"Loading {len(files)} CSV file(s).")
+        return files
+
+    def load_all(self):
+        if 'folder_root' in self.config['IO']:
+            files = self.get_files(self.config['IO']['folder_lake'], self.config['IO']['folder_root'])
+        else:
+            files = self.get_files(self.config['IO']['folder_lake'])
         if len(files) == 0:
             return
 

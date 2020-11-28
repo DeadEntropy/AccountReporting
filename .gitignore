@@ -5,10 +5,8 @@
 .idea/misc.xml
 .idea/modules.xml
 .idea/vcs.xml
-*.csv
 *.ipynb
 env
-*.ini
 notebooks
 bkanalysis/ui/assets
 bkanalysis/ui/__init__.py
