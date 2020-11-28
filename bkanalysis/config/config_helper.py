@@ -10,5 +10,5 @@ def parse_list(item, strip=True):
 
 def get_path(config, key, root='folder_root'):
     if root in config:
-        return os.path.join(root, config[key])
+        return os.path.join(config[root], config[key])
     return config[key]

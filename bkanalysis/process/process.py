@@ -7,15 +7,28 @@ from bkanalysis.process.iat_identification import IatIdentification
 import configparser
 from bkanalysis.config import config_helper as ch
 import ast
+import os
 
 
 class Process:
     @staticmethod
-    def __initialise_map(config, path, parse_dates=None):
+    def __initialise_map(config, path, root='folder_root', default_columns=None, parse_dates=None):
         try:
-            return pd.read_csv(ch.get_path(config, path), parse_dates=parse_dates)
+            return pd.read_csv(ch.get_path(config, path, root), parse_dates=parse_dates)
         except:
-            return pd.DataFrame()
+            try:
+                pd.DataFrame(columns=default_columns).to_csv(ch.get_path(config, path, root), index=False)
+            except:
+                raise Exception(f'Couldnt access {os.path.abspath(ch.get_path(config, path))}')
+            return pd.DataFrame(columns=default_columns)
+
+    @staticmethod
+    def __save_to_csv(config, df, key, root='folder_root'):
+        if root in config:
+            path = os.path.join(config[root], config[key])
+        else:
+            path = config[key]
+        df.to_csv(path, index=False)
 
     def __init__(self, config=None):
         if config is None:
@@ -24,19 +37,19 @@ class Process:
         else:
             self.config = config
 
-        self.map_simple = Process.__initialise_map(self.config['Mapping'], 'path_map')
-        self.map_main = Process.__initialise_map(self.config['Mapping'],'path_map_type')
-        self.map_full_type = Process.__initialise_map(self.config['Mapping'],'path_map_full_type')
-        self.map_full_subtype = Process.__initialise_map(self.config['Mapping'],'path_map_full_subtype')
-        self.map_master = Process.__initialise_map(self.config['Mapping'],'path_map_full_master_type')
+        self.map_simple = Process.__initialise_map(self.config['Mapping'], 'path_map', default_columns=['Memo Simple', 'Memo Mapped'])
+        self.map_main = Process.__initialise_map(self.config['Mapping'],'path_map_type', default_columns=['Memo Mapped', 'Type', 'SubType'])
+        self.map_full_type = Process.__initialise_map(self.config['Mapping'],'path_map_full_type', default_columns=['Type', 'FullType', 'MasterType'])
+        self.map_full_subtype = Process.__initialise_map(self.config['Mapping'],'path_map_full_subtype', default_columns=['SubType', 'FullSubType'])
+        self.map_master = Process.__initialise_map(self.config['Mapping'],'path_map_full_master_type', default_columns=['MasterType', 'FullMasterType'])
         self.mapping_override_df = Process.__initialise_map(self.config['Mapping'],'path_override', parse_dates=[0])
 
     def __del__(self):
-        self.map_simple.to_csv(self.config['Mapping']['path_map'], index=False)
-        self.map_main.to_csv(self.config['Mapping']['path_map_type'], index=False)
-        self.map_full_type.to_csv(self.config['Mapping']['path_map_full_type'], index=False)
-        self.map_full_subtype.to_csv(self.config['Mapping']['path_map_full_subtype'], index=False)
-        self.map_master.to_csv(self.config['Mapping']['path_map_full_master_type'], index=False)
+        self.__save_to_csv(self.config['Mapping'], self.map_simple, 'path_map')
+        self.__save_to_csv(self.config['Mapping'], self.map_main, 'path_map_type')
+        self.__save_to_csv(self.config['Mapping'], self.map_full_type, 'path_map_full_type')
+        self.__save_to_csv(self.config['Mapping'], self.map_full_subtype, 'path_map_full_subtype')
+        self.__save_to_csv(self.config['Mapping'], self.map_master, 'path_map_full_master_type')
 
     def map_memo(self, memo_series):
         self.map_simple['Memo Mapped'] = self.map_simple['Memo Mapped'].str.strip().str.upper()
@@ -184,6 +197,12 @@ class Process:
 
         return df_out
 
+    @staticmethod
+    def __clean_memo(s):
+        if isinstance(s, str):
+            return re.sub('\*', '', re.sub(' +', ' ', s.split(' ON')[0])).replace(',', '').strip()
+        return s
+
     def extend(self, df, ignore_overrides=False):
         expected_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['expected_columns'])]
         assert set(df.columns) == set(expected_columns), 'Columns do not match expectation.'
@@ -207,8 +226,7 @@ class Process:
         df_out.AdjustedYear = [get_adjusted_year(dt) for dt in df.Date]
         df_out.FiscalYear = [get_fiscal_year(dt) for dt in df.Date]
         df_out.YearToDate = [get_year_to_date(dt) for dt in df.Date]
-        df_out.MemoSimple = [re.sub('\*', '', re.sub(' +', ' ', s.split(' ON')[0])).replace(',', '').strip() for s in
-                             df.Memo]
+        df_out.MemoSimple = [self.__clean_memo(s) for s in df.Memo]
 
         memo_mapped = self.map_memo(df_out.MemoSimple)
         df_out.MemoMapped = memo_mapped

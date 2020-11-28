@@ -50,10 +50,10 @@ def load(path_in, config):
     df_out.Currency = currency
     df_out.Amount = df[f" Paid In ({currency}) "] - df[f" Paid Out ({currency}) "]
     df_out.Subcategory = df[" Category"]
-    df_out.Memo = df[" Description "] + df[" Notes"] + df[" Exchange Out"] + df[" Exchange In"]
+    df_out.Memo = df[" Description "] + df[" Notes"].fillna('') + df[" Exchange Out"] + df[" Exchange In"]
     df_out.Memo = df_out.Memo.str.replace('£', 'GBP')
     df_out.Memo = df_out.Memo.str.replace('€', 'EUR')
-    df_out.Memo = df_out.Memo.str.replace(',', '')
+    df_out.Memo = df_out.Memo.str.replace(',', '').str.strip()
     df_out['AccountType'] = config['account_type']
 
     return df_out

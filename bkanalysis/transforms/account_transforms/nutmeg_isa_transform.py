@@ -36,7 +36,7 @@ def load(path_in, config):
     df_out.Account = 'Nutmeg: ' + df['Pot']
     df_out.Currency = config['currency']
     df_out.Amount = df["Amount (£)"]
-    df_out.Subcategory = df["Description"]
+    df_out.Subcategory = df.Description
     df_out.Memo = 'Nutmeg: ' + df['Pot']
     account_types = ast.literal_eval(config['account_types'])
     df_out['AccountType'] = [account_types[acc] for acc in df_out.Account]

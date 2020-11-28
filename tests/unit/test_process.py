@@ -7,14 +7,14 @@ import os
 
 class TestProcess(unittest.TestCase):
 
-    @unittest.skip("not fully implemented")
     def test_process(self):
         mt = master_transform.Loader(ch.get_config())
         df_raw = mt.load_all()
 
         pr = process.Process(ch.get_config())
-        df = pr.process(df_raw)
+        df = pr.extend(df_raw)
         self.assertTrue(len(df) > 0, 'empty DataFrame loaded')
+        self.assertEqual(df.drop('Week', axis=1).isnull().sum().sum(), 0, 'Loaded DataFrame contains NaN.')
 
 
 if __name__ == '__main__':

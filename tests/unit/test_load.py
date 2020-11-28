@@ -34,7 +34,12 @@ class TestLoad(unittest.TestCase):
     def test_transform_load(self):
         mt = master_transform.Loader(ch.get_config())
         df = mt.load_all()
-        self.assertTrue(len(df) > 0, 'empty DataFrame loaded')
+        self.assertTrue(len(df) > 0, 'empty DataFrame loaded.')
+
+    def test_transform_load_check_nan(self):
+        mt = master_transform.Loader(ch.get_config())
+        df = mt.load_all()
+        self.assertEqual(df.isnull().sum().sum(), 0, 'Loaded DataFrame contains NaN.')
 
 
 if __name__ == '__main__':
