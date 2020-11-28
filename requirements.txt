@@ -33,5 +33,5 @@ docutils~=0.15.2
 pyparsing~=2.4.7
 kiwisolver~=1.2.0
 Cython~=0.29.14
-bkanalysis~=0.1
+# bkanalysis~=0.1
 yfinance~=0.1.55
