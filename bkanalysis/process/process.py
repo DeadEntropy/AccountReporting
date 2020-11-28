@@ -43,7 +43,8 @@ class Process:
         self.map_full_type = Process.__initialise_map(self.config['Mapping'],'path_map_full_type', default_columns=['Type', 'FullType', 'MasterType'])
         self.map_full_subtype = Process.__initialise_map(self.config['Mapping'],'path_map_full_subtype', default_columns=['SubType', 'FullSubType'])
         self.map_master = Process.__initialise_map(self.config['Mapping'],'path_map_full_master_type', default_columns=['MasterType', 'FullMasterType'])
-        self.mapping_override_df = Process.__initialise_map(self.config['Mapping'],'path_override', parse_dates=[0])
+        self.mapping_override_df = Process.__initialise_map(self.config['Mapping'],'path_override', parse_dates=[0], \
+                                                            default_columns=['Date', 'Account', 'MemoMapped', 'OverridesType','OverrideSubType'])
 
     def __del__(self):
         self.__save_to_csv(self.config['Mapping'], self.map_simple, 'path_map')
