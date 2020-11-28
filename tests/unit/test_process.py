@@ -3,6 +3,10 @@ from bkanalysis.process import process
 import tests.unit.config_helper as ch
 import unittest
 import os
+import sys
+
+myPath = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, myPath + '/../')
 
 
 class TestSum(unittest.TestCase):
