@@ -16,6 +16,7 @@ class Process:
         try:
             return pd.read_csv(ch.get_path(config, path, root), parse_dates=parse_dates)
         except:
+            print(f'Could not find mapping file in: {ch.get_path(config, path, root)}.')
             try:
                 pd.DataFrame(columns=default_columns).to_csv(ch.get_path(config, path, root), index=False)
             except:
