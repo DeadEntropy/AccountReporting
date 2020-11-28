@@ -5,22 +5,31 @@ from bkanalysis.process.process_helper import get_adjusted_month, get_adjusted_y
     get_missing_map, get_missing_type
 from bkanalysis.process.iat_identification import IatIdentification
 import configparser
+from bkanalysis.config import config_helper as ch
 import ast
 
 
 class Process:
+    @staticmethod
+    def __initialise_map(config, path, parse_dates=None):
+        try:
+            return pd.read_csv(ch.get_path(config, path), parse_dates=parse_dates)
+        except:
+            return pd.DataFrame()
 
     def __init__(self, config=None):
         if config is None:
             self.config = configparser.ConfigParser()
             self.config.read('config/config.ini')
+        else:
+            self.config = config
 
-        self.map_simple = pd.read_csv(self.config['Mapping']['path_map'])
-        self.map_main = pd.read_csv(self.config['Mapping']['path_map_type'])
-        self.map_full_type = pd.read_csv(self.config['Mapping']['path_map_full_type'])
-        self.map_full_subtype = pd.read_csv(self.config['Mapping']['path_map_full_subtype'])
-        self.map_master = pd.read_csv(self.config['Mapping']['path_map_full_master_type'])
-        self.mapping_override_df = pd.read_csv(self.config['Mapping']['path_override'], parse_dates=[0])
+        self.map_simple = Process.__initialise_map(self.config['Mapping'], 'path_map')
+        self.map_main = Process.__initialise_map(self.config['Mapping'],'path_map_type')
+        self.map_full_type = Process.__initialise_map(self.config['Mapping'],'path_map_full_type')
+        self.map_full_subtype = Process.__initialise_map(self.config['Mapping'],'path_map_full_subtype')
+        self.map_master = Process.__initialise_map(self.config['Mapping'],'path_map_full_master_type')
+        self.mapping_override_df = Process.__initialise_map(self.config['Mapping'],'path_override', parse_dates=[0])
 
     def __del__(self):
         self.map_simple.to_csv(self.config['Mapping']['path_map'], index=False)
@@ -80,7 +89,8 @@ class Process:
         mapping_a = pd.Series(self.map_main['Type'].values, index=self.map_main['Memo Mapped']).to_dict()
         mapping_b = pd.Series(self.map_main['SubType'].values, index=self.map_main['Memo Mapped']).to_dict()
         type_mapping = pd.Series(self.map_full_type['FullType'].values, index=self.map_full_type['Type']).to_dict()
-        master_type_mapping = pd.Series(self.map_full_type['MasterType'].values, index=self.map_full_type['Type']).to_dict()
+        master_type_mapping = pd.Series(self.map_full_type['MasterType'].values,
+                                        index=self.map_full_type['Type']).to_dict()
         subtype_mapping = pd.Series(self.map_full_subtype['FullSubType'].values,
                                     index=self.map_full_subtype['SubType']).to_dict()
         full_master_type_mapping = pd.Series(self.map_master['FullMasterType'].values,
@@ -124,10 +134,13 @@ class Process:
 
     def apply_overrides(self, df):
         self.mapping_override_df['Date'] = self.mapping_override_df['Date'].apply(lambda x: x.strftime('%d-%b-%Y'))
-        self.mapping_override_df['MemoMapped'] = self.mapping_override_df['MemoMapped'].fillna('').str.strip().str.upper()
+        self.mapping_override_df['MemoMapped'] = self.mapping_override_df['MemoMapped'].fillna(
+            '').str.strip().str.upper()
         self.mapping_override_df['Account'] = self.mapping_override_df['Account'].fillna('').str.strip().str.upper()
-        self.mapping_override_df['OverridesType'] = self.mapping_override_df['OverridesType'].fillna('').str.strip().str.upper()
-        self.mapping_override_df['OverrideSubType'] = self.mapping_override_df['OverrideSubType'].fillna('').str.strip().str.upper()
+        self.mapping_override_df['OverridesType'] = self.mapping_override_df['OverridesType'].fillna(
+            '').str.strip().str.upper()
+        self.mapping_override_df['OverrideSubType'] = self.mapping_override_df['OverrideSubType'].fillna(
+            '').str.strip().str.upper()
 
         subset_values = self.mapping_override_df[['OverridesType', 'OverrideSubType']]
         subset_keys = self.mapping_override_df[['Date', 'Account', 'MemoMapped']]
@@ -138,7 +151,8 @@ class Process:
         type_mapping = pd.Series(self.map_full_type['FullType'].values, index=self.map_full_type['Type']).to_dict()
         subtype_mapping = pd.Series(self.map_full_subtype['FullSubType'].values,
                                     index=self.map_full_subtype['SubType']).to_dict()
-        master_type_mapping = pd.Series(self.map_full_type['MasterType'].values, index=self.map_full_type['Type']).to_dict()
+        master_type_mapping = pd.Series(self.map_full_type['MasterType'].values,
+                                        index=self.map_full_type['Type']).to_dict()
         full_master_type_mapping = pd.Series(self.map_master['FullMasterType'].values,
                                              index=self.map_master['MasterType']).to_dict()
 

@@ -1,4 +1,5 @@
 from bkanalysis.transforms import master_transform
+from bkanalysis.process import process
 import tests.unit.config_helper as ch
 import unittest
 import os
@@ -6,9 +7,12 @@ import os
 
 class TestSum(unittest.TestCase):
 
-    def test_transform_load(self):
+    def test_process(self):
         mt = master_transform.Loader(ch.get_config())
-        df = mt.load_all()
+        df_raw = mt.load_all()
+
+        pr = process.Process(ch.get_config())
+        df = pr.process(df_raw)
         self.assertTrue(len(df) > 0, 'empty DataFrame loaded')
 
 

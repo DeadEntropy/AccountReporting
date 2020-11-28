@@ -17,4 +17,5 @@ def get_config():
         raise Exception(f'did not successfully load the config. please make sure the config path is correct.')
 
     config['IO']['folder_root'] = os.path.join(Path(__file__).parent.parent, "test_data")
+    config['Mapping']['folder_root'] = os.path.join(Path(__file__).parent.parent, "test_data")
     return config
