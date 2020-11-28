@@ -2,13 +2,9 @@ from bkanalysis.transforms import master_transform
 import tests.unit.config_helper as ch
 import unittest
 import os
-import sys
-
-myPath = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, myPath + '/../')
 
 
-class TestSum(unittest.TestCase):
+class TestLoad(unittest.TestCase):
 
     def test_exists_config(self):
         self.assertTrue(os.path.exists(ch.get_config_path()), f'Config path is not valid: {os.path.abspath(ch.get_config_path())}.')
