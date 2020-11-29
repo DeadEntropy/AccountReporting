@@ -10,21 +10,13 @@ class LastUpdate:
             self.config = configparser.ConfigParser()
             self.config.read('config/config.ini')
 
-    @staticmethod
-    def get_link(config, account):
-        if config.has_option('Status', account.replace(' ', '').replace(':', '')):
-            return config['Status'][account.replace(' ', '').replace(':', '')]
-        print(f'Could not find a valid link for account "{account}" in the "Status" section of the config')
-        return None
-
     def last_update(self, df_input):
         dic_last_update = {}
         df_input['Date'] = pd.to_datetime(df_input['Date'])
         for bank_acc in df_input.Account.unique():
-            dic_last_update[bank_acc] = [df_input[df_input.Account == bank_acc].Date.max(),
-                                         self.get_link(self.config, bank_acc)]
+            dic_last_update[bank_acc] = [df_input[df_input.Account == bank_acc].Date.max()]
 
-        return pd.DataFrame.from_dict(dic_last_update, orient='index', columns=['LastUpdate', 'Link'])
+        return pd.DataFrame.from_dict(dic_last_update, orient='index', columns=['LastUpdate'])
 
     def last_update_save(self):
         df_input = pd.read_csv(self.config['IO']['path_aggregated'])

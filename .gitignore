@@ -5,9 +5,10 @@
 .idea/misc.xml
 .idea/modules.xml
 .idea/vcs.xml
-*.ipynb
+# *.ipynb
 env
-notebooks
+notebooks/config
+notebooks/.ipynb_checkpoints
 bkanalysis/ui/assets
 bkanalysis/ui/__init__.py
 bkanalysis/ui/application.py

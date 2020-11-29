@@ -8,6 +8,7 @@ import numpy as np
 import warnings
 import plotly.express as px
 import yfinance as yf
+pd.options.display.float_format = '{:,.0f}'.format
 warnings.filterwarnings("ignore")
 
 
@@ -146,6 +147,10 @@ def project(df, currency='GBP', nb_years=11, projection_data={}):
         xaxis_title="Date")
 
     return fig
+
+
+def get_projection_template(df):
+    return {acc: [0, 0, 0] for acc in df.Account.unique()}
 
 
 def project_compare(df, currency='GBP', nb_years=11, projection_data_1={}, projection_data_2={}):
