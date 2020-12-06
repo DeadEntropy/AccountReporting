@@ -23,7 +23,7 @@ class TestProcess(unittest.TestCase):
         df['Amount'] = [100, -100, 200]
         df['Date'] = datetime.datetime(2020, 10, 15)
 
-        df_out = iat.remove_duplicate(df)
+        df_out = iat.remove_duplicate(df) 
         self.assertEqual(len(df_out), 1, 'Duplicate did not get removed successfully')
 
     def test_remove_offsetting_2(self):
