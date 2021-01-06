@@ -12,12 +12,16 @@ pd.options.display.float_format = '{:,.0f}'.format
 warnings.filterwarnings("ignore")
 
 
-def load():
+def load(save_to_csv=False):
     mt = master_transform.Loader()
     df_raw = mt.load_all()
+    if save_to_csv:
+        mt.save(df_raw)
 
     pr = process.Process()
     df = pr.process(df_raw)
+    if save_to_csv:
+        pr.save(df)
     pr.__del__()
     return df
 

@@ -35,8 +35,8 @@ def get_product_name(s):
 
 
 def get_year(s):
-    if int(datetime.datetime.now().year) != 2020:
-        raise Exception('This function only works for 2020!')
+    # if int(datetime.datetime.now().year) != 2020:
+    #     raise Exception('This function only works for 2020!')
 
     return s
 

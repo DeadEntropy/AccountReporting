@@ -73,7 +73,11 @@ class Loader:
         df = df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False)
         return df.reset_index(drop=True)
 
+    def save(self, df):
+        df_copy = df.copy(True)
+        df_copy.Date = df_copy.Date.apply(lambda x: x.strftime("%d-%b-%Y"))
+        df_copy.to_csv(self.config['IO']['path_aggregated'], index=False)
+
     def load_save(self):
         df = self.load_all()
-        df.Date = df.Date.apply(lambda x: x.strftime("%d-%b-%Y"))
-        df.to_csv(self.config['IO']['path_aggregated'], index=False)
+        self.save(df)

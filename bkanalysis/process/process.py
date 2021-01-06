@@ -256,8 +256,13 @@ class Process:
         df_out = self.remove_offsetting(df_out)
         return df_out
 
+    def save(self, df):
+        df_copy = df.copy(True)
+        df_copy.Date = df_copy.Date.apply(lambda x: x.strftime("%d-%b-%Y"))
+        df_copy.to_csv(self.config['IO']['path_processed'], index=False)
+
     def process_save(self):
         df_raw = pd.read_csv(self.config['IO']['path_aggregated'], parse_dates=[0])
         print(f'Process {df_raw.shape[0]} line(s).')
         df = self.process(df_raw)
-        df.to_csv(self.config['IO']['path_processed'], index=False)
+        self.save(df)
