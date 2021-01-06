@@ -34,11 +34,33 @@ def get_product_name(s):
     return names[0]
 
 
-def get_year(s):
+def  get_year(s):
     # if int(datetime.datetime.now().year) != 2020:
     #     raise Exception('This function only works for 2020!')
 
     return s
+
+
+def get_dates_from_description(df, fallback_year):
+    results = []
+    year = None
+    for index, row in df.iterrows():
+        description = row['Description']
+        date = row['Completed Date']
+        if '\n' in description:
+            if len(description.split('\n')[1].split(' ')) == 3:
+                try:
+                    current_date = pd.to_datetime(description.split('\n')[1].split(' ')[2], format='%Y/%M/%d')
+                    results.append(current_date)
+                    year = current_date.year
+                except:
+                    results.append(pd.to_datetime(f'{date}, {fallback_year if (year is None) else year}', format='%b %d, %Y'))
+            else:
+                results.append(pd.to_datetime(f'{date}, {fallback_year if (year is None) else year}', format='%b %d, %Y'))
+        else:
+            results.append(pd.to_datetime(f'{date}, {fallback_year if (year is None) else year}', format='%b %d, %Y'))
+
+    return results
 
 
 def load(path_in, config):
@@ -56,13 +78,14 @@ def load(path_in, config):
 
     df_out = pd.DataFrame(columns=sd.target_columns)
 
-    df_out.Date = get_year(pd.to_datetime(df["Completed Date"] + ", " + config['year'], format='%b %d, %Y'))
+    df_out.Date = get_dates_from_description(df[["Description", "Completed Date"]], config['year'])
+    # df_out.Date = get_year(pd.to_datetime(df["Completed Date"] + ", " + config['year'], format='%b %d, %Y'))
 
     df_out.Account = get_product_name(df["Product name"])
     df_out.Currency = config['currency']
-    df_out.Amount = df["Money in (GBP)"] - df["Money out (GBP)"]
-    df_out.Subcategory = df["Description"].str.split('\r\n').str[0]
-    df_out.Memo = df["Description"].str.split('\r\n').str[0] + " " + df["Interest rate (AER)"].astype(str)
+    df_out.Amount = df["Money in (GBP)"] + df["Money out (GBP)"]
+    df_out.Subcategory = df["Description"].str.split('\n').str[0].str.strip()
+    df_out.Memo = (df["Description"].str.split('\n').str[0].str.strip() + " " + df["Interest rate (AER)"].astype(str)).str.strip()
     df_out['AccountType'] = config['account_type']
 
     return df_out
