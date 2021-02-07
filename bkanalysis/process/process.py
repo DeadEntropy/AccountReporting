@@ -202,7 +202,7 @@ class Process:
     @staticmethod
     def __clean_memo(s):
         if isinstance(s, str):
-            return re.sub('\*', '', re.sub(' +', ' ', s.split(' ON')[0])).replace(',', '').strip()
+            return re.sub('\*', '', re.sub(' +', ' ', s.split(' ON ')[0])).replace(',', '').strip()
         return s
 
     def extend(self, df, ignore_overrides=False):
