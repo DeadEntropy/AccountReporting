@@ -14,7 +14,7 @@ class LastUpdate:
         dic_last_update = {}
         df_input['Date'] = pd.to_datetime(df_input['Date'])
         for bank_acc in df_input.Account.unique():
-            dic_last_update[bank_acc] = [df_input[df_input.Account == bank_acc].Date.max()]
+            dic_last_update[bank_acc] = [df_input[df_input.Account == bank_acc].Date.max().strftime("%Y-%m-%d")]
 
         return pd.DataFrame.from_dict(dic_last_update, orient='index', columns=['LastUpdate'])
 
