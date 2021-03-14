@@ -8,6 +8,7 @@ import numpy as np
 import warnings
 import plotly.express as px
 import yfinance as yf
+
 pd.options.display.float_format = '{:,.0f}'.format
 warnings.filterwarnings("ignore")
 
@@ -107,7 +108,7 @@ def plot_wealth(df, freq='w', currency='GBP', date_range=None, include_internal=
 def try_get(d, k, default=None):
     if k in d:
         return d[k]
-    elif not(default is None):
+    elif not (default is None):
         return default
     raise Exception(f'Key {k} is not in dictionary.')
 
@@ -250,8 +251,10 @@ def internal_flows(df):
     return fig
 
 
-def plot_sunburst(df, path, account=None, currency=None, date_range=None):
+__DATE_FORMAT = '%Y-%m-%d'
 
+
+def plot_sunburst(df, path, account=None, currency=None, date_range=None):
     if date_range is not None:
         df = df[(df.Date > date_range[0]) & (df.Date < date_range[1])]
     else:
@@ -262,11 +265,14 @@ def plot_sunburst(df, path, account=None, currency=None, date_range=None):
     if account is not None:
         df = df[df.Account == account]
 
-    df_expenses = df[(df.FullType != 'Savings')
+    df_expenses = df[(~df.FullMasterType.isin(['Income', 'ExIncome']))
+                     & (df.FullType != 'Savings')
                      & (df.FacingAccount == '')
                      & (df.Amount < 0)
                      & (df.FullType != 'Intra-Account Transfert')]
     df_expenses.Amount = (-1) * df_expenses.Amount
 
-    fig = px.sunburst(df_expenses, path=path, values='Amount')
+    title = f'Spending Breakdown for {np.min(df.Date).strftime(__DATE_FORMAT)} to {np.max(df.Date).strftime(__DATE_FORMAT)}' \
+            f' (Total Spend: {np.abs(df_expenses.Amount.sum()):,.0f})'
+    fig = px.sunburst(df_expenses, path=path, values='Amount', title=title)
     return fig
