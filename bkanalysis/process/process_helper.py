@@ -36,6 +36,8 @@ def get_missing_map(memo, mapping):
                       f'Enter the Index of the suggestion if relevant:').upper()
         try:
             index = int(value)
+            if index > len(suggestions):
+                raise IndexError(f'there are only {len(suggestions)} choice(s), but you selected choice {index}.')
             value = suggestions[index-1]
         except ValueError:
             pass
@@ -46,6 +48,9 @@ def get_missing_map(memo, mapping):
                                 f'use that instead? (y/n)')
                 if replace.upper() == 'Y':
                     value = suggested_values[0]
+        except IndexError as e:
+            print(f"\nIndexError: {e}")
+            return get_missing_map(memo, mapping)
     else:
         value = input(f'Please enter the mapping for "{memo}:').upper()
         # Check if something very similar already exists
