@@ -34,8 +34,10 @@ class Loader:
             return lloyds_mort.load(file, self.config['LloydsMortgage'])
         elif nut_transform.can_handle(file, self.config['Nutmeg']):
             return nut_transform.load(file, self.config['Nutmeg'])
-        elif rev_transform.can_handle(file, self.config['Revolut']):
-            return rev_transform.load(file, self.config['Revolut'])
+        elif rev_transform.can_handle(file, self.config['Revolut'], ';'):
+            return rev_transform.load(file, self.config['Revolut'], ';')
+        elif rev_transform.can_handle(file, self.config['Revolut'], ', '):
+            return rev_transform.load(file, self.config['Revolut'], ', ')
         elif citi_transform.can_handle(file, self.config['Citi']):
             return citi_transform.load(file, self.config['Citi'])
         elif clone_transform.can_handle(file):

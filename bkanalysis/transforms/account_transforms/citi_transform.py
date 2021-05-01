@@ -10,9 +10,12 @@ from bkanalysis.transforms.account_transforms import static_data as sd
 
 
 def can_handle(path_in, config):
-    df = pd.read_csv(path_in, nrows=1, index_col=False)
-    expected_columns = parse_list(config['expected_columns'])
-    return set(df.columns) == set(expected_columns)
+    try:
+        df = pd.read_csv(path_in, nrows=1, index_col=False)
+        expected_columns = parse_list(config['expected_columns'])
+        return set(df.columns) == set(expected_columns)
+    except IndexError:
+        raise ValueError(f'Couldnt process file {path_in}.')
 
 
 def simplify_memo(memo):
