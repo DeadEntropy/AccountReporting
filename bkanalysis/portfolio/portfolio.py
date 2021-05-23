@@ -28,7 +28,8 @@ def __get_symbol_from_isin(isin):
         return None
 
 
-@cached(LRUCache(maxsize=1024))
+mem_cache = LRUCache(maxsize=1024)
+@cached(mem_cache)
 def __get_history(ticker, period):
     return ticker.history(period=period)
 
@@ -66,6 +67,12 @@ def get_with_isin_map(isin):
     return get_symbol_from_isin(__isin_map[isin]) if isin in __isin_map else get_symbol_from_isin(isin)
 
 
+mem_cache_symbol = LRUCache(maxsize=1024)
+@cached(mem_cache_symbol)
+def __get_ticker(symbol):
+    return yf.Ticker(symbol)
+
+
 def __get_close(ticker, currency='GBP'):
     hist = __get_history(ticker, '1d')
     if len(hist) == 0:
@@ -79,6 +86,8 @@ def __get_close(ticker, currency='GBP'):
     return hist.iloc[0].Close * fx
 
 
+mem_cache_currency = LRUCache(maxsize=1024)
+@cached(mem_cache_currency)
 def __get_currency(ticker):
     if ticker is None:
         return None
@@ -106,7 +115,7 @@ def process_stock(stocks, key='isin', period='1y', fallback_key=None, currency='
         stocks['symbol'] = [get_with_isin_map(v) if get_with_isin_map(v) is not None else get_with_isin_map(v_fallback)
                             for (v, v_fallback) in zip(stocks[key], stocks[fallback_key])]
 
-    stocks['yf_ticker'] = [yf.Ticker(symbol) if symbol is not None else None for symbol in stocks['symbol']]
+    stocks['yf_ticker'] = [__get_ticker(symbol) if symbol is not None else None for symbol in stocks['symbol']]
     stocks['close'] = [__get_close(ticker, currency) if ticker is not None else None for ticker in stocks['yf_ticker']]
     stocks['native_currency'] = [__get_currency(ticker) if ticker is not None else None for ticker in stocks['yf_ticker']]
     stocks['currency'] = currency
