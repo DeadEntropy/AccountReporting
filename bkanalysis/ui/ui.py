@@ -46,7 +46,7 @@ def get_current(df, by=['AccountType', 'Currency']):
     df_by = pd.DataFrame(pd.pivot_table(df, values='Amount', index=by, columns=[], aggfunc=sum)
                          .to_records())
 
-    df_by = df_by[(df_by.Amount > 1) | (df_by.Amount < -1)].sort_values('Amount', ascending=False, ignore_index=True)
+    df_by = df_by[(df_by.Amount > 0.01) | (df_by.Amount < -0.01)].sort_values('Amount', ascending=False, ignore_index=True)
     return df_by
 
 
@@ -58,7 +58,10 @@ def convert_fx(df, currency='GBP', key_currency='Currency', key_value='Amount'):
             if ccy == currency:
                 fx_spots[ccy] = 1.0
             else:
-                ticker = f'{ccy}{currency}=X'
+                if ccy in ['BTC', 'ETH']:
+                    ticker = f'{ccy}-{currency}'
+                else:
+                    ticker = f'{ccy}{currency}=X'
                 try:
                     fx_spots[ccy] = yf.Ticker(ticker).history(period='1d').iloc[0].Close
                 except:

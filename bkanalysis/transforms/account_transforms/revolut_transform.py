@@ -34,16 +34,16 @@ def load(path_in, config, sep=';'):
     assert set(df.columns) == set(set([e.replace('CCY', currency) for e in expected_columns])), \
         f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Nutmeg)'
 
-    df[f"Paid In ({currency})"] = pd.to_numeric(df[f"Paid In ({currency})"].str.replace(',', ''),
+    df[f"Paid In ({currency})"] = pd.to_numeric(df[f"Paid In ({currency})"].str.replace(',', '').str.replace('"', '').str.strip(),
                                                 errors='coerce').fillna(0)
     if f"Paid Out ({currency})" not in df.columns:
         raise Exception(f'"Paid Out ({currency})" not in columns')
 
     try:
-        col = df[f"Paid Out ({currency})"].str
+        col = df[f"Paid Out ({currency})"].str.replace(',', '').str.replace('"', '').str.strip()
     except:
         col = df[f"Paid Out ({currency})"]
-    df[f"Paid Out ({currency})"] = pd.to_numeric(col.replace(',', ''), errors='coerce').fillna(0)
+    df[f"Paid Out ({currency})"] = pd.to_numeric(col, errors='coerce').fillna(0)
 
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Completed Date"].str.strip(), format='%d %b %Y')
