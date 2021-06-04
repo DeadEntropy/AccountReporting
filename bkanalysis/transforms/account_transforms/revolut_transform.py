@@ -8,6 +8,8 @@ from bkanalysis.transforms.account_transforms import static_data as sd
 
 
 def can_handle(path_in, config, sep=';'):
+    if not path_in.endswith('csv'):
+        return False
     df = pd.read_csv(path_in, sep=sep, nrows=1)
     expected_columns = [s.strip() for s in parse_list(config['expected_columns'], False)]
 

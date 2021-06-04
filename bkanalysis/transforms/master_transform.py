@@ -7,7 +7,7 @@ import configparser
 from bkanalysis.transforms.account_transforms import barclays_transform as barc, clone_transform, citi_transform, \
     lloyds_mortgage_transform as lloyds_mort, revolut_transform as rev_transform, \
     lloyds_current_transform as lloyds_curr, nutmeg_isa_transform as nut_transform, ubs_pension_transform, \
-    static_data as sd, vault_transform, coinbase_transform
+    static_data as sd, vault_transform, coinbase_transform, bnp_stock_transform
 
 
 class Loader:
@@ -48,25 +48,35 @@ class Loader:
             return vault_transform.load(file, self.config['Vault'])
         elif coinbase_transform.can_handle(file, self.config['Coinbase']):
             return coinbase_transform.load(file, self.config['Coinbase'])
+        elif bnp_stock_transform.can_handle(file, self.config['BnpStocks']):
+            return bnp_stock_transform.load(file, self.config['BnpStocks'])
 
         raise ValueError(f'file {file} could not be processed by any of the loaders.')
 
     @staticmethod
-    def get_files(folder_lake, root=None):
+    def get_files(folder_lake, root=None, include_xls=True):
         print(f'Loading files from {os.path.abspath(folder_lake)}.')
         if root is None:
-            files = glob.glob(os.path.join(folder_lake, '*.csv'))
+            csv_files = glob.glob(os.path.join(folder_lake, '*.csv'))
         else:
-            files = glob.glob(os.path.join(root, folder_lake, '*.csv'))
+            csv_files = glob.glob(os.path.join(root, folder_lake, '*.csv'))
 
-        print(f"Loading {len(files)} CSV file(s).")
-        return files
+        if include_xls:
+            if root is None:
+                xls_files = glob.glob(os.path.join(folder_lake, '*.xls'))
+            else:
+                xls_files = glob.glob(os.path.join(root, folder_lake, '*.xls'))
+        else:
+            xls_files = []
 
-    def load_all(self):
+        print(f"Loading {len(csv_files)} CSV file(s) and {len(xls_files)} XLS file(s).")
+        return csv_files + xls_files
+
+    def load_all(self, include_xls):
         if 'folder_root' in self.config['IO']:
-            files = self.get_files(self.config['IO']['folder_lake'], self.config['IO']['folder_root'])
+            files = self.get_files(self.config['IO']['folder_lake'], self.config['IO']['folder_root'], include_xls)
         else:
-            files = self.get_files(self.config['IO']['folder_lake'])
+            files = self.get_files(self.config['IO']['folder_lake'], include_xls=include_xls)
         if len(files) == 0:
             return
 

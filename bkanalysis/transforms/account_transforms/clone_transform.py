@@ -3,6 +3,8 @@ from bkanalysis.transforms.account_transforms import static_data as sd
 
 
 def can_handle(path_in):
+    if not path_in.endswith('csv'):
+        return False
     df = pd.read_csv(path_in, nrows=1)
     return set(df.columns) == set(sd.target_columns)
 

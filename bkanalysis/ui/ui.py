@@ -8,14 +8,15 @@ import numpy as np
 import warnings
 import plotly.express as px
 import yfinance as yf
+from bkanalysis.portfolio import portfolio as pf
 
 pd.options.display.float_format = '{:,.0f}'.format
 warnings.filterwarnings("ignore")
 
 
-def load(save_to_csv=False):
+def load(save_to_csv=False, include_xls=True):
     mt = master_transform.Loader()
-    df_raw = mt.load_all()
+    df_raw = mt.load_all(include_xls)
     if save_to_csv:
         mt.save(df_raw)
 
@@ -42,11 +43,20 @@ def get_status(df):
     return st.last_update(df)
 
 
-def get_current(df, by=['AccountType', 'Currency']):
-    df_by = pd.DataFrame(pd.pivot_table(df, values='Amount', index=by, columns=[], aggfunc=sum)
+def get_current(df, by=['AccountType', 'Currency'], ref_currency=None):
+    if ref_currency is None:
+        value_str = 'Amount'
+    elif len(ref_currency) == 3:
+        value_str = f'Amount_{ref_currency}'
+        if value_str not in df.columns:
+            df[f'Amount_{ref_currency}'] = convert_fx(df, ref_currency)
+    else:
+        raise Exception(f'{ref_currency} is not a valid ref_currency.')
+
+    df_by = pd.DataFrame(pd.pivot_table(df, values=value_str, index=by, columns=[], aggfunc=sum)
                          .to_records())
 
-    df_by = df_by[(df_by.Amount > 0.01) | (df_by.Amount < -0.01)].sort_values('Amount', ascending=False, ignore_index=True)
+    df_by = df_by[(df_by[value_str] > 0.01) | (df_by[value_str] < -0.01)].sort_values(value_str, ascending=False, ignore_index=True)
     return df_by
 
 
@@ -57,7 +67,7 @@ def convert_fx(df, currency='GBP', key_currency='Currency', key_value='Amount'):
         for ccy in df_ccy[key_currency].unique():
             if ccy == currency:
                 fx_spots[ccy] = 1.0
-            else:
+            elif len(ccy) == 3:  # its a currency
                 if ccy in ['BTC', 'ETH']:
                     ticker = f'{ccy}-{currency}'
                 else:
@@ -66,6 +76,8 @@ def convert_fx(df, currency='GBP', key_currency='Currency', key_value='Amount'):
                     fx_spots[ccy] = yf.Ticker(ticker).history(period='1d').iloc[0].Close
                 except:
                     raise Exception(f'failed to get fx spot for {ticker}.')
+            else:  # its a ticker
+                fx_spots[ccy] = pf.get_close_from_isin(ccy, currency)
 
         return df_ccy[key_value] * [fx_spots[ccy] for ccy in df_ccy.Currency]
     else:

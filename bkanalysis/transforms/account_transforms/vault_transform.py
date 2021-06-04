@@ -11,6 +11,8 @@ import datetime
 
 
 def can_handle(path_in, config):
+    if not path_in.endswith('csv'):
+        return False
     df = pd.read_csv(path_in, nrows=1)
     expected_columns = parse_list(config['expected_columns'])
     return set(df.columns) == set(expected_columns)

@@ -175,3 +175,16 @@ def get_portfolio_ts(stocks, start_point, period, currency='GBP'):
         return _sum_ts
 
     return _sum_ts * start_point / _sum_ts[0]
+
+
+def get_close_from_isin(isin, currency):
+    symbol = get_with_isin_map(isin)
+    if symbol is None:
+        return 0.0
+    ticker = __get_ticker(symbol)
+    if ticker is None:
+        return 0.0
+    close = __get_close(ticker, currency)
+    if close is None:
+        return 0.0
+    return close
