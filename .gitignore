@@ -1,11 +1,11 @@
 *.pyc
 *.iml
+*.ipynb
 .idea/dictionaries/nicol.xml
 .idea/inspectionProfiles/profiles_settings.xml
 .idea/misc.xml
 .idea/modules.xml
 .idea/vcs.xml
-# *.ipynb
 env
 notebooks/config
 notebooks/.ipynb_checkpoints
@@ -16,9 +16,4 @@ bkanalysis/ui/requirements.txt
 .venv
 .azure
 Dockerfile
-notebooks/full_analysis_backup.ipynb
-notebooks/trips_outside_uk.ipynb
-notebooks/wealth_monitoring.ipynb
-notebooks/wealth_monitoring.ipynb
-notebooks/wealth_monitoring.ipynb
 notebooks/trips.csv
