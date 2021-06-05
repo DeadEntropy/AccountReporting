@@ -72,7 +72,7 @@ class Loader:
         print(f"Loading {len(csv_files)} CSV file(s) and {len(xls_files)} XLS file(s).")
         return csv_files + xls_files
 
-    def load_all(self, include_xls):
+    def load_all(self, include_xls=True):
         if 'folder_root' in self.config['IO']:
             files = self.get_files(self.config['IO']['folder_lake'], self.config['IO']['folder_root'], include_xls)
         else:

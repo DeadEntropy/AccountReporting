@@ -33,7 +33,7 @@ def load(path_in, config, sep=';'):
         if ccy in df.columns[2]:
             currency = ccy
 
-    assert set(df.columns) == set(set([e.replace('CCY', currency) for e in expected_columns])), \
+    assert set(df.columns) == set(set([e.replace('CCY', currency).strip() for e in expected_columns])), \
         f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Nutmeg)'
 
     df[f"Paid In ({currency})"] = pd.to_numeric(df[f"Paid In ({currency})"].str.replace(',', '').str.replace('"', '').str.strip(),

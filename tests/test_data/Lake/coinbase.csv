@@ -1,0 +1,5 @@
+portfolio,type,time,amount,balance,amount/balance unit,transfer id,trade id,order id
+default,deposit,2021-06-01T14:10:42.816Z,2500,2500,GBP,,,
+default,match,2021-06-01T14:24:18.274Z,-2400,100,GBP,,,
+default,match,2021-06-01T14:24:18.274Z,1.2,1.2,ETH,,,
+default,fee,2021-06-01T14:24:18.274Z,-10,90,GBP,,,
