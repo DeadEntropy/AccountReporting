@@ -19,7 +19,7 @@ class CacheDict:
         self.__cache[key] = value
 
         with open(self.__path, 'w') as outfile:
-            json.dump(self.__cache, outfile)
+            json.dump(self.__cache, outfile, indent=2)
 
     def get(self, key, func):
         if key in self.__cache:
