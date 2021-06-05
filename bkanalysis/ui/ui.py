@@ -84,11 +84,17 @@ def convert_fx(df, currency='GBP', key_currency='Currency', key_value='Amount'):
         raise Exception(f'currency is not set to a correct value ({currency}). Expected None or String.')
 
 
-def plot_wealth(df, freq='w', currency='GBP', date_range=None, include_internal=False):
+def plot_wealth(df, freq='w', currency='GBP', date_range=None, include_internal=False, include_labels=False):
     if include_internal:
         df_ccy = df
     else:
         df_ccy = df[df.FacingAccount == '']
+
+    if date_range is not None:
+        if len(date_range) == 2:
+            df_ccy = df_ccy[(df_ccy.Date > date_range[0]) & (df_ccy.Date < date_range[1])]
+        else:
+            raise Exception(f'date_range is not set to a correct value ({date_range}). Expected None or String.')
 
     if f'Amount_{currency}' not in df_ccy.columns:
         df_ccy[f'Amount_{currency}'] = convert_fx(df_ccy, currency)
@@ -96,21 +102,16 @@ def plot_wealth(df, freq='w', currency='GBP', date_range=None, include_internal=
     values = df_ccy.set_index('Date').groupby(pd.Grouper(freq=freq))[f'Amount_{currency}'].sum()
     values.update(pd.Series(np.cumsum(values.values), index=values.index))
 
-    df_ccy['MemoDetailed'] = df_ccy.MemoMapped + ": " + df_ccy.Amount.map('{:,.0f}'.format)
-    df_agg = df_ccy.groupby(['Date', 'MemoDetailed']).agg({f'Amount_{currency}': sum})
-    g = df_agg[f'Amount_{currency}'].groupby(level=0, group_keys=False)
-    res = g.apply(lambda x: x.sort_values(ascending=False))
-    labels = pd.DataFrame(res.to_frame().to_records()).groupby(pd.Grouper(key='Date', freq=freq))[
-        'MemoDetailed'].apply(lambda x: '<br>'.join(x.unique()))
-
-    if date_range is not None:
-        if len(date_range) == 2:
-            values = values[(values.index > date_range[0]) & (values.index < date_range[1])]
-            labels = labels[(labels.index > date_range[0]) & (labels.index < date_range[1])]
-        else:
-            raise Exception(f'date_range is not set to a correct value ({date_range}). Expected None or String.')
-
-    fig = go.Figure(data=go.Scatter(x=values.index, y=values.values, hovertext=labels))
+    if include_labels:
+        df_ccy['MemoDetailed'] = df_ccy.MemoMapped + ": " + df_ccy.Amount.map('{:,.0f}'.format)
+        df_agg = df_ccy.groupby(['Date', 'MemoDetailed']).agg({f'Amount_{currency}': sum})
+        g = df_agg[f'Amount_{currency}'].groupby(level=0, group_keys=False)
+        res = g.apply(lambda x: x.sort_values(ascending=False))
+        labels = pd.DataFrame(res.to_frame().to_records()).groupby(pd.Grouper(key='Date', freq=freq))[
+            'MemoDetailed'].apply(lambda x: '<br>'.join(x.unique()))
+        fig = go.Figure(data=go.Scatter(x=values.index, y=values.values, hovertext=labels))
+    else:
+        fig = go.Figure(data=go.Scatter(x=values.index, y=values.values))
 
     fig.update_layout(
         title="Total Wealth",
