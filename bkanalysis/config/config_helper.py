@@ -1,6 +1,8 @@
 import ast
 import os
 
+source = r'config/config.ini'
+
 
 def parse_list(item, strip=True):
     if strip:

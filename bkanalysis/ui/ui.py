@@ -2,13 +2,13 @@
 from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
 from bkanalysis.projection import projection as pj
+from bkanalysis.market import market_prices as mp
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 import warnings
 import plotly.express as px
-import yfinance as yf
-from bkanalysis.portfolio import portfolio as pf
+
 
 pd.options.display.float_format = '{:,.0f}'.format
 warnings.filterwarnings("ignore")
@@ -63,22 +63,7 @@ def get_current(df, by=['AccountType', 'Currency'], ref_currency=None):
 def convert_fx(df, currency='GBP', key_currency='Currency', key_value='Amount'):
     if isinstance(currency, str):
         df_ccy = df
-        fx_spots = {}
-        for ccy in df_ccy[key_currency].unique():
-            if ccy == currency:
-                fx_spots[ccy] = 1.0
-            elif len(ccy) == 3:  # its a currency
-                if ccy in ['BTC', 'ETH']:
-                    ticker = f'{ccy}-{currency}'
-                else:
-                    ticker = f'{ccy}{currency}=X'
-                try:
-                    fx_spots[ccy] = yf.Ticker(ticker).history(period='1d').iloc[0].Close
-                except:
-                    raise Exception(f'failed to get fx spot for {ticker}.')
-            else:  # its a ticker
-                fx_spots[ccy] = pf.get_close_from_isin(ccy, currency)
-
+        fx_spots = mp.get_spot_prices(df_ccy[key_currency].unique(), currency)
         return df_ccy[key_value] * [fx_spots[ccy] for ccy in df_ccy.Currency]
     else:
         raise Exception(f'currency is not set to a correct value ({currency}). Expected None or String.')

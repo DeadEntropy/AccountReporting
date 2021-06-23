@@ -8,6 +8,7 @@ from bkanalysis.transforms.account_transforms import barclays_transform as barc,
     lloyds_mortgage_transform as lloyds_mort, revolut_transform as rev_transform, \
     lloyds_current_transform as lloyds_curr, nutmeg_isa_transform as nut_transform, ubs_pension_transform, \
     static_data as sd, vault_transform, coinbase_transform, bnp_stock_transform
+from bkanalysis.config import config_helper as ch
 
 
 class Loader:
@@ -15,7 +16,8 @@ class Loader:
     def __init__(self, config=None):
         if config is None:
             self.config = configparser.ConfigParser()
-            self.config.read('config/config.ini')
+            if len(self.config.read(ch.source)) != 1:
+                raise OSError(f'no config found in {ch.source}')
         else:
             self.config = config
 

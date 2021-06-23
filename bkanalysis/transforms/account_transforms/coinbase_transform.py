@@ -5,6 +5,7 @@ import glob
 import os
 from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
+from bkanalysis.config import config_helper as ch
 
 
 def can_handle(path_in, config, sep=','):
@@ -51,6 +52,7 @@ def load_save(config):
 
 def load_save_default():
     config = configparser.ConfigParser()
-    config.read('config/config.ini')
+    if len(config.read(ch.source)) != 1:
+        raise OSError(f'no config found in {ch.source}')
 
     load_save(config['Coinbase'])

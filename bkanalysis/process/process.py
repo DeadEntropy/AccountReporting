@@ -34,7 +34,8 @@ class Process:
     def __init__(self, config=None):
         if config is None:
             self.config = configparser.ConfigParser()
-            self.config.read('config/config.ini')
+            if len(self.config.read(ch.source)) != 1:
+                raise OSError(f'no config found in {ch.source}')
         else:
             self.config = config
 

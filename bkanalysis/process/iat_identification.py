@@ -2,16 +2,18 @@
 import ast
 import configparser
 import pandas as pd
+from bkanalysis.config import config_helper as ch
 
 
 class IatIdentification:
-    iat_types = ['SA', 'IAT', 'W_IN', 'W_OUT', 'SC', 'R', 'MC', 'O', 'FR', 'TAX', 'FPC', 'FLC', 'FLL']
+    iat_types = ['SA', 'IAT', 'W_IN', 'W_OUT', 'SC', 'R', 'MC', 'O', 'FR', 'TAX', 'FPC', 'FLC', 'FLL', 'FSC']
     iat_fx_types = ['FX']
 
     def __init__(self, config=None):
         if config is None:
             self.config = configparser.ConfigParser()
-            self.config.read('config/config.ini')
+            if len(self.config.read(ch.source)) != 1:
+                raise OSError(f'no config found in {ch.source}')
         else:
             self.config = config
 
