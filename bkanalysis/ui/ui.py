@@ -49,7 +49,7 @@ def get_current(df, by=['AccountType', 'Currency'], ref_currency=None):
     elif len(ref_currency) == 3:
         value_str = f'Amount_{ref_currency}'
         if value_str not in df.columns:
-            df[f'Amount_{ref_currency}'] = convert_fx(df, ref_currency)
+            df[f'Amount_{ref_currency}'] = convert_fx_spot(df, ref_currency)
     else:
         raise Exception(f'{ref_currency} is not a valid ref_currency.')
 
@@ -60,7 +60,7 @@ def get_current(df, by=['AccountType', 'Currency'], ref_currency=None):
     return df_by
 
 
-def convert_fx(df, currency='GBP', key_currency='Currency', key_value='Amount'):
+def convert_fx_spot(df, currency='GBP', key_currency='Currency', key_value='Amount'):
     if isinstance(currency, str):
         df_ccy = df
         fx_spots = mp.get_spot_prices(df_ccy[key_currency].unique(), currency)
@@ -82,7 +82,7 @@ def plot_wealth(df, freq='w', currency='GBP', date_range=None, include_internal=
             raise Exception(f'date_range is not set to a correct value ({date_range}). Expected None or String.')
 
     if f'Amount_{currency}' not in df_ccy.columns:
-        df_ccy[f'Amount_{currency}'] = convert_fx(df_ccy, currency)
+        df_ccy[f'Amount_{currency}'] = convert_fx_spot(df_ccy, currency)
 
     values = df_ccy.set_index('Date').groupby(pd.Grouper(freq=freq))[f'Amount_{currency}'].sum()
     values.update(pd.Series(np.cumsum(values.values), index=values.index))
@@ -120,14 +120,14 @@ def project(df, currency='GBP', nb_years=11, projection_data={}):
     projection['Volatility'] = [try_get(projection_data, acc, [0, 0, 0])[1] for acc in projection.Account]
     projection['Contribution'] = [try_get(projection_data, acc, [0, 0, 0])[2] for acc in projection.Account]
 
-    projection['Amount'] = convert_fx(projection, currency, 'Currency', 'Amount')
-    projection['Contribution'] = convert_fx(projection, currency, 'Currency', 'Contribution')
+    projection['Amount'] = convert_fx_spot(projection, currency, 'Currency', 'Amount')
+    projection['Contribution'] = convert_fx_spot(projection, currency, 'Currency', 'Contribution')
 
     r = range(0, nb_years)
     (w, w_low, w_up, w_low_ex, w_up_ex) = pj.project_full(projection, r)
 
     if f'Amount_{currency}' not in df.columns:
-        df[f'Amount_{currency}'] = convert_fx(df, currency)
+        df[f'Amount_{currency}'] = convert_fx_spot(df, currency)
 
     piv = pd.DataFrame(
         pd.pivot_table(df, values=f'Amount_{currency}', index=['Date'], columns=[], aggfunc=sum).to_records())
@@ -171,23 +171,23 @@ def project_compare(df, currency='GBP', nb_years=11, projection_data_1={}, proje
     projection_1['Volatility'] = [try_get(projection_data_1, acc, [0, 0, 0])[1] for acc in projection_1.Account]
     projection_1['Contribution'] = [try_get(projection_data_1, acc, [0, 0, 0])[2] for acc in projection_1.Account]
 
-    projection_1['Amount'] = convert_fx(projection_1, currency, 'Currency', 'Amount')
-    projection_1['Contribution'] = convert_fx(projection_1, currency, 'Currency', 'Contribution')
+    projection_1['Amount'] = convert_fx_spot(projection_1, currency, 'Currency', 'Amount')
+    projection_1['Contribution'] = convert_fx_spot(projection_1, currency, 'Currency', 'Contribution')
 
     projection_2 = get_current(df, ['AccountType', 'Currency', 'Account']).copy()
     projection_2['Return'] = [try_get(projection_data_2, acc, [0, 0, 0])[0] for acc in projection_2.Account]
     projection_2['Volatility'] = [try_get(projection_data_2, acc, [0, 0, 0])[1] for acc in projection_2.Account]
     projection_2['Contribution'] = [try_get(projection_data_2, acc, [0, 0, 0])[2] for acc in projection_2.Account]
 
-    projection_2['Amount'] = convert_fx(projection_2, currency, 'Currency', 'Amount')
-    projection_2['Contribution'] = convert_fx(projection_2, currency, 'Currency', 'Contribution')
+    projection_2['Amount'] = convert_fx_spot(projection_2, currency, 'Currency', 'Amount')
+    projection_2['Contribution'] = convert_fx_spot(projection_2, currency, 'Currency', 'Contribution')
 
     r = range(0, nb_years)
     (w1, w1_low, w1_up, w1_low_ex, w1_up_ex) = pj.project_full(projection_1, r)
     (w2, w2_low, w2_up, w2_low_ex, w2_up_ex) = pj.project_full(projection_2, r)
 
     if f'Amount_{currency}' not in df.columns:
-        df[f'Amount_{currency}'] = convert_fx(df, currency)
+        df[f'Amount_{currency}'] = convert_fx_spot(df, currency)
 
     piv = pd.DataFrame(
         pd.pivot_table(df, values=f'Amount_{currency}', index=['Date'], columns=[], aggfunc=sum).to_records())

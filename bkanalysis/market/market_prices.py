@@ -3,29 +3,58 @@ import pandas as pd
 from cachetools import cached, LRUCache
 from bkanalysis.portfolio import cache
 import requests
+import re
 
+mem_cache_history = LRUCache(maxsize=1024)
+mem_cache_currency = LRUCache(maxsize=1024)
 
 __query_yahoo_url = "https://query2.finance.yahoo.com/v1/finance/search"
 __isin_to_symbol_mapping_path = r'isin_cache.json'
 __isin_cache = cache.CacheDict(__isin_to_symbol_mapping_path)
 
+regex_ticker = re.compile(r'^[a-zA-Z][a-zA-Z][0-9]+')
+
+
+def get_spot_price(instr, currency):
+    if instr == currency:
+        return 1.0
+    elif len(instr) == 3:  # its a currency
+        if instr in ['BTC', 'ETH']:
+            symbol = f'{instr}-{currency}'
+        else:
+            symbol = f'{instr}{currency}=X'
+        try:
+            return __get_history(symbol, '1d').iloc[0].Close
+        except:
+            raise Exception(f'failed to get spot for {symbol}.')
+    elif regex_ticker.search(instr):  # its an isin
+        symbol = get_with_isin_map(instr)
+        if symbol is None:
+            print(f'Could not associate symbol to {instr}')
+            return 0.0
+        if regex_ticker.search(symbol):  # would lead to an infinite loop
+            print(f'symbol associated to {instr} is still an isin.')
+            return 0.0
+        return get_spot_price(symbol, currency)
+    else:
+        try:
+            spot_native = __get_history(instr, '1d').iloc[0].Close
+            native_ccy = __get_currency(instr)
+            if native_ccy is None:
+                print(f'Could not identify native_ccy for {instr}')
+                return 0.0
+            fx = get_spot_price(native_ccy, currency)
+
+            return spot_native * fx
+        except:
+            print(f'Could not find spot for {instr}')
+            return 0.0
+
 
 def get_spot_prices(instr_list, currency):
     fx_spots = {}
-    for ccy in instr_list:
-        if ccy == currency:
-            fx_spots[ccy] = 1.0
-        elif len(ccy) == 3:  # its a currency
-            if ccy in ['BTC', 'ETH']:
-                ticker = f'{ccy}-{currency}'
-            else:
-                ticker = f'{ccy}{currency}=X'
-            try:
-                fx_spots[ccy] = yf.Ticker(ticker).history(period='1d').iloc[0].Close
-            except:
-                raise Exception(f'failed to get fx spot for {ticker}.')
-        else:  # its a ticker
-            fx_spots[ccy] = get_close_from_isin(ccy, currency)
+    for instr in instr_list:
+        fx_spots[instr] = get_spot_price(instr, currency)
 
     return fx_spots
 
@@ -46,12 +75,6 @@ def __get_symbol_from_isin(isin):
         return data['quotes'][0]['symbol']
     except IndexError:
         return None
-
-
-mem_cache = LRUCache(maxsize=1024)
-@cached(mem_cache)
-def __get_history(ticker, period):
-    return ticker.history(period=period)
 
 
 def __get_time_series_in_currency(index, currency, period):
@@ -83,30 +106,27 @@ def get_with_isin_map(isin):
     return get_symbol_from_isin(__isin_map[isin]) if isin in __isin_map else get_symbol_from_isin(isin)
 
 
-mem_cache_symbol = LRUCache(maxsize=1024)
-@cached(mem_cache_symbol)
 def __get_ticker(symbol):
     return yf.Ticker(symbol)
 
 
-mem_cache_close = LRUCache(maxsize=1024)
-@cached(mem_cache_close)
-def __get_close(ticker, currency='GBP'):
-    hist = __get_history(ticker, '1d')
-    if len(hist) == 0:
-        return None
-    native_ccy = __get_currency(ticker)
-    if native_ccy is None:
-        return None
-
-    fx = __get_history(yf.Ticker(f"{native_ccy}{currency}=X"), '1d').iloc[0].Close
-
-    return hist.iloc[0].Close * fx
+@cached(mem_cache_history)
+def __get_history(symbol, period):
+    return __get_ticker(symbol).history(period=period)
 
 
-mem_cache_currency = LRUCache(maxsize=1024)
+__currency_map = {
+    'FHQP.F': 'EUR',
+    'PBF7.F': 'EUR'
+}
+
+
 @cached(mem_cache_currency)
-def __get_currency(ticker):
+def __get_currency(symbol):
+    if symbol in __currency_map:
+        return __currency_map[symbol]
+
+    ticker = __get_ticker(symbol)
     if ticker is None:
         return None
     try:
@@ -124,16 +144,3 @@ def __get_currency(ticker):
         return info['currency']
     else:
         return None
-
-
-def get_close_from_isin(isin, currency):
-    symbol = get_with_isin_map(isin)
-    if symbol is None:
-        return 0.0
-    ticker = __get_ticker(symbol)
-    if ticker is None:
-        return 0.0
-    close = __get_close(ticker, currency)
-    if close is None:
-        return 0.0
-    return close
