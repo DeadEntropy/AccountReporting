@@ -1,3 +1,5 @@
+from json import JSONDecodeError
+
 import yfinance as yf
 import pandas as pd
 from cachetools import cached, LRUCache
@@ -25,6 +27,8 @@ def get_spot_price(instr, currency):
             symbol = f'{instr}{currency}=X'
         try:
             return __get_history(symbol, '1d').iloc[0].Close
+        except JSONDecodeError as e:
+            raise JSONDecodeError(f'failed to get spot for {symbol}:', e.doc, e.pos)
         except:
             raise Exception(f'failed to get spot for {symbol}.')
     elif regex_ticker.search(instr):  # its an isin

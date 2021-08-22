@@ -258,8 +258,12 @@ __DATE_FORMAT = '%Y-%m-%d'
 def plot_sunburst(df, path, account=None, currency=None, date_range=None):
     if date_range is not None:
         df = df[(df.Date > date_range[0]) & (df.Date < date_range[1])]
+        if len(df) == 0:
+            raise Exception(f'df is empty, check that date_range is correct.')
     else:
         df = df[df.YearToDate < 1]
+        if len(df) == 0:
+            raise Exception(f'df is empty, check dataframe contains data less than 1 year old.')
 
     if currency is not None:
         df = df[df.Currency == currency]
@@ -273,7 +277,14 @@ def plot_sunburst(df, path, account=None, currency=None, date_range=None):
                      & (df.FullType != 'Intra-Account Transfert')]
     df_expenses.Amount = (-1) * df_expenses.Amount
 
-    title = f'Spending Breakdown for {np.min(df.Date).strftime(__DATE_FORMAT)} to {np.max(df.Date).strftime(__DATE_FORMAT)}' \
-            f' (Total Spend: {np.abs(df_expenses.Amount.sum()):,.0f})'
+    try:
+        title = f'Spending Breakdown for {np.min(df.Date).strftime(__DATE_FORMAT)} to {np.max(df.Date).strftime(__DATE_FORMAT)}' \
+                f' (Total Spend: {np.abs(df_expenses.Amount.sum()):,.0f})'
+    except ValueError:
+        print(f'{np.min(df.Date)}')
+        print(f'{np.max(df.Date)}')
+        print(f'{np.abs(df_expenses.Amount.sum())}')
+        title = ''
+
     fig = px.sunburst(df_expenses, path=path, values='Amount', title=title)
     return fig
