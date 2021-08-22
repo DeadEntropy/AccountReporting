@@ -17,3 +17,4 @@ bkanalysis/ui/requirements.txt
 .azure
 Dockerfile
 notebooks/trips.csv
+tests/run.py
