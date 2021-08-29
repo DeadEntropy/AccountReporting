@@ -16,11 +16,12 @@ def process_stock(stocks, key='isin', period='1y', fallback_key=None, currency='
                             for (v, v_fallback) in zip(stocks[key], stocks[fallback_key])]
 
     stocks['yf_ticker'] = [mp.__get_ticker(symbol) if symbol is not None else None for symbol in stocks['symbol']]
-    stocks['close'] = [mp.__get_close(ticker, currency) if ticker is not None else None for ticker in stocks['yf_ticker']]
-    stocks['native_currency'] = [mp.__get_currency(ticker) if ticker is not None else None for ticker in stocks['yf_ticker']]
+    stocks['close_native'] = [mp.__get_last_close(symbol, period) if symbol is not None else None for symbol in stocks['symbol']]
+    stocks['native_currency'] = [mp.__get_currency(symbol).upper() if symbol is not None else None for symbol in stocks['symbol']]
+    stocks['close'] = [mp.get_spot_price(symbol, currency) for symbol in stocks['symbol']]
     stocks['currency'] = currency
-    stocks[f'times_series_{period}_{currency}'] = [mp.__get_time_series_in_currency(ticker, currency, period) if ticker is not None else None for ticker
-                                        in stocks.yf_ticker]
+    stocks[f'times_series_{period}_{currency}'] = [mp.__get_time_series_in_currency(symbol, currency, period) \
+                                                   if symbol is not None else None for symbol in stocks['symbol']]
 
 
 def total_return(ts):

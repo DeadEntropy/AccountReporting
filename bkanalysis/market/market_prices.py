@@ -16,12 +16,17 @@ __isin_cache = cache.CacheDict(__isin_to_symbol_mapping_path)
 
 regex_ticker = re.compile(r'^[a-zA-Z][a-zA-Z][0-9]+')
 
+__currencies = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD', 'KRW', 'CNH']
+__crypto = ['BTC', 'ETH']
+
 
 def get_spot_price(instr, currency):
+    if instr is None:
+        return None
     if instr == currency:
         return 1.0
-    elif len(instr) == 3:  # its a currency
-        if instr in ['BTC', 'ETH']:
+    elif (len(instr) == 3) and (instr in __currencies or instr in __crypto):  # its a currency/crypto
+        if instr in __crypto:
             symbol = f'{instr}-{currency}'
         else:
             symbol = f'{instr}{currency}=X'
@@ -35,10 +40,10 @@ def get_spot_price(instr, currency):
         symbol = get_with_isin_map(instr)
         if symbol is None:
             print(f'Could not associate symbol to {instr}')
-            return 0.0
+            return None
         if regex_ticker.search(symbol):  # would lead to an infinite loop
             print(f'symbol associated to {instr} is still an isin.')
-            return 0.0
+            return None
         return get_spot_price(symbol, currency)
     else:
         try:
@@ -46,13 +51,13 @@ def get_spot_price(instr, currency):
             native_ccy = __get_currency(instr)
             if native_ccy is None:
                 print(f'Could not identify native_ccy for {instr}')
-                return 0.0
+                return None
             fx = get_spot_price(native_ccy, currency)
 
             return spot_native * fx
         except:
             print(f'Could not find spot for {instr}')
-            return 0.0
+            return None
 
 
 def get_spot_prices(instr_list, currency):
@@ -73,7 +78,9 @@ def __get_symbol_from_isin(isin):
     try:
         data = r.json()
     except:
-        raise Exception(f'failed to parse answer for {isin}: {r}')
+        # raise Exception(f'failed to parse answer for {isin}: {r}')
+        print(f'failed to parse answer for {isin}: {r}')
+        return None
 
     try:
         return data['quotes'][0]['symbol']
@@ -81,17 +88,19 @@ def __get_symbol_from_isin(isin):
         return None
 
 
-def __get_time_series_in_currency(index, currency, period):
-    ticker = yf.Ticker(index)
-    close_native_ccy = __get_history(ticker, period).Close
-    native_ccy = __get_currency(ticker)
+def __get_time_series_in_currency(symbol, currency, period):
+    close_native_ccy = __get_history(symbol, period).Close
+    native_ccy = __get_currency(symbol)
     if native_ccy is None:
         return None
 
     if native_ccy == currency:
         return close_native_ccy
 
-    fx_ts = __get_history(yf.Ticker(f"{native_ccy}{currency}=X"), period).Close
+    if len(close_native_ccy) == 0:
+        return None
+
+    fx_ts = __get_history(f"{native_ccy}{currency}=X", period).Close
 
     frame = {'eq': close_native_ccy, 'fx': fx_ts}
     result = pd.DataFrame(frame)
@@ -114,6 +123,15 @@ def __get_ticker(symbol):
     return yf.Ticker(symbol)
 
 
+def __get_last_close(symbol, period):
+    hist = __get_history(symbol, period)
+    if hist is None:
+        return None
+    if len(hist.Close) == 0:
+        return None
+    return hist.Close[-1]
+
+
 @cached(mem_cache_history)
 def __get_history(symbol, period):
     return __get_ticker(symbol).history(period=period)
@@ -128,7 +146,7 @@ __currency_map = {
 @cached(mem_cache_currency)
 def __get_currency(symbol):
     if symbol in __currency_map:
-        return __currency_map[symbol]
+        return __currency_map[symbol].upper()
 
     ticker = __get_ticker(symbol)
     if ticker is None:
@@ -145,6 +163,6 @@ def __get_currency(symbol):
     if info is None:
         return None
     if 'currency' in info:
-        return info['currency']
+        return info['currency'].upper()
     else:
         return None
