@@ -14,7 +14,7 @@ __query_yahoo_url = "https://query2.finance.yahoo.com/v1/finance/search"
 __isin_to_symbol_mapping_path = r'isin_cache.json'
 __isin_cache = cache.CacheDict(__isin_to_symbol_mapping_path)
 
-regex_ticker = re.compile(r'^[a-zA-Z][a-zA-Z][0-9]+')
+regex_ticker = re.compile(r'^[a-zA-Z][a-zA-Z][0-9]+$')
 
 __currencies = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD', 'KRW', 'CNH']
 __crypto = ['BTC', 'ETH']
@@ -31,7 +31,7 @@ def get_spot_price(instr, currency):
         else:
             symbol = f'{instr}{currency}=X'
         try:
-            return __get_history(symbol, '1d').iloc[0].Close
+            return __get_history(symbol, '1y').iloc[0].Close
         except JSONDecodeError as e:
             raise JSONDecodeError(f'failed to get spot for {symbol}:', e.doc, e.pos)
         except:
@@ -47,7 +47,7 @@ def get_spot_price(instr, currency):
         return get_spot_price(symbol, currency)
     else:
         try:
-            spot_native = __get_history(instr, '1d').iloc[0].Close
+            spot_native = __get_last_close(instr, '1y')
             native_ccy = __get_currency(instr)
             if native_ccy is None:
                 print(f'Could not identify native_ccy for {instr}')

@@ -1,26 +1,29 @@
 # coding=utf8
+import pandas as pd
+import numpy as np
+
 from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
 from bkanalysis.projection import projection as pj
 from bkanalysis.market import market_prices as mp
-import pandas as pd
-import plotly.graph_objects as go
-import numpy as np
-import warnings
-import plotly.express as px
 
+import plotly.graph_objects as go
+import plotly.express as px
+import matplotlib.pyplot as plt
+
+import warnings
 
 pd.options.display.float_format = '{:,.0f}'.format
 warnings.filterwarnings("ignore")
 
 
-def load(save_to_csv=False, include_xls=True):
-    mt = master_transform.Loader()
+def load(save_to_csv=False, include_xls=True, config=None):
+    mt = master_transform.Loader(config)
     df_raw = mt.load_all(include_xls)
     if save_to_csv:
         mt.save(df_raw)
 
-    pr = process.Process()
+    pr = process.Process(config)
     df = pr.process(df_raw)
     if save_to_csv:
         pr.save(df)
@@ -252,10 +255,7 @@ def internal_flows(df):
     return fig
 
 
-__DATE_FORMAT = '%Y-%m-%d'
-
-
-def plot_sunburst(df, path, account=None, currency=None, date_range=None):
+def get_expenses(df, date_range=None):
     if date_range is not None:
         df = df[(df.Date > date_range[0]) & (df.Date < date_range[1])]
         if len(df) == 0:
@@ -265,11 +265,6 @@ def plot_sunburst(df, path, account=None, currency=None, date_range=None):
         if len(df) == 0:
             raise Exception(f'df is empty, check dataframe contains data less than 1 year old.')
 
-    if currency is not None:
-        df = df[df.Currency == currency]
-    if account is not None:
-        df = df[df.Account == account]
-
     df_expenses = df[(~df.FullMasterType.isin(['Income', 'ExIncome']))
                      & (df.FullType != 'Savings')
                      & (df.FacingAccount == '')
@@ -277,14 +272,60 @@ def plot_sunburst(df, path, account=None, currency=None, date_range=None):
                      & (df.FullType != 'Intra-Account Transfert')]
     df_expenses.Amount = (-1) * df_expenses.Amount
 
+    return df_expenses
+
+
+__DATE_FORMAT = '%Y-%m-%d'
+
+
+def get_title(dates, amounts):
     try:
-        title = f'Spending Breakdown for {np.min(df.Date).strftime(__DATE_FORMAT)} to {np.max(df.Date).strftime(__DATE_FORMAT)}' \
-                f' (Total Spend: {np.abs(df_expenses.Amount.sum()):,.0f})'
+        title = f'Spending Breakdown for {np.min(dates).strftime(__DATE_FORMAT)} to ' \
+                f'{np.max(dates).strftime(__DATE_FORMAT)}' \
+                f' (Total Spend: {np.abs(amounts.sum()):,.0f})'
     except ValueError:
-        print(f'{np.min(df.Date)}')
-        print(f'{np.max(df.Date)}')
-        print(f'{np.abs(df_expenses.Amount.sum())}')
+        print(f'{np.min(dates)}')
+        print(f'{np.max(dates)}')
+        print(f'{np.abs(amounts.sum())}')
         title = ''
 
+    return title
+
+
+def plot_sunburst(df, path, date_range=None):
+    df_expenses = get_expenses(df, date_range)
+    title = get_title(df_expenses.Date, df_expenses.Amount)
     fig = px.sunburst(df_expenses, path=path, values='Amount', title=title)
+    return fig
+
+
+def plot_pie(df, index='Account', date_range=None, minimal_amount=1000):
+    fig, ax = plt.subplots(subplot_kw=dict(aspect="equal"))
+    plt.close()
+
+    def func(pct, allvals):
+        absolute = int(round(pct / 100. * np.sum(allvals)))
+        if pct < 1:
+            return ''
+        return "{:.1f}%\n{:,}".format(pct, absolute)
+
+    df_expenses = get_expenses(df)
+    df_expenses["Amount"] = pd.to_numeric(df_expenses["Amount"])
+    df_account = pd.DataFrame(pd.pivot_table(df_expenses, values=['Amount'], index=index, aggfunc=sum).to_records())
+    df_account = df_account[df_account.Amount > minimal_amount]
+    df_account = df_account.sort_values('Amount', ascending=False)
+
+    account = list(df_account[index])
+    amount = list(df_account.Amount)
+
+    wedges, texts, autotexts = ax.pie(amount, labels=account, autopct=lambda pct: func(pct, amount),
+                                      textprops=dict(color="w"))
+
+    # plt.setp(autotexts, size=12, weight="bold")
+
+    title = get_title(df_expenses.Date, df_expenses.Amount)
+    ax.set_title(title)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+              fancybox=True, shadow=True, ncol=5)
+
     return fig
