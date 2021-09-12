@@ -14,7 +14,7 @@ __query_yahoo_url = "https://query2.finance.yahoo.com/v1/finance/search"
 __isin_to_symbol_mapping_path = r'isin_cache.json'
 __isin_cache = cache.CacheDict(__isin_to_symbol_mapping_path)
 
-regex_ticker = re.compile(r'^[a-zA-Z][a-zA-Z][0-9]+$')
+regex_ticker = re.compile(r'^[a-zA-Z][a-zA-Z][0-9]+')
 
 __currencies = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD', 'KRW', 'CNH']
 __crypto = ['BTC', 'ETH']
@@ -36,7 +36,7 @@ def get_spot_price(instr, currency):
             raise JSONDecodeError(f'failed to get spot for {symbol}:', e.doc, e.pos)
         except:
             raise Exception(f'failed to get spot for {symbol}.')
-    elif regex_ticker.search(instr):  # its an isin
+    elif regex_ticker.search(instr) and len(instr) == 12:  # its an isin
         symbol = get_with_isin_map(instr)
         if symbol is None:
             print(f'Could not associate symbol to {instr}')

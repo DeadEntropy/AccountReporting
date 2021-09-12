@@ -20,19 +20,25 @@ def get_key(proportion, date):
     return max([v for v in list(proportion.keys()) if date > pd.to_datetime(v)])
 
 
-def fund_price(df_unit_price, date, fund_name, recursif=0):
-    try:
-        if recursif == 0:
-            return list(df_unit_price[(df_unit_price['Unit Price Date'] == date) & (df_unit_price['Fund Name'] == fund_name)]['Unit Price'])[0]
-        elif recursif<5:
-            return list(df_unit_price[(df_unit_price['Unit Price Date'] == date - timedelta(days=recursif)) & (df_unit_price['Fund Name'] == fund_name)]['Unit Price'])[0]
-        else:
-            raise Exception(f'Failed with fallback on {date}\t{fund_name}')
-    except IndexError:
-        if recursif < 5:
-            return fund_price(df_unit_price, date, fund_name, recursif+1)
-        else:
-            raise Exception(f'Failed on {date}\t{fund_name}')
+def fund_price(df_unit_price, date, fund_name):
+    if fund_name not in list(df_unit_price['Fund Name']):
+        raise Exception(f'{fund_name} is not available. (available: {", ".join(list(set(list(df_unit_price["Fund Name"]))))})')
+
+    if date in df_unit_price['Unit Price Date']:
+        return list(df_unit_price[(df_unit_price['Unit Price Date'] == date)
+                                  & (df_unit_price['Fund Name'] == fund_name)]['Unit Price'])[0]
+    elif date > max(df_unit_price['Unit Price Date']):
+        return list(df_unit_price[(df_unit_price['Unit Price Date'] == max(df_unit_price['Unit Price Date']))
+                                  & (df_unit_price['Fund Name'] == fund_name)]['Unit Price'])[0]
+    else:
+        for days in range(1, 15):
+            adjusted_date = date - timedelta(days=days)
+            if adjusted_date in list(df_unit_price['Unit Price Date']):
+                return list(df_unit_price[(df_unit_price['Unit Price Date'] == adjusted_date) & (
+                            df_unit_price['Fund Name'] == fund_name)]['Unit Price'])[0]
+
+        raise Exception(f'{date}/{fund_name} is not available (tried 15 days fallback. '
+                        f'last available date is {max(df_unit_price["Unit Price Date"])}).')
 
 
 def __to_float(s):

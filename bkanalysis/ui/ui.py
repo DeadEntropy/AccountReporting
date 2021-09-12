@@ -59,7 +59,11 @@ def get_current(df, by=['AccountType', 'Currency'], ref_currency=None):
     df_by = pd.DataFrame(pd.pivot_table(df, values=value_str, index=by, columns=[], aggfunc=sum)
                          .to_records())
 
-    df_by = df_by[(df_by[value_str] > 0.01) | (df_by[value_str] < -0.01)].sort_values(value_str, ascending=False, ignore_index=True)
+    if value_str not in df_by.columns:
+        raise Exception(f'{value_str} not in df.columns: {", ".join(df_by.columns)}.')
+
+    df_by = df_by[(df_by[value_str] > 0.01) | (df_by[value_str] < -0.01)]
+    df_by = df_by.sort_values(value_str, ascending=False, ignore_index=True)
     return df_by
 
 
