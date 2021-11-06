@@ -7,7 +7,8 @@ import configparser
 from bkanalysis.transforms.account_transforms import barclays_transform as barc, clone_transform, citi_transform, \
     lloyds_mortgage_transform as lloyds_mort, revolut_transform as rev_transform, \
     lloyds_current_transform as lloyds_curr, nutmeg_isa_transform as nut_transform, ubs_pension_transform, \
-    static_data as sd, vault_transform, coinbase_transform, bnp_stock_transform, chase_transform
+    static_data as sd, vault_transform, coinbase_transform, bnp_stock_transform, chase_transform, \
+    revolut_transform_2 as rev_transform_2, fidelity_transform
 from bkanalysis.config import config_helper as ch
 
 
@@ -40,6 +41,8 @@ class Loader:
             return rev_transform.load(file, self.config['Revolut'], ';')
         elif rev_transform.can_handle(file, self.config['Revolut'], ', '):
             return rev_transform.load(file, self.config['Revolut'], ', ')
+        elif rev_transform_2.can_handle(file, self.config['Revolut2'], ','):
+            return rev_transform_2.load(file, self.config['Revolut2'], ',')
         elif citi_transform.can_handle(file, self.config['Citi']):
             return citi_transform.load(file, self.config['Citi'])
         elif clone_transform.can_handle(file):
@@ -54,6 +57,8 @@ class Loader:
             return bnp_stock_transform.load(file, self.config['BnpStocks'])
         elif chase_transform.can_handle(file, self.config['Chase']):
             return chase_transform.load(file, self.config['Chase'])
+        elif fidelity_transform.can_handle(file, self.config['Fidelity']):
+            return fidelity_transform.load(file, self.config['Fidelity'])
 
         raise ValueError(f'file {file} could not be processed by any of the loaders.')
 
