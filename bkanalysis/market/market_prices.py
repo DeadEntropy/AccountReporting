@@ -20,6 +20,20 @@ __currencies = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD', 'KRW', 'CNH']
 __crypto = ['BTC', 'ETH']
 
 
+def get_symbol(instr, currency):
+    if instr is None:
+        return None
+    elif (len(instr) == 3) and (instr in __currencies or instr in __crypto):  # its a currency/crypto
+        if instr in __crypto:
+            return f'{instr}-{currency}'
+        else:
+            return f'{instr}{currency}=X'
+    elif regex_ticker.search(instr) and len(instr) == 12:  # its an isin
+        return get_with_isin_map(instr)
+
+    return instr
+
+
 def get_spot_price(instr, currency):
     if instr is None:
         return None
@@ -31,7 +45,7 @@ def get_spot_price(instr, currency):
         else:
             symbol = f'{instr}{currency}=X'
         try:
-            return __get_history(symbol, '1y').iloc[0].Close
+            return __get_history(symbol, '1y').sort_values('Date').iloc[-1].Close
         except JSONDecodeError as e:
             raise JSONDecodeError(f'failed to get spot for {symbol}:', e.doc, e.pos)
         except:
@@ -48,15 +62,21 @@ def get_spot_price(instr, currency):
     else:
         try:
             spot_native = __get_last_close(instr, '1y')
+            if spot_native is None:
+                print(f'Could not find last close for {spot_native}.')
+                return None
             native_ccy = __get_currency(instr)
             if native_ccy is None:
-                print(f'Could not identify native_ccy for {instr}')
+                print(f'Could not identify native_ccy for {instr}.')
                 return None
             fx = get_spot_price(native_ccy, currency)
+            if fx is None:
+                print(f'Could not find spot for {native_ccy} in {currency}.')
+                return None
 
             return spot_native * fx
-        except:
-            print(f'Could not find spot for {instr}')
+        except Exception as e:
+            print(f'Could not find spot for {instr} in {currency}: {e}')
             return None
 
 
@@ -126,9 +146,12 @@ def __get_ticker(symbol):
 def __get_last_close(symbol, period):
     hist = __get_history(symbol, period)
     if hist is None:
+        print(f'hist for {symbol} for {period} is None.')
         return None
     if len(hist.Close) == 0:
+        print(f'hist for {symbol} for {period} contains no values.')
         return None
+
     return hist.Close[-1]
 
 

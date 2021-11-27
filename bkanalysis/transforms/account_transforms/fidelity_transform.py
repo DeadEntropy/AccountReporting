@@ -28,11 +28,11 @@ def load(path_in, config, sep=','):
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Run Date"].str.strip(), format='%m/%d/%Y')
     df_out.Account = 'Fidelity Brokerage'
-    df_out.Currency = [config['cash_account'] if s.isspace() else s for s in df.Symbol]
+    df_out.Currency = [config['cash_account'] if s.isspace() else s.strip() for s in df.Symbol]
     df_out.Amount = [a if ccy == config['cash_account'] else q for (q, a, ccy) in
                      zip(df.Quantity, df['Amount ($)'], df_out.Currency)]
-    df_out.Subcategory = df.Action
-    df_out.Memo = df['Security Description']
+    df_out.Memo = df.Action
+    df_out.Subcategory = df['Security Description']
     df_out['AccountType'] = config['account_type']
 
     # Fidelity doesnt give the outflows from t he cash_account, so we need to manually add them
@@ -42,8 +42,8 @@ def load(path_in, config, sep=','):
     df_cash_out.Account = 'Fidelity Brokerage'
     df_cash_out.Currency = config['cash_account']
     df_cash_out.Amount = df_cash_account['Amount ($)']
-    df_cash_out.Subcategory = df_cash_account.Action
-    df_cash_out.Memo = df_cash_account['Security Description']
+    df_cash_out.Memo = df_cash_account.Action
+    df_cash_out.Subcategory = df_cash_account['Security Description']
 
     df_out = df_out.append(df_cash_out).sort_values('Date', ascending=False).reset_index(drop=True)
 
