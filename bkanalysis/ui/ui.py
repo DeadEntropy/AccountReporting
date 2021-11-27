@@ -2,6 +2,9 @@
 import pandas as pd
 import numpy as np
 
+import itertools
+import datetime as dt
+
 from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
 from bkanalysis.projection import projection as pj
@@ -17,11 +20,14 @@ pd.options.display.float_format = '{:,.0f}'.format
 warnings.filterwarnings("ignore")
 
 
-def load(save_to_csv=False, include_xls=True, config=None):
+def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True, config=None):
     mt = master_transform.Loader(config)
     df_raw = mt.load_all(include_xls)
     if save_to_csv:
         mt.save(df_raw)
+
+    if not map_transactions:
+        return df_raw
 
     pr = process.Process(config)
     df = pr.process(df_raw)
@@ -31,13 +37,37 @@ def load(save_to_csv=False, include_xls=True, config=None):
     return df
 
 
-def load_csv(file_path):
-    df = pd.read_csv(file_path, parse_dates=['Date'])
-    df['FacingAccount'] = df['FacingAccount'].fillna('')
-    df['SubType'] = df['SubType'].fillna('')
-    df['FullSubType'] = df['FullSubType'].fillna('')
-    df['Type'] = df['Type'].fillna('')
-    df['FullType'] = df['FullType'].fillna('')
+def transactions_to_values(df):
+    # Ensure all dates are in the same format
+    df.Date = [dt.datetime(old_date.year, old_date.month, old_date.day) for old_date in df.Date]
+
+    # Ensure there all (Account, Currency, Date) tuples are unique
+    df.drop(df.columns.difference(['Account', 'Currency', 'Date', 'MemoMapped', 'Amount']), 1, inplace=True)
+    df = df.groupby(['Account', 'Currency', 'Date']).agg(
+        {'Amount': 'sum', 'MemoMapped': sum}).reset_index().drop_duplicates().set_index(['Account', 'Currency', 'Date'])
+
+    # Compute the running sum for each tuple (Account, Currency)
+    df = df.sort_values('Date')
+    df['CumulatedAmount'] = df.groupby(['Account', 'Currency'])['Amount'].transform(pd.Series.cumsum)
+    df = df.sort_values('Date', ascending=False)
+
+    # Prepare the Schedule
+    date_range = pd.date_range(start=df.reset_index().Date.min(), end=df.reset_index().Date.max(), freq='1D')
+
+    # Create the Index on the full time range
+    index = list(
+        itertools.product(*[list(set(list(df.reset_index().set_index(['Account', 'Currency']).index))), date_range]))
+    index = [(tupl[0], tupl[1], time) for (tupl, time) in index]
+
+    # set the new multi-index
+    df = df.reindex(pd.MultiIndex.from_tuples(index, names=df.index.names)) \
+        .reset_index() \
+        .groupby(['Account', 'Currency']) \
+        .apply(lambda group: group.interpolate(method='ffill', limit_direction='forward')) \
+        .dropna() \
+        .reset_index(drop=True) \
+        .set_index(['Account', 'Currency'])
+
     return df
 
 
