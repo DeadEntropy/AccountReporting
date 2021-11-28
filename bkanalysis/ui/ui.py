@@ -9,6 +9,7 @@ from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
 from bkanalysis.projection import projection as pj
 from bkanalysis.market import market_prices as mp
+from bkanalysis.ui import Market as mkt
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -52,7 +53,9 @@ def transactions_to_values(df):
     df = df.sort_values('Date', ascending=False)
 
     # Prepare the Schedule
-    date_range = pd.date_range(start=df.reset_index().Date.min(), end=df.reset_index().Date.max(), freq='1D')
+    date_range = pd.date_range(start=df.reset_index().Date.min(),\
+                               end=max(df.reset_index().Date.max(), dt.datetime.now()),\
+                               freq='1D')
 
     # Create the Index on the full time range
     index = list(
@@ -67,6 +70,29 @@ def transactions_to_values(df):
         .dropna() \
         .reset_index(drop=True) \
         .set_index(['Account', 'Currency'])
+
+    return df
+
+
+def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10y'):
+    # Get the symbols from the dataframe
+    symbols = [mp.get_symbol(instr, ref_currency) for instr in df.reset_index().Currency.unique()]
+
+    # Get the additional currencies
+    currencies = list(set([mp.__get_currency(symbol) for symbol in symbols if symbol is not None]))
+    symbols = list(set([f'{ccy}{ref_currency}=X' for ccy in currencies if ccy != ref_currency] + symbols))
+
+    # Get the time series
+    values = [(symbol, mp.__get_history(symbol, period), mp.__get_currency(symbol)) for symbol in symbols if
+              symbol is not None]
+
+    # Build the market
+    market = mkt.Market(values)
+
+    # Compute the value of the each (Account, Currency) in ref_currency
+    price_in_currency = [market.get_price_in_currency(mp.get_symbol(instr, ref_currency), date, ref_currency)\
+                         if instr != ref_currency else 1.0 for (instr, date) in zip(df.reset_index().Currency, df.reset_index().Date)]
+    df['CumulatedAmountInCurrency'] = df['CumulatedAmount'] * price_in_currency
 
     return df
 
