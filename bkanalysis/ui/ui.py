@@ -8,8 +8,7 @@ import datetime as dt
 from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
 from bkanalysis.projection import projection as pj
-from bkanalysis.market import market_prices as mp
-from bkanalysis.ui import Market as mkt
+from bkanalysis.market import market_prices as mp, Market as mkt
 
 import plotly.graph_objects as go
 import plotly.express as px
