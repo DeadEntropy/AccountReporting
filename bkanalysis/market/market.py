@@ -1,16 +1,13 @@
 import datetime as dt
+from bkanalysis.market.price import Price
 
 
 class Market:
-    class Price:
-        def __init__(self, value: float, currency: str):
-            self.value = value
-            self.currency = currency
 
     _EXTRAPOLATE_LEFT = True
 
-    def __init__(self, values):
-        self._dict = {value[0]: {date: self.Price(close, value[2]) for (date, close) in value[1].Close.iteritems()} for value in list(values)}
+    def __init__(self, dict_of_values):
+        self._dict = dict_of_values
 
     def __get_previous_date(self, instr: str, date: dt.datetime):
         if instr not in self._dict.keys():

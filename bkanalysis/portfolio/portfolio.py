@@ -17,7 +17,7 @@ def process_stock(stocks, key='isin', period='1y', fallback_key=None, currency='
 
     stocks['yf_ticker'] = [mp.__get_ticker(symbol) if symbol is not None else None for symbol in stocks['symbol']]
     stocks['close_native'] = [mp.__get_last_close(symbol, period) if symbol is not None else None for symbol in stocks['symbol']]
-    stocks['native_currency'] = [mp.__get_currency(symbol).upper() if symbol is not None else None for symbol in stocks['symbol']]
+    stocks['native_currency'] = [mp.get_currency(symbol).upper() if symbol is not None else None for symbol in stocks['symbol']]
     stocks['close'] = [mp.get_spot_price(symbol, currency) for symbol in stocks['symbol']]
     stocks['currency'] = currency
     stocks[f'times_series_{period}_{currency}'] = [mp.__get_time_series_in_currency(symbol, currency, period) \

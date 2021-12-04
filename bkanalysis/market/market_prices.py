@@ -45,7 +45,7 @@ def get_spot_price(instr, currency):
         else:
             symbol = f'{instr}{currency}=X'
         try:
-            return __get_history(symbol, '1y').sort_values('Date').iloc[-1].Close
+            return get_history(symbol, '1y').sort_values('Date').iloc[-1].Close
         except JSONDecodeError as e:
             raise JSONDecodeError(f'failed to get spot for {symbol}:', e.doc, e.pos)
         except:
@@ -65,7 +65,7 @@ def get_spot_price(instr, currency):
             if spot_native is None:
                 print(f'Could not find last close for {spot_native}.')
                 return None
-            native_ccy = __get_currency(instr)
+            native_ccy = get_currency(instr)
             if native_ccy is None:
                 print(f'Could not identify native_ccy for {instr}.')
                 return None
@@ -109,8 +109,8 @@ def __get_symbol_from_isin(isin):
 
 
 def __get_time_series_in_currency(symbol, currency, period):
-    close_native_ccy = __get_history(symbol, period).Close
-    native_ccy = __get_currency(symbol)
+    close_native_ccy = get_history(symbol, period).Close
+    native_ccy = get_currency(symbol)
     if native_ccy is None:
         return None
 
@@ -120,7 +120,7 @@ def __get_time_series_in_currency(symbol, currency, period):
     if len(close_native_ccy) == 0:
         return None
 
-    fx_ts = __get_history(f"{native_ccy}{currency}=X", period).Close
+    fx_ts = get_history(f"{native_ccy}{currency}=X", period).Close
 
     frame = {'eq': close_native_ccy, 'fx': fx_ts}
     result = pd.DataFrame(frame)
@@ -144,7 +144,7 @@ def __get_ticker(symbol):
 
 
 def __get_last_close(symbol, period):
-    hist = __get_history(symbol, period)
+    hist = get_history(symbol, period)
     if hist is None:
         print(f'hist for {symbol} for {period} is None.')
         return None
@@ -156,7 +156,7 @@ def __get_last_close(symbol, period):
 
 
 @cached(mem_cache_history)
-def __get_history(symbol, period):
+def get_history(symbol, period):
     return __get_ticker(symbol).history(period=period)
 
 
@@ -167,7 +167,7 @@ __currency_map = {
 
 
 @cached(mem_cache_currency)
-def __get_currency(symbol):
+def get_currency(symbol):
     if symbol in __currency_map:
         return __currency_map[symbol].upper()
 
