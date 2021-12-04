@@ -61,7 +61,7 @@ def get_transaction(path_in, path_unit_price, proportion: {}, switch: {}):
         df_transaction[f'Price {fund_name}'] = [fund_price(df_unit_price, date, fund_name) for date in df_transaction.index]
         df_transaction[f'Unit {fund_name}'] = df_transaction[f'Amount'] / df_transaction[f'Price {fund_name}'] * [proportion[get_key(proportion, date)][fund_name] for date in df_transaction.index]
 
-    for k,v in switch.items():
+    for k, v in switch.items():
         df_transaction.loc[k, "Unit Global Equity (Voluntary)"] = v['Global Equity (Voluntary)']
         df_transaction.loc[k, "Unit Lifestyle (Voluntary)"] = v['Lifestyle (Voluntary)']
 
@@ -83,8 +83,7 @@ def simplify(df_transaction):
     return df_transfer.append(df_gain).sort_values('Effective Date', ascending=False).reset_index(drop=True)
 
 
-def load(path_in, config):
-
+def load(path_in, config, market):
     if 'path_unit_price' in config:
         df = simplify(get_transaction(path_in,
                                       config['path_unit_price'],

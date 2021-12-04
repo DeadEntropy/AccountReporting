@@ -1,6 +1,7 @@
 from enum import Enum
 import configparser
 import ast
+import pandas as pd
 from bkanalysis.config import config_helper as ch
 from bkanalysis.market import market_prices as mp
 from bkanalysis.market.price import Price
@@ -34,7 +35,7 @@ class MarketLoader:
 
         # Get the additional currencies
         currencies_from_yahoo = list(set([self.get_currency_from_yahoo(symbol) for symbol in symbols if symbol is not None]))
-        symbols = list(set([f'{ccy}{ref_currency}=X' for ccy in currencies_from_yahoo if ccy != ref_currency] + symbols))
+        symbols = list(set([f'{ccy}{ref_currency}=X' for ccy in currencies_from_yahoo if ccy != ref_currency and ccy is not None] + symbols))
 
         # Get the time series
         values = {symbol: self.get_history(symbol, period) for symbol in symbols if symbol is not None}
@@ -47,7 +48,7 @@ class MarketLoader:
             if self.source_map[symbol][0] == SOURCE.YAHOO:
                 return self.get_history_from_yahoo(symbol, period)
             elif self.source_map[symbol][0] == SOURCE.FILE:
-                if len(self.source_map[symbol][0]) != 2:
+                if len(self.source_map[symbol]) != 2:
                     raise Exception('source is FILE but not path was passed in.')
                 return self.get_history_from_file(self.source_map[symbol][1])
             else:
@@ -59,7 +60,9 @@ class MarketLoader:
 
     @staticmethod
     def get_history_from_file(path: str):
-        return None
+        df = pd.read_csv(path)
+        currency = df['Currency code'][0]
+        return {date: Price(close, currency) for (date, close) in df.set_index('Unit Price Date')['Unit Price'].items()}
 
     @staticmethod
     def get_history_from_yahoo(symbol: str, period: str):

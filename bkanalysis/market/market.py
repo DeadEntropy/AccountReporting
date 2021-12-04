@@ -9,6 +9,9 @@ class Market:
     def __init__(self, dict_of_values):
         self._dict = dict_of_values
 
+    def supported_instr(self):
+        return list(self._dict.keys())
+
     def __get_previous_date(self, instr: str, date: dt.datetime):
         if instr not in self._dict.keys():
             raise Exception(f'{instr} is not in the Market.')

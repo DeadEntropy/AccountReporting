@@ -1,6 +1,7 @@
 # coding=utf8
 import glob
 import os
+import ast
 import pandas as pd
 import configparser
 
@@ -10,6 +11,8 @@ from bkanalysis.transforms.account_transforms import barclays_transform as barc,
     static_data as sd, vault_transform, coinbase_transform, bnp_stock_transform, chase_transform, \
     revolut_transform_2 as rev_transform_2, fidelity_transform
 from bkanalysis.config import config_helper as ch
+from bkanalysis.market.market import Market
+from bkanalysis.market import market_loader as ml
 
 
 class Loader:
@@ -21,6 +24,12 @@ class Loader:
                 raise OSError(f'no config found in {ch.source}')
         else:
             self.config = config
+
+        self.market = None
+        if 'Market' in self.config:
+            if 'instr_to_preload' in self.config['Market']:
+                self.market = Market(ml.MarketLoader().load(\
+                    ast.literal_eval(self.config['Market']['instr_to_preload']), None, None))
 
     def load(self, file):
         df = self.load_internal(file)
@@ -48,7 +57,7 @@ class Loader:
         elif clone_transform.can_handle(file):
             return clone_transform.load(file)
         elif ubs_pension_transform.can_handle(file, self.config['UbsPension']):
-            return ubs_pension_transform.load(file, self.config['UbsPension'])
+            return ubs_pension_transform.load(file, self.config['UbsPension'], self.market)
         elif vault_transform.can_handle(file, self.config['Vault']):
             return vault_transform.load(file, self.config['Vault'])
         elif coinbase_transform.can_handle(file, self.config['Coinbase']):
