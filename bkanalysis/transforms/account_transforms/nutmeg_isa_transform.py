@@ -6,6 +6,8 @@ import os
 from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
+from bkanalysis.market.market import Market
+from bkanalysis.transforms.account_transforms import transformation_helper as helper
 import re
 
 
@@ -22,7 +24,7 @@ def can_handle(path_in, config):
     return set(columns) == set(expected_columns)
 
 
-def load(path_in, config):
+def load(path_in, config, market: Market, ref_currency: str):
     df = pd.read_csv(path_in, sep=',')
     try:
         expected_columns = [re.sub(regex, '', s) for s in parse_list(config['expected_columns'])]
@@ -43,6 +45,20 @@ def load(path_in, config):
     df_out.Memo = 'Nutmeg: ' + df['Pot']
     account_types = ast.literal_eval(config['account_types'])
     df_out['AccountType'] = [account_types[acc] for acc in df_out.Account]
+
+    if market is not None:
+        proportions = parse_list(config['proportions'], False)
+        df_per_account = []
+        for account in df_out.Account.unique():
+            if account not in proportions:
+                continue
+            df_per_account.append(helper.get_transaction(df_out[df_out.Account == account],
+                                                         market,
+                                                         proportions[account],
+                                                         {},
+                                                         ref_currency,
+                                                         account))
+        df_out = pd.concat(df_per_account)
 
     return df_out
 

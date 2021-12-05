@@ -6,7 +6,7 @@ from bkanalysis.market.market import Market
 from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
-import datetime as dt
+from bkanalysis.transforms.account_transforms import transformation_helper as helper
 
 
 def can_handle(path_in, config):
@@ -17,70 +17,12 @@ def can_handle(path_in, config):
     return set(df.columns) == set(expected_columns)
 
 
-def get_key(proportion, date):
-    return max([v for v in list(proportion.keys()) if date > pd.to_datetime(v)])
-
-
-def __to_float(s):
-    try:
-        return s.str.replace('£', '').str.replace(',', '').astype('float64')
-    except AttributeError:
-        return s
-
-
-def get_transaction(path_in: str, market: Market, proportion: {}, switch: {}, ref_currency: str):
-    df_transaction = pd.read_csv(path_in).fillna(0.0)
-
-    df_transaction['Effective Date'] = pd.to_datetime(df_transaction['Effective Date'], format='%d/%m/%Y')
-    df_transaction['Amount'] = __to_float(df_transaction['Amount']).fillna(0.0)
-    df_transaction = df_transaction.set_index('Effective Date')
-
-    list_of_funds = list(set([item for sublist in proportion.values() for item in sublist]))
-    list_of_dfs = [df_transaction]
-
-    for fund_name in list_of_funds:
-        df_fund = pd.DataFrame(columns=df_transaction.columns, index=df_transaction.index)
-        df_fund['Price'] = [market.get_price_in_currency(fund_name, date, ref_currency) for date in df_transaction.index]
-        df_fund['Amount'] = df_transaction[f'Amount'] / df_fund['Price'] * [proportion[get_key(proportion, date)][fund_name] for date in df_transaction.index]
-        df_fund.drop('Price', axis=1, inplace=True)
-        df_fund['Transaction Currency'] = fund_name
-        df_fund['Transaction Type'] = 'UBS Pension Fund Purchase'
-
-        df_cash_impact = pd.DataFrame(columns=df_transaction.columns, index=df_transaction.index)
-
-        df_cash_impact['Amount'] = -df_transaction[f'Amount'] * [proportion[get_key(proportion, date)][fund_name] for date in df_transaction.index]
-        df_cash_impact['Transaction Currency'] = ref_currency
-        df_cash_impact['Transaction Type'] = 'UBS Pension Fund Purchase'
-
-        list_of_dfs.append(df_fund)
-        list_of_dfs.append(df_cash_impact)
-
-        result = pd.concat(list_of_dfs)
-        result = result[result.Amount!=0].reset_index()
-
-    for k, v in switch.items():
-        for fund_name, fund_units in v.items():
-            result = result.append(pd.DataFrame([[dt.datetime.strptime(k, '%Y-%m-%d'), 'UBS Pension Fund Switch', fund_name, fund_units]], columns=result.columns))
-
-    result['Effective Date'] = pd.to_datetime(result['Effective Date'], format='%d/%m/%Y')
-    result = result.sort_values('Effective Date', ascending=False).reset_index(drop=True)
-
-    return result
-
-
 def load(path_in, config, market: Market, ref_currency: str):
-    if market is not None:
-        df = get_transaction(path_in,
-                             market,
-                             parse_list(config['proportion'], False),
-                             parse_list(config['switch'], False),
-                             ref_currency)
-    else:
-        df = pd.read_csv(path_in)
-        expected_columns = parse_list(config['expected_columns'])
-        assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
-                                                         f'are [{", ".join(df.columns)}]. (Lloyds Mortgage)'
-        df["Effective Date"] = pd.to_datetime(df["Effective Date"], format='%d/%m/%Y')
+    df = pd.read_csv(path_in)
+    expected_columns = parse_list(config['expected_columns'])
+    assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
+                                                     f'are [{", ".join(df.columns)}]. (UBS Pensio Mortgage)'
+    df["Effective Date"] = pd.to_datetime(df["Effective Date"], format='%d/%m/%Y')
 
     df_out = pd.DataFrame(columns=sd.target_columns)
 
@@ -91,6 +33,14 @@ def load(path_in, config, market: Market, ref_currency: str):
     df_out.Memo = df["Transaction Type"]
     df_out['AccountType'] = config['account_type']
     df_out.Account = config['account_name']
+
+    if market is not None:
+        df_out = helper.get_transaction(df_out,
+                                        market,
+                                        parse_list(config['proportion'], False),
+                                        parse_list(config['switch'], False),
+                                        ref_currency,
+                                        'UBS Pension')
 
     return df_out
 

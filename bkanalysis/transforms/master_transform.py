@@ -17,7 +17,7 @@ from bkanalysis.market import market_loader as ml
 
 class Loader:
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, ref_currency='GBP'):
         if config is None:
             self.config = configparser.ConfigParser()
             if len(self.config.read(ch.source)) != 1:
@@ -29,7 +29,7 @@ class Loader:
         if 'Market' in self.config:
             if 'instr_to_preload' in self.config['Market']:
                 self.market = Market(ml.MarketLoader().load(\
-                    ast.literal_eval(self.config['Market']['instr_to_preload']), None, None))
+                    ast.literal_eval(self.config['Market']['instr_to_preload']), ref_currency, '10y'))
 
     def load(self, file):
         df = self.load_internal(file)
@@ -45,7 +45,7 @@ class Loader:
         elif lloyds_mort.can_handle(file, self.config['LloydsMortgage']):
             return lloyds_mort.load(file, self.config['LloydsMortgage'])
         elif nut_transform.can_handle(file, self.config['Nutmeg']):
-            return nut_transform.load(file, self.config['Nutmeg'])
+            return nut_transform.load(file, self.config['Nutmeg'], self.market, ref_currency)
         elif rev_transform.can_handle(file, self.config['Revolut'], ';'):
             return rev_transform.load(file, self.config['Revolut'], ';')
         elif rev_transform.can_handle(file, self.config['Revolut'], ', '):
