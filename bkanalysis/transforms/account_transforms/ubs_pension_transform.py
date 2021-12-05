@@ -1,11 +1,12 @@
 import configparser
-from datetime import timedelta
 import pandas as pd
 import glob
 import os
+from bkanalysis.market.market import Market
 from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
+import datetime as dt
 
 
 def can_handle(path_in, config):
@@ -20,27 +21,6 @@ def get_key(proportion, date):
     return max([v for v in list(proportion.keys()) if date > pd.to_datetime(v)])
 
 
-def fund_price(df_unit_price, date, fund_name):
-    if fund_name not in list(df_unit_price['Fund Name']):
-        raise Exception(f'{fund_name} is not available. (available: {", ".join(list(set(list(df_unit_price["Fund Name"]))))})')
-
-    if date in df_unit_price['Unit Price Date']:
-        return list(df_unit_price[(df_unit_price['Unit Price Date'] == date)
-                                  & (df_unit_price['Fund Name'] == fund_name)]['Unit Price'])[0]
-    elif date > max(df_unit_price['Unit Price Date']):
-        return list(df_unit_price[(df_unit_price['Unit Price Date'] == max(df_unit_price['Unit Price Date']))
-                                  & (df_unit_price['Fund Name'] == fund_name)]['Unit Price'])[0]
-    else:
-        for days in range(1, 15):
-            adjusted_date = date - timedelta(days=days)
-            if adjusted_date in list(df_unit_price['Unit Price Date']):
-                return list(df_unit_price[(df_unit_price['Unit Price Date'] == adjusted_date) & (
-                            df_unit_price['Fund Name'] == fund_name)]['Unit Price'])[0]
-
-        raise Exception(f'{date}/{fund_name} is not available (tried 15 days fallback. '
-                        f'last available date is {max(df_unit_price["Unit Price Date"])}).')
-
-
 def __to_float(s):
     try:
         return s.str.replace('£', '').str.replace(',', '').astype('float64')
@@ -48,47 +28,53 @@ def __to_float(s):
         return s
 
 
-def get_transaction(path_in, path_unit_price, proportion: {}, switch: {}):
+def get_transaction(path_in: str, market: Market, proportion: {}, switch: {}, ref_currency: str):
     df_transaction = pd.read_csv(path_in).fillna(0.0)
-    df_unit_price = pd.read_csv(path_unit_price).dropna()
 
     df_transaction['Effective Date'] = pd.to_datetime(df_transaction['Effective Date'], format='%d/%m/%Y')
     df_transaction['Amount'] = __to_float(df_transaction['Amount']).fillna(0.0)
     df_transaction = df_transaction.set_index('Effective Date')
-    df_unit_price['Unit Price Date'] = pd.to_datetime(df_unit_price['Unit Price Date'], format='%d/%m/%Y')
 
-    for fund_name in df_unit_price["Fund Name"].unique():
-        df_transaction[f'Price {fund_name}'] = [fund_price(df_unit_price, date, fund_name) for date in df_transaction.index]
-        df_transaction[f'Unit {fund_name}'] = df_transaction[f'Amount'] / df_transaction[f'Price {fund_name}'] * [proportion[get_key(proportion, date)][fund_name] for date in df_transaction.index]
+    list_of_funds = list(set([item for sublist in proportion.values() for item in sublist]))
+    list_of_dfs = [df_transaction]
+
+    for fund_name in list_of_funds:
+        df_fund = pd.DataFrame(columns=df_transaction.columns, index=df_transaction.index)
+        df_fund['Price'] = [market.get_price_in_currency(fund_name, date, ref_currency) for date in df_transaction.index]
+        df_fund['Amount'] = df_transaction[f'Amount'] / df_fund['Price'] * [proportion[get_key(proportion, date)][fund_name] for date in df_transaction.index]
+        df_fund.drop('Price', axis=1, inplace=True)
+        df_fund['Transaction Currency'] = fund_name
+        df_fund['Transaction Type'] = 'UBS Pension Fund Purchase'
+
+        df_cash_impact = pd.DataFrame(columns=df_transaction.columns, index=df_transaction.index)
+
+        df_cash_impact['Amount'] = -df_transaction[f'Amount'] * [proportion[get_key(proportion, date)][fund_name] for date in df_transaction.index]
+        df_cash_impact['Transaction Currency'] = ref_currency
+        df_cash_impact['Transaction Type'] = 'UBS Pension Fund Purchase'
+
+        list_of_dfs.append(df_fund)
+        list_of_dfs.append(df_cash_impact)
+
+        result = pd.concat(list_of_dfs)
+        result = result[result.Amount!=0].reset_index()
 
     for k, v in switch.items():
-        df_transaction.loc[k, "Unit Global Equity (Voluntary)"] = v['Global Equity (Voluntary)']
-        df_transaction.loc[k, "Unit Lifestyle (Voluntary)"] = v['Lifestyle (Voluntary)']
+        for fund_name, fund_units in v.items():
+            result = result.append(pd.DataFrame([[dt.datetime.strptime(k, '%Y-%m-%d'), 'UBS Pension Fund Switch', fund_name, fund_units]], columns=result.columns))
 
-    for fund_name in df_unit_price["Fund Name"].unique():
-        df_transaction[f'Cumulated Unit {fund_name}'] = df_transaction[f'Unit {fund_name}'][::-1].cumsum()[::-1]
-    df_transaction['Total Value'] = df_transaction['Price Global Equity (Voluntary)'] * df_transaction['Cumulated Unit Global Equity (Voluntary)'] + df_transaction['Price Lifestyle (Voluntary)'] * df_transaction['Cumulated Unit Lifestyle (Voluntary)']
-    df_transaction['Cumulated Capital Gain'] = df_transaction['Total Value'] - df_transaction['Amount'][::-1].cumsum()[::-1]
-    df_transaction['Incremental Capital Gain'] = df_transaction['Cumulated Capital Gain'][::-1].rolling(window=2).apply(
-        lambda x: x.iloc[1] - x.iloc[0]).fillna(0.0)[::-1]
+    result['Effective Date'] = pd.to_datetime(result['Effective Date'], format='%d/%m/%Y')
+    result = result.sort_values('Effective Date', ascending=False).reset_index(drop=True)
 
-    return df_transaction
+    return result
 
 
-def simplify(df_transaction):
-    df_gain = df_transaction[['Transaction Type', 'Transaction Currency', 'Incremental Capital Gain']].reset_index().rename(
-        columns={'Incremental Capital Gain': 'Amount'})
-    df_gain['Transaction Type'] = 'Capital Gain'
-    df_transfer = df_transaction[['Transaction Type', 'Transaction Currency', 'Amount']].reset_index()
-    return df_transfer.append(df_gain).sort_values('Effective Date', ascending=False).reset_index(drop=True)
-
-
-def load(path_in, config, market):
-    if 'path_unit_price' in config:
-        df = simplify(get_transaction(path_in,
-                                      config['path_unit_price'],
-                                      parse_list(config['proportion'], False),
-                                      parse_list(config['switch'], False)))
+def load(path_in, config, market: Market, ref_currency: str):
+    if market is not None:
+        df = get_transaction(path_in,
+                             market,
+                             parse_list(config['proportion'], False),
+                             parse_list(config['switch'], False),
+                             ref_currency)
     else:
         df = pd.read_csv(path_in)
         expected_columns = parse_list(config['expected_columns'])

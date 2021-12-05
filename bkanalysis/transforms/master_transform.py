@@ -36,7 +36,7 @@ class Loader:
         df['SourceFile'] = os.path.basename(file)
         return df
 
-    def load_internal(self, file):
+    def load_internal(self, file, ref_currency='GBP'):
         # print(f'Loading {file}')
         if barc.can_handle(file, self.config['Barclays']):
             return barc.load(file, self.config['Barclays'])
@@ -57,7 +57,7 @@ class Loader:
         elif clone_transform.can_handle(file):
             return clone_transform.load(file)
         elif ubs_pension_transform.can_handle(file, self.config['UbsPension']):
-            return ubs_pension_transform.load(file, self.config['UbsPension'], self.market)
+            return ubs_pension_transform.load(file, self.config['UbsPension'], self.market, ref_currency)
         elif vault_transform.can_handle(file, self.config['Vault']):
             return vault_transform.load(file, self.config['Vault'])
         elif coinbase_transform.can_handle(file, self.config['Coinbase']):

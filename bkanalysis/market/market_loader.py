@@ -58,10 +58,13 @@ class MarketLoader:
             return self.get_history_from_yahoo(symbol, period)
         raise Exception(f'default source can not be {self.source_default}.')
 
+    _FILE_DATE_FORMAT = '%d/%m/%Y'
+
     @staticmethod
     def get_history_from_file(path: str):
         df = pd.read_csv(path)
         currency = df['Currency code'][0]
+        df['Unit Price Date'] = pd.to_datetime( df['Unit Price Date'], format=MarketLoader._FILE_DATE_FORMAT)
         return {date: Price(close, currency) for (date, close) in df.set_index('Unit Price Date')['Unit Price'].items()}
 
     @staticmethod
