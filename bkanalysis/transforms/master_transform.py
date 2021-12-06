@@ -17,7 +17,7 @@ from bkanalysis.market import market_loader as ml
 
 class Loader:
 
-    def __init__(self, config=None, ref_currency='GBP'):
+    def __init__(self, config=None, include_market=True, ref_currency='GBP'):
         if config is None:
             self.config = configparser.ConfigParser()
             if len(self.config.read(ch.source)) != 1:
@@ -26,7 +26,7 @@ class Loader:
             self.config = config
 
         self.market = None
-        if 'Market' in self.config:
+        if 'Market' in self.config and include_market:
             if 'instr_to_preload' in self.config['Market']:
                 self.market = Market(ml.MarketLoader().load(\
                     ast.literal_eval(self.config['Market']['instr_to_preload']), ref_currency, '10y'))
@@ -48,8 +48,8 @@ class Loader:
             return nut_transform.load(file, self.config['Nutmeg'], self.market, ref_currency)
         elif rev_transform.can_handle(file, self.config['Revolut'], ';'):
             return rev_transform.load(file, self.config['Revolut'], ';')
-        elif rev_transform.can_handle(file, self.config['Revolut'], ', '):
-            return rev_transform.load(file, self.config['Revolut'], ', ')
+        elif rev_transform.can_handle(file, self.config['Revolut'], ','):
+            return rev_transform.load(file, self.config['Revolut'], ',')
         elif rev_transform_2.can_handle(file, self.config['Revolut2'], ','):
             return rev_transform_2.load(file, self.config['Revolut2'], ',')
         elif citi_transform.can_handle(file, self.config['Citi']):

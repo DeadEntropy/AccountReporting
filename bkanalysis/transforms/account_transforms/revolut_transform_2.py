@@ -6,6 +6,7 @@ import os
 from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
+import datetime as dt
 
 
 def can_handle(path_in, config, sep=';'):
@@ -35,6 +36,7 @@ def load(path_in, config, sep=';'):
 
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Started Date"].str.strip(), format='%Y-%m-%d %H:%M:%S')
+    df_out.Date = [dt.datetime(d.year, d.month, d.day) for d in df_out.Date]
     df_out.Account = config['account_name'] + " " + currency
     df_out.Currency = df.Currency
     df_out.Amount = df.Amount + df.Fee

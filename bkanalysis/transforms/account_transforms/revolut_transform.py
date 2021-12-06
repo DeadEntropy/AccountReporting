@@ -3,6 +3,7 @@ import configparser
 import pandas as pd
 import glob
 import os
+import re
 from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
@@ -26,7 +27,15 @@ def can_handle(path_in, config, sep=';'):
 
 
 def load(path_in, config, sep=';'):
-    df = pd.read_csv(path_in, sep=sep)
+    with open(path_in) as f:
+        lines = f.readlines()
+
+    new_lines = []
+    for line in lines:
+        new_lines.append(re.sub(r'(\d+),( Fee)', r'\1\2', re.sub(r'(\d+),(\d+)', r'\1\2', line)))
+
+    df = pd.DataFrame([[v.strip().replace('"', '') for v in line.split(',')] for line in new_lines[1:]],\
+                      columns=[cell.strip() for cell in new_lines[0].split(',')])
     df.columns = [s.strip() for s in df.columns]
     expected_columns = parse_list(config['expected_columns'], False)
 
@@ -54,7 +63,7 @@ def load(path_in, config, sep=';'):
     df_out.Currency = currency
     df_out.Amount = df[f"Paid In ({currency})"] - df[f"Paid Out ({currency})"]
     df_out.Subcategory = df["Category"]
-    df_out.Memo = df["Description"] + df["Notes"].fillna('') + df["Exchange Out"] + df["Exchange In"]
+    df_out.Memo = df["Description"] + " " + df["Notes"].fillna('') + " " + df["Exchange Out"] + " " + df["Exchange In"]
     df_out.Memo = df_out.Memo.str.replace('£', 'GBP')
     df_out.Memo = df_out.Memo.str.replace('€', 'EUR')
     df_out.Memo = df_out.Memo.str.replace(',', '').str.strip()

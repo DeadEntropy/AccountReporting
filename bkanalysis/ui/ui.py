@@ -12,8 +12,8 @@ pd.options.display.float_format = '{:,.0f}'.format
 warnings.filterwarnings("ignore")
 
 
-def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True, config=None):
-    mt = master_transform.Loader(config)
+def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True, config=None, include_market=True):
+    mt = master_transform.Loader(config, include_market)
     df_raw = mt.load_all(include_xls)
     if save_to_csv:
         mt.save(df_raw)
