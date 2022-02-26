@@ -2,6 +2,8 @@
 import pandas as pd
 import numpy as np
 
+import datetime
+
 from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
 from bkanalysis.projection import projection as pj
@@ -9,6 +11,7 @@ from bkanalysis.market import market_prices as mp
 
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 
 import warnings
@@ -252,7 +255,7 @@ def internal_flows(df):
     return fig
 
 
-def get_expenses(df, date_range=None):
+def get_reimbursement(df, date_range=None, values='Amount'):
     if date_range is not None:
         df = df[(df.Date > date_range[0]) & (df.Date < date_range[1])]
         if len(df) == 0:
@@ -265,11 +268,33 @@ def get_expenses(df, date_range=None):
     df_expenses = df[(~df.FullMasterType.isin(['Income', 'ExIncome']))
                      & (df.FullType != 'Savings')
                      & (df.FacingAccount == '')
-                     & (df.Amount < 0)
-                     & (df.FullType != 'Intra-Account Transfert')]
-    df_expenses.Amount = (-1) * df_expenses.Amount
+                     & (df[values] > 0)
+                     & (df.FullType != 'Intra-Account Transfert')
+                     & (df.FullMasterType != 'Savings')
+                     & (df.MemoMapped != 'PAYPAL')]
+    df_expenses[values] = (-1) * df_expenses[values]
 
     return df_expenses
+
+
+def get_expenses(df, date_range=None, values='Amount'):
+    if date_range is not None:
+        df = df[(df.Date > date_range[0]) & (df.Date < date_range[1])]
+        if len(df) == 0:
+            raise Exception(f'df is empty, check that date_range is correct.')
+    else:
+        df = df[df.YearToDate < 1]
+        if len(df) == 0:
+            raise Exception(f'df is empty, check dataframe contains data less than 1 year old.')
+
+    df_expenses = df[(~df.FullMasterType.isin(['Income', 'ExIncome']))
+                     & (df.FullType != 'Savings')
+                     & (df.FacingAccount == '')
+                     & (df[values] < 0)
+                     & (df.FullType != 'Intra-Account Transfert')]
+    df_expenses[values] = (-1) * df_expenses[values]
+
+    return df_expenses.append(get_reimbursement(df, date_range, values))
 
 
 __DATE_FORMAT = '%Y-%m-%d'
@@ -289,11 +314,11 @@ def get_title(dates, amounts):
     return title
 
 
-def plot_sunburst(df, path, date_range=None):
-    df_expenses = get_expenses(df, date_range)
-    title = get_title(df_expenses.Date, df_expenses.Amount)
-    fig = px.sunburst(df_expenses, path=path, values='Amount', title=title)
-    return fig
+def plot_sunburst(df, path, date_range=None, values='Amount'):
+    df_expenses = get_expenses(df, date_range, values)
+    title = get_title(df_expenses.Date, df_expenses[values])
+    sb = px.sunburst(df_expenses, path=path, values=values, title=title)
+    return sb
 
 
 def plot_pie(df, index='Account', date_range=None, minimal_amount=1000):
@@ -326,3 +351,88 @@ def plot_pie(df, index='Account', date_range=None, minimal_amount=1000):
               fancybox=True, shadow=True, ncol=5)
 
     return fig
+
+
+def plot_expenses_pie(df, full_type=None, values='Amount', year_end=2021):
+    sunbursts = {}
+    for year in range(year_end - 1, year_end+1):
+        if full_type is None:
+            sunbursts[year] = plot_sunburst(df, ['FullType', 'FullSubType'],
+                                            date_range=[f'{year}-01-01', f'{year}-12-31'], values=values)
+        else:
+            sunbursts[year] = plot_sunburst(df[df.FullType == full_type], ['FullSubType','MemoMapped'],
+                                            date_range=[f'{year}-01-01', f'{year}-12-31'], values=values)
+
+    fig = make_subplots(rows=1, cols=2, specs=[
+        [{"type": "sunburst"}, {"type": "sunburst"}]
+    ], subplot_titles=(sunbursts[year_end - 1].layout['title']['text'], sunbursts[year].layout['title']['text']))
+
+    fig.add_trace(sunbursts[year_end - 1].data[0], row=1, col=1)
+    fig.add_trace(sunbursts[year_end].data[0], row=1, col=2)
+    return fig
+
+
+def compare_expenses(df_trans, year_end=2021):
+    df_expenses = {}
+    for year in range(year_end - 1, year_end + 1):
+        df_expenses[year] = get_expenses(df_trans, date_range=[f'{year}-01-01', f'{year}-12-31'])
+
+    labels = list(set(df_expenses[year_end - 1].FullType) | set(df_expenses[year_end].FullType))
+    values_2020 = [(-1) * df_expenses[year_end - 1][df_expenses[year_end - 1].FullType == label].Amount_USD.sum() for
+                   label in labels]
+    values_2021 = [(-1) * df_expenses[year_end][df_expenses[year_end].FullType == label].Amount_USD.sum() for label in
+                   labels]
+    values_diff = [(-1) * df_expenses[year_end][df_expenses[year_end].FullType == label].Amount_USD.sum() - (-1) *
+                   df_expenses[year_end - 1][df_expenses[year_end - 1].FullType == label].Amount_USD.sum() for label in
+                   labels]
+
+    df = pd.DataFrame({'Label': labels, 'Values Diff': values_diff, f'Values {year_end - 1}': values_2020,
+                       f'Values {year_end}': values_2021})
+    df = df.sort_values('Values Diff')
+
+    return df
+
+
+def plot_expenses_bar(df, year_end=2021, figsize=(12, 6), dpi=320):
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+    x = np.arange(df.shape[0])  # the label locations
+    width = 0.35  # the width of the bars
+
+    rects_diff = ax.bar(x, df['Values Diff'], width, label=f'{year_end - 1} vs {year_end}')
+
+    ax.set_title(f'Change in expenses by Category between {year_end - 1} and {year_end}')
+    ax.set_xticks(x, df.Label, rotation=45)
+    ax.grid()
+    ax.bar_label(rects_diff, padding=3, rotation=45, labels=[f'{v.get_height():,.0f}' for v in rects_diff], fontsize=7)
+    fig.tight_layout()
+
+
+def plot_budget_bar(df, year_end=2021):
+    fig, ax = plt.subplots(figsize=(12, 6), dpi=320)
+
+    x = np.arange(df.shape[0])  # the label locations
+    width = 0.35  # the width of the bars
+
+    rects_budget = ax.bar(x + width * 3 / 4, df[f'Budget {year_end + 1}'], width, label=f'{year_end + 1} Budget')
+    ax.bar(x - width / 2, df[f'Values {year_end - 1}'], width / 2, label=f'{year_end - 1} Spending', alpha=0.5)
+    ax.bar(x, df[f'Values {year_end}'], width / 2, label=f'{year_end} Spending', alpha=0.5)
+
+    ax.set_title(f'Budget for {year_end + 1}')
+    ax.set_xticks(x, df.index, rotation=45)
+    ax.grid()
+    ax.legend()
+    ax.bar_label(rects_budget, padding=3, rotation=45, labels=[f'{v.get_height():,.0f}' for v in rects_budget],
+                 fontsize=7)
+    fig.tight_layout()
+
+
+def capital_gain(df, account, currency, start='2020-12-31', end='2021-12-31'):
+    df_1 = df.loc[(account, currency)]
+    df_1 = df_1[(df_1.Date > datetime.datetime.strptime(start, "%Y-%m-%d")) & (df_1.Date <= datetime.datetime.strptime(end, "%Y-%m-%d"))]
+    df_1 = df_1.sort_values('Date')
+    price_end = df_1.CumulatedAmountInCurrency[-1]
+    price_start = df_1.CumulatedAmountInCurrency[0] - df_1.AmountInCurrency[0]
+    total_invested = df_1.AmountInCurrency.sum()
+    price_change = price_end - price_start - total_invested
+    return price_change

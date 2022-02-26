@@ -29,6 +29,13 @@ def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True
     return df
 
 
+def interpolate(x):
+    z = x.interpolate(method='ffill', limit_direction='forward').dropna()
+    z['Amount'] = x['Amount'].fillna(0.0)
+    z['MemoMapped'] = x['MemoMapped'].fillna('')
+    return z
+
+
 def transactions_to_values(df):
     # Ensure all dates are in the same format
     df.Date = [dt.datetime(old_date.year, old_date.month, old_date.day) for old_date in df.Date]
@@ -57,7 +64,7 @@ def transactions_to_values(df):
     df = df.reindex(pd.MultiIndex.from_tuples(index, names=df.index.names)) \
         .reset_index() \
         .groupby(['Account', 'Currency']) \
-        .apply(lambda group: group.interpolate(method='ffill', limit_direction='forward')) \
+        .apply(interpolate) \
         .dropna() \
         .reset_index(drop=True) \
         .set_index(['Account', 'Currency'])
@@ -77,6 +84,7 @@ def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10
     price_in_currency = [market.get_price_in_currency(ml.MarketLoader.get_symbol(instr, ref_currency), date, ref_currency)\
                          if instr != ref_currency else 1.0 for (instr, date) in zip(df.reset_index().Currency, df.reset_index().Date)]
     df['CumulatedAmountInCurrency'] = df['CumulatedAmount'] * price_in_currency
+    df['AmountInCurrency'] = df['Amount'] * price_in_currency
 
     return df
 
@@ -84,3 +92,4 @@ def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10
 def get_status(df):
     st = status.LastUpdate()
     return st.last_update(df)
+
