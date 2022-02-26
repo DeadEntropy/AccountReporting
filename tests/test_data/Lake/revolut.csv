@@ -1,5 +1,5 @@
-Completed Date ; Description ; Paid Out (GBP) ; Paid In (GBP) ; Exchange Out; Exchange In; Balance (GBP); Category; Notes
-26 Nov 2020 ; MERCHANT9  ; 11.0 ;  ;  ;  ; 80.0; Transport;
-24 Nov 2020 ; MERCHANT9  ; 4.0 ;  ;  ;  ; 91.0; Transport;
-23 Nov 2020 ; MERCHANT1  ; 5.0 ;  ;  ;  ; 95.0; Transport;
-24 Feb 2020 ; TopUp  ;  ; 100.00 ;  ;  ; 100.00; General;
+Completed Date , Description , Paid Out (GBP) , Paid In (GBP) , Exchange Out, Exchange In, Balance (GBP), Category, Notes
+26 Nov 2020 , MERCHANT9  , 11.0 ,  ,  ,  , 80.0, Transport,
+24 Nov 2020 , MERCHANT9  , 4.0 ,  ,  ,  , 91.0, Transport,
+23 Nov 2020 , MERCHANT1  , 5.0 ,  ,  ,  , 95.0, Transport,
+24 Feb 2020 , TopUp  ,  , 100.00 ,  ,  , 100.00, General,
