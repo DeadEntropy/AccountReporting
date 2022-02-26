@@ -89,23 +89,28 @@ def get_spot_prices(instr_list, currency):
 
 
 def get_symbol_from_isin(isin):
-    return __isin_cache.get(isin, __get_symbol_from_isin)
+    return __isin_cache.get(isin, __get_symbol_from_isin(isin))
 
 
 def __get_symbol_from_isin(isin):
     params = {'q': isin, 'quotesCount': 1, 'newsCount': 0}
-    r = requests.get(__query_yahoo_url, params=params)
-    try:
-        data = r.json()
-    except:
-        # raise Exception(f'failed to parse answer for {isin}: {r}')
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
+    r = requests.get(__query_yahoo_url, params=params, headers=headers)
+    
+    if r.status_code != 200:
         print(f'failed to parse answer for {isin}: {r}')
         return None
 
     try:
-        return data['quotes'][0]['symbol']
-    except IndexError:
-        return None
+        data = r.json()
+    except:
+        raise Exception(f'failed to parse answer for {isin}: {r}')
+
+    assert 'quotes' in data, f'Yahoo request for {isin} didnt return a quotes. (status_code: {r.status_code})'
+    assert len(data['quotes']) > 0, f'Yahoo request for {isin} didnt return a quotes. (status_code: {r.status_code})'
+    assert 'symbol' in data['quotes'][0], f'Yahoo request for {isin} didnt return a symbol. (status_code: {r.status_code})'
+
+    return data['quotes'][0]['symbol']
 
 
 def __get_time_series_in_currency(symbol, currency, period):
@@ -135,7 +140,8 @@ __isin_map = {'FR0014000RC4': 'FR0000120321'}
 
 
 def get_with_isin_map(isin):
-    if isin == 'CASH': return None
+    if isin == 'CASH':
+        return None
     return get_symbol_from_isin(__isin_map[isin]) if isin in __isin_map else get_symbol_from_isin(isin)
 
 

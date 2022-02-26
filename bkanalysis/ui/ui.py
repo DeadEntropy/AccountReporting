@@ -29,7 +29,7 @@ def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True
     return df
 
 
-def interpolate(x):
+def __interpolate(x):
     z = x.interpolate(method='ffill', limit_direction='forward').dropna()
     z['Amount'] = x['Amount'].fillna(0.0)
     z['MemoMapped'] = x['MemoMapped'].fillna('')
@@ -64,7 +64,7 @@ def transactions_to_values(df):
     df = df.reindex(pd.MultiIndex.from_tuples(index, names=df.index.names)) \
         .reset_index() \
         .groupby(['Account', 'Currency']) \
-        .apply(interpolate) \
+        .apply(__interpolate) \
         .dropna() \
         .reset_index(drop=True) \
         .set_index(['Account', 'Currency'])

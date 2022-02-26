@@ -10,6 +10,7 @@ from bkanalysis.market.price import Price
 class SOURCE(Enum):
     YAHOO = 1
     FILE = 2
+    HARDCODED = 3
 
 
 class MarketLoader:
@@ -51,6 +52,10 @@ class MarketLoader:
                 if len(self.source_map[symbol]) != 2:
                     raise Exception('source is FILE but not path was passed in.')
                 return self.get_history_from_file(self.source_map[symbol][1])
+            elif self.source_map[symbol][0] == SOURCE.HARDCODED:
+                if len(self.source_map[symbol]) != 3:
+                    raise Exception('source is HARDCODED but not VALUE was passed in.')
+                return self.get_history_from_hardcoded(self.source_map[symbol][1], self.source_map[symbol][2])
             else:
                 raise Exception(f'{self.source_map[symbol][0]} source is not supported.')
 
@@ -59,6 +64,10 @@ class MarketLoader:
         raise Exception(f'default source can not be {self.source_default}.')
 
     _FILE_DATE_FORMAT = '%d/%m/%Y'
+
+    @staticmethod
+    def get_history_from_hardcoded(values: dict, currency: str):
+        return {date: Price(close, currency) for (date, close) in values.items()}
 
     @staticmethod
     def get_history_from_file(path: str):
