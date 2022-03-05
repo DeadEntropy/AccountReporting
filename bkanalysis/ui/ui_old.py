@@ -427,7 +427,7 @@ def plot_budget_bar(df, year_end=2021):
     fig.tight_layout()
 
 
-def capital_gain(df, account, currency, start='2020-12-31', end='2021-12-31'):
+def capital_gain(df: pd.DataFrame, account: str, currency: str, start='2020-12-31', end='2021-12-31'):
     df_1 = df.loc[(account, currency)]
     df_1 = df_1[(df_1.Date > datetime.datetime.strptime(start, "%Y-%m-%d")) & (df_1.Date <= datetime.datetime.strptime(end, "%Y-%m-%d"))]
     df_1 = df_1.sort_values('Date')

@@ -14,26 +14,26 @@ def project(initial, year, growth, volatility, std_dev, contribution):
                                                                                  std_dev, 0) for y in range(0, year)])
 
 
-def project_full(df_i, r, ignore_contrib=False, ignore_growth=False):
+def project_full(df_i, r, by='Amount', ignore_contrib=False, ignore_growth=False):
     df = df_i.copy()
     df['Forecast'] = df.apply(
-        lambda row: [project(row['Amount'], i, 0.0 if ignore_growth else row['Return'],
+        lambda row: [project(row[by], i, 0.0 if ignore_growth else row['Return'],
                              0.0 if ignore_growth else row['Volatility'], 0.0,
                              0.0 if ignore_contrib else row['Contribution']) for i in r], axis=1)
     df['Forecast_Lower'] = df.apply(
-        lambda row: [project(row['Amount'], i, 0.0 if ignore_growth else row['Return'],
+        lambda row: [project(row[by], i, 0.0 if ignore_growth else row['Return'],
                              0.0 if ignore_growth else row['Volatility'], -1.28,
                              0.0 if ignore_contrib else row['Contribution']) for i in r], axis=1)
     df['Forecast_Upper'] = df.apply(
-        lambda row: [project(row['Amount'], i, 0.0 if ignore_growth else row['Return'],
+        lambda row: [project(row[by], i, 0.0 if ignore_growth else row['Return'],
                              0.0 if ignore_growth else row['Volatility'], 1.28,
                              0.0 if ignore_contrib else row['Contribution']) for i in r], axis=1)
     df['Forecast_Extreme_Lower'] = df.apply(
-        lambda row: [project(row['Amount'], i, 0.0 if ignore_growth else row['Return'],
+        lambda row: [project(row[by], i, 0.0 if ignore_growth else row['Return'],
                              0.0 if ignore_growth else row['Volatility'], -1.96,
                              0.0 if ignore_contrib else row['Contribution']) for i in r], axis=1)
     df['Forecast_Extreme_Upper'] = df.apply(
-        lambda row: [project(row['Amount'], i, 0.0 if ignore_growth else row['Return'],
+        lambda row: [project(row[by], i, 0.0 if ignore_growth else row['Return'],
                              0.0 if ignore_growth else row['Volatility'], 1.96,
                              0.0 if ignore_contrib else row['Contribution']) for i in r], axis=1)
 

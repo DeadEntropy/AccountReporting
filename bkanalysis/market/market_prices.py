@@ -3,16 +3,15 @@ from json import JSONDecodeError
 import yfinance as yf
 import pandas as pd
 from cachetools import cached, LRUCache
-from bkanalysis.portfolio import cache
 import requests
 import re
 
 mem_cache_history = LRUCache(maxsize=1024)
 mem_cache_currency = LRUCache(maxsize=1024)
+mem_cache_symbol = LRUCache(maxsize=1024)
 
-__query_yahoo_url = "https://query2.finance.yahoo.com/v1/finance/search"
-__isin_to_symbol_mapping_path = r'isin_cache.json'
-__isin_cache = cache.CacheDict(__isin_to_symbol_mapping_path)
+__query_yahoo_url_search = "https://query2.finance.yahoo.com/v1/finance/search"
+__query_yahoo_url_quote = "https://query2.finance.yahoo.com/v7/finance/quote"
 
 regex_ticker = re.compile(r'^[a-zA-Z][a-zA-Z][0-9]+')
 
@@ -20,6 +19,7 @@ __currencies = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD', 'KRW', 'CNH']
 __crypto = ['BTC', 'ETH']
 
 
+@cached(mem_cache_symbol)
 def get_symbol(instr, currency):
     if instr is None:
         return None
@@ -87,25 +87,19 @@ def get_spot_prices(instr_list, currency):
 
     return fx_spots
 
+from time import sleep
+
 
 def get_symbol_from_isin(isin):
-    return __isin_cache.get(isin, __get_symbol_from_isin(isin))
-
-
-def __get_symbol_from_isin(isin):
     params = {'q': isin, 'quotesCount': 1, 'newsCount': 0}
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
-    r = requests.get(__query_yahoo_url, params=params, headers=headers)
+    r = requests.get(__query_yahoo_url_search, params=params, headers=headers)
+    sleep(0.05)
+
+    assert r.status_code == 200, f'Yahoo Request Failed for {isin}. Status code: {r.status_code}'
+
+    data = r.json()
     
-    if r.status_code != 200:
-        print(f'failed to parse answer for {isin}: {r}')
-        return None
-
-    try:
-        data = r.json()
-    except:
-        raise Exception(f'failed to parse answer for {isin}: {r}')
-
     assert 'quotes' in data, f'Yahoo request for {isin} didnt return a quotes. (status_code: {r.status_code})'
     assert len(data['quotes']) > 0, f'Yahoo request for {isin} didnt return a quotes. (status_code: {r.status_code})'
     assert 'symbol' in data['quotes'][0], f'Yahoo request for {isin} didnt return a symbol. (status_code: {r.status_code})'
@@ -174,24 +168,18 @@ __currency_map = {
 
 @cached(mem_cache_currency)
 def get_currency(symbol):
-    if symbol in __currency_map:
-        return __currency_map[symbol].upper()
+    params = {'symbols': symbol}
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
+    r = requests.get(__query_yahoo_url_quote, params=params, headers=headers)
+    sleep(0.05)
 
-    ticker = __get_ticker(symbol)
-    if ticker is None:
-        return None
-    try:
-        info = ticker.info
-    except IndexError:
-        return None
-    except ValueError:
-        return None
-    except KeyError:
-        return None
+    assert r.status_code == 200, f'Yahoo Request Failed for {isin}. Status code: {r.status_code}'
 
-    if info is None:
-        return None
-    if 'currency' in info:
-        return info['currency'].upper()
-    else:
-        return None
+    data = r.json()
+    
+    assert 'quoteResponse' in data, f'Yahoo request for {symbol} didnt return a quoteResponse.'
+    assert 'result' in data['quoteResponse'], f'Yahoo request for {symbol} didnt return a quoteResponse.'
+    assert len(data['quoteResponse']['result']) > 0, f'Yahoo request for {symbol} didnt return a quoteResponse.'
+    assert 'currency' in data['quoteResponse']['result'][0], f'Yahoo request for {symbol} didnt return a symbol.'
+
+    return data['quoteResponse']['result'][0]['currency']
