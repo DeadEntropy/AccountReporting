@@ -9,7 +9,7 @@ import ast
 
 class TestProcess(unittest.TestCase):
 
-    def test_remove_offsetting(self):
+    def test_remove_duplicate(self):
         config = ch.get_config()
         iat = iat_identification.IatIdentification(config)
 
@@ -26,7 +26,7 @@ class TestProcess(unittest.TestCase):
         df_out = iat.remove_duplicate(df)
         self.assertEqual(len(df_out), 1, 'Duplicate did not get removed successfully')
 
-    def test_remove_offsetting_2(self):
+    def test_remove_duplicate_2(self):
         config = ch.get_config()
         iat = iat_identification.IatIdentification(config)
 
@@ -54,6 +54,7 @@ class TestProcess(unittest.TestCase):
         df['AccountType'] = ['account_type'] * 3
         df['Currency'] = ['CCY'] * 3
         df['Type'] = ['IAT'] * 3
+        df['FullType'] = ['Intra-Account Transfert'] * 3
 
         df['Amount'] = [100, -100, 200]
         df['Date'] = datetime.datetime(2020, 10, 15)

@@ -119,7 +119,14 @@ class Process:
         master_type = []
         full_master_type = []
         for memo in memo_series.str.upper():
-            if memo in mapping_a.keys():
+            if memo == '':
+                type.append('')
+                subtype.append('')
+                full_type.append('')
+                full_subtype.append('')
+                master_type.append('')
+                full_master_type.append('')
+            elif memo in mapping_a.keys():
                 try:
                     type.append(mapping_a[memo].strip())
                     subtype.append(mapping_b[memo].strip())
@@ -192,11 +199,11 @@ class Process:
 
         return df
 
-    def remove_offsetting(self, df):
+    def remove_offsetting(self, df, remove_duplicate=True, iat_value_col=None, map_iat_fx=True):
         iat = IatIdentification(self.config)
-        df_out = iat.remove_duplicate(df)
-        df_out = iat.map_iat(df_out)
-        df_out = iat.map_iat_fx(df_out)
+        df_out = iat.remove_duplicate(df) if remove_duplicate else df
+        df_out = iat.map_iat(df_out, iat_value_col) if iat_value_col is not None else df_out
+        df_out = iat.map_iat_fx(df_out) if map_iat_fx else df_out
 
         return df_out
 
@@ -208,7 +215,7 @@ class Process:
 
     def extend(self, df, ignore_overrides=False):
         expected_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['expected_columns'])]
-        assert set(df.columns) == set(expected_columns), 'Columns do not match expectation.'
+        assert set(df.columns) == set(expected_columns), f'Columns do not match expectation. Expected: [{expected_columns}]'
 
         new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
         df_out = pd.DataFrame(columns=list(new_columns))
@@ -228,34 +235,42 @@ class Process:
         df_out.AdjustedMonth = [get_adjusted_month(dt) for dt in df.Date]
         df_out.AdjustedYear = [get_adjusted_year(dt) for dt in df.Date]
         df_out.FiscalYear = [get_fiscal_year(dt) for dt in df.Date]
-        df_out.YearToDate = [get_year_to_date(dt) for dt in df.Date]
         df_out.MemoSimple = [self.__clean_memo(s) for s in df.Memo]
 
         memo_mapped = self.map_memo(df_out.MemoSimple)
         df_out.MemoMapped = memo_mapped
 
-        type, full_type, subtype, full_subtype, master_type, full_master_type = \
+        return self.extend_types(df_out, False, ignore_overrides)
+
+
+    def extend_types(self, df_out, only_full=True, ignore_overrides=True):
+        df_out['YearToDate'] = [get_year_to_date(dt) for dt in df_out.Date]
+
+        type_, full_type, subtype, full_subtype, master_type, full_master_type = \
             self.map_type(df_out.MemoMapped)
 
-        df_out.Type = type
-        df_out.FullType = full_type
-        df_out.SubType = subtype
-        df_out.FullSubType = full_subtype
+        if not only_full:
+            df_out['Type'] = type_
+        df_out['FullType'] = full_type
+        if not only_full:
+            df_out['SubType'] = subtype
+        df_out['FullSubType'] = full_subtype
 
         if not ignore_overrides:
             self.apply_overrides(df_out)
 
-        df_out.MasterType = master_type
-        df_out.FullMasterType = full_master_type
+        if not only_full:
+            df_out['MasterType'] = master_type
+        df_out['FullMasterType'] = full_master_type
 
-        df_out.FacingAccount = ''
+        df_out['FacingAccount'] = ''
 
         return df_out
 
     def process(self, df, ignore_overrides=False):
         df.Amount = df.Amount.astype(float)
         df_out = self.extend(df, ignore_overrides)
-        df_out = self.remove_offsetting(df_out)
+        df_out = self.remove_offsetting(df_out, iat_value_col='Amount')
         return df_out
 
     def save(self, df):

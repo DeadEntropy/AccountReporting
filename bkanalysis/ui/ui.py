@@ -19,11 +19,11 @@ logging.basicConfig(level=logging.WARNING)
 
 DATE = 'Date'
 AMOUNT = 'Amount'
-AMOUNT_CURRENCY = 'AmountInCurrency'
+AMOUNT_CCY = 'AmountCcy'
 CUMULATED_AMOUNT = 'CumulatedAmount'
-CUMULATED_AMOUNT_CURRENCY = 'CumulatedAmountInCurrency'
+CUMULATED_AMOUNT_CCY = 'CumulatedAmountCcy'
 CAPITAL_GAIN = 'CapitalGains'
-CUMULATED_AMOUNT_CURRENCY_EXCL_CAPITAL = 'CumulatedAmountInCurrencyExclCapitalGains'
+CUMULATED_AMOUNT_CCY_EXCL_CAPITAL = 'CumulatedAmountCcyExclCapGains'
 MEMO_MAPPED = 'MemoMapped'
 
 
@@ -117,11 +117,32 @@ def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10
                                 ref_currency)\
                          if instr != ref_currency else 1.0 
                          for (instr, date) in zip(df.reset_index().Currency, df.reset_index().Date)]
-    df[CUMULATED_AMOUNT_CURRENCY] = df[CUMULATED_AMOUNT] * price_in_currency
-    df[AMOUNT_CURRENCY] = df[AMOUNT] * price_in_currency
-    df[MEMO_MAPPED] = [[(k, v * p) for (k, v) in memo] if memo != '' else {} for (memo, p) in zip(df[MEMO_MAPPED], price_in_currency)]
+    df[CUMULATED_AMOUNT_CCY] = df[CUMULATED_AMOUNT] * price_in_currency
+    df[AMOUNT_CCY] = df[AMOUNT] * price_in_currency
+    df[MEMO_MAPPED] = [[(k, v * p) for (k, v) in memo] if memo != '' else {} 
+                       for (memo, p) in zip(
+                                            df[MEMO_MAPPED], 
+                                            price_in_currency)]
 
     return df
+
+
+def add_mappings(df, ref_currency, config=None):
+    assert MEMO_MAPPED in df.columns, f'{MEMO_MAPPED} not in columns'
+    
+    df_exp = df.explode(MEMO_MAPPED)
+    df_exp[AMOUNT_CCY] = [memoMapped[1] if not isinstance(memoMapped, float) else 0 for memoMapped in df_exp[MEMO_MAPPED]]
+    df_exp[MEMO_MAPPED] = [memoMapped[0] if not isinstance(memoMapped, float) else '' for memoMapped in df_exp[MEMO_MAPPED]]
+    
+    assert round(df[AMOUNT_CCY].sum(), 2) == round(df_exp[AMOUNT_CCY].sum(), 2), f'{AMOUNT_CCY} Mismatch'
+
+    df_exp[MEMO_MAPPED] = df_exp[MEMO_MAPPED].fillna('')
+
+    pr = process.Process(config)
+    df_exp = pr.extend_types(df_exp.reset_index(), False, True)
+    df_exp['Currency'] = ref_currency
+
+    return pr.remove_offsetting(df_exp, False, AMOUNT_CCY, False)
 
 
 def get_status(df):
@@ -130,8 +151,8 @@ def get_status(df):
 
 
 def capital_gain(df: pd.DataFrame, start=None, end=None):
-    assert CUMULATED_AMOUNT_CURRENCY in df.columns, f'Expect "{CUMULATED_AMOUNT_CURRENCY}" to be in the columns.'
-    assert AMOUNT_CURRENCY in df.columns, f'Expect "{AMOUNT_CURRENCY}" to be in the columns.'
+    assert CUMULATED_AMOUNT_CCY in df.columns, f'Expect "{CUMULATED_AMOUNT_CCY}" to be in the columns.'
+    assert AMOUNT_CCY in df.columns, f'Expect "{AMOUNT_CCY}" to be in the columns.'
     assert DATE in df.columns, f'Expect "{DATE}" to be in the columns.'
 
     if start is not None and end is not None:
@@ -145,9 +166,9 @@ def capital_gain(df: pd.DataFrame, start=None, end=None):
     assert len(df_range.Date) == len(set(df_range.Date)), 'Duplicate Values found in "Date".'
 
     df_range = df_range.sort_values('Date')
-    price_end = list(df_range[CUMULATED_AMOUNT_CURRENCY])[-1]
-    price_start = list(df_range[CUMULATED_AMOUNT_CURRENCY])[0] - list(df_range[AMOUNT_CURRENCY])[0]
-    total_invested = df_range[AMOUNT_CURRENCY].sum()
+    price_end = list(df_range[CUMULATED_AMOUNT_CCY])[-1]
+    price_start = list(df_range[CUMULATED_AMOUNT_CCY])[0] - list(df_range[AMOUNT_CCY])[0]
+    total_invested = df_range[AMOUNT_CCY].sum()
     price_change = price_end - price_start - total_invested
     return price_change
 
@@ -165,7 +186,7 @@ def __sum_to_dict(l: []):
     return out
 
 
-def plot_wealth(df, freq='w', date_range=None, include_internal=False, by=CUMULATED_AMOUNT_CURRENCY):
+def plot_wealth(df, freq='w', date_range=None, include_internal=False, by=CUMULATED_AMOUNT_CCY):
     assert by in df.columns, f'Expect "{by}" to be in the columns.'
     assert DATE in df.columns, f'Expect "{DATE}" to be in the columns.'
     assert MEMO_MAPPED in df.columns, f'Expect "{MEMO_MAPPED}" to be in the columns.'
@@ -179,9 +200,9 @@ def plot_wealth(df, freq='w', date_range=None, include_internal=False, by=CUMULA
 
     df[MEMO_MAPPED] = [memo if memo != '' else {} for memo in df[MEMO_MAPPED]]
     
-    df_on_dates = pd.pivot_table(df, index='Date', values=[by, AMOUNT_CURRENCY, MEMO_MAPPED], 
+    df_on_dates = pd.pivot_table(df, index='Date', values=[by, AMOUNT_CCY, MEMO_MAPPED], 
                aggfunc={by: sum, 
-                        AMOUNT_CURRENCY: sum,
+                        AMOUNT_CCY: sum,
                         MEMO_MAPPED:__sum_to_dict})
 
     df2 = df_on_dates.reset_index()
@@ -214,26 +235,26 @@ def __try_get(d, k, default=None):
 
 
 def project(df, nb_years=11, projection_data={}):
-    assert CUMULATED_AMOUNT_CURRENCY in df.columns, f'Expect "{CUMULATED_AMOUNT_CURRENCY}" to be in the columns.'
+    assert CUMULATED_AMOUNT_CCY in df.columns, f'Expect "{CUMULATED_AMOUNT_CCY}" to be in the columns.'
     assert DATE in df.columns, f'Expect "{DATE}" to be in the columns.'
 
     last_date = df.Date[-1]
-    projection = pd.pivot_table(df[(df.Date == last_date)], values=CUMULATED_AMOUNT_CURRENCY, index=['Account'], 
-                   aggfunc=sum).sort_values(CUMULATED_AMOUNT_CURRENCY, ascending=False).reset_index()
+    projection = pd.pivot_table(df[(df.Date == last_date)], values=CUMULATED_AMOUNT_CCY, index=['Account'], 
+                   aggfunc=sum).sort_values(CUMULATED_AMOUNT_CCY, ascending=False).reset_index()
 
     projection['Return'] = [__try_get(projection_data, acc, [0, 0, 0])[0] for acc in projection.Account]
     projection['Volatility'] = [__try_get(projection_data, acc, [0, 0, 0])[1] for acc in projection.Account]
     projection['Contribution'] = [__try_get(projection_data, acc, [0, 0, 0])[2] for acc in projection.Account]
     
     r = range(0, nb_years)
-    (w, w_low, w_up, w_low_ex, w_up_ex) = pj.project_full(projection, r, CUMULATED_AMOUNT_CURRENCY)
+    (w, w_low, w_up, w_low_ex, w_up_ex) = pj.project_full(projection, r, CUMULATED_AMOUNT_CCY)
 
     piv = pd.DataFrame(
-        pd.pivot_table(df, values=CUMULATED_AMOUNT_CURRENCY, index=DATE, columns=[], aggfunc=sum).to_records())
+        pd.pivot_table(df, values=CUMULATED_AMOUNT_CCY, index=DATE, columns=[], aggfunc=sum).to_records())
 
     fig = go.Figure()
 
-    fig.add_trace(go.Scatter(x=piv[DATE], y=piv[CUMULATED_AMOUNT_CURRENCY],
+    fig.add_trace(go.Scatter(x=piv[DATE], y=piv[CUMULATED_AMOUNT_CCY],
                              mode='lines', name='Wealth'))
 
     projection_x = [pd.Timestamp(piv[DATE].values[-1] + np.timedelta64(365 * i, 'D')) for i in r]
@@ -261,34 +282,34 @@ def project(df, nb_years=11, projection_data={}):
 
 
 def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={}):
-    assert CUMULATED_AMOUNT_CURRENCY in df.columns, f'Expect "{CUMULATED_AMOUNT_CURRENCY}" to be in the columns.'
+    assert CUMULATED_AMOUNT_CCY in df.columns, f'Expect "{CUMULATED_AMOUNT_CCY}" to be in the columns.'
     assert DATE in df.columns, f'Expect "{DATE}" to be in the columns.'
 
     last_date = df.Date[-1]
-    projection_1 = pd.pivot_table(df[(df.Date == last_date)], values=CUMULATED_AMOUNT_CURRENCY, index=['Account'], 
-                   aggfunc=sum).sort_values(CUMULATED_AMOUNT_CURRENCY, ascending=False).reset_index()
+    projection_1 = pd.pivot_table(df[(df.Date == last_date)], values=CUMULATED_AMOUNT_CCY, index=['Account'], 
+                   aggfunc=sum).sort_values(CUMULATED_AMOUNT_CCY, ascending=False).reset_index()
     projection_1['Return'] = [__try_get(projection_data_1, acc, [0, 0, 0])[0] for acc in projection_1.Account]
     projection_1['Volatility'] = [__try_get(projection_data_1, acc, [0, 0, 0])[1] for acc in projection_1.Account]
     projection_1['Contribution'] = [__try_get(projection_data_1, acc, [0, 0, 0])[2] for acc in projection_1.Account]
 
 
-    projection_2 = pd.pivot_table(df[(df.Date == last_date)], values=CUMULATED_AMOUNT_CURRENCY, index=['Account'], 
-                   aggfunc=sum).sort_values(CUMULATED_AMOUNT_CURRENCY, ascending=False).reset_index()
+    projection_2 = pd.pivot_table(df[(df.Date == last_date)], values=CUMULATED_AMOUNT_CCY, index=['Account'], 
+                   aggfunc=sum).sort_values(CUMULATED_AMOUNT_CCY, ascending=False).reset_index()
     projection_2['Return'] = [__try_get(projection_data_2, acc, [0, 0, 0])[0] for acc in projection_2.Account]
     projection_2['Volatility'] = [__try_get(projection_data_2, acc, [0, 0, 0])[1] for acc in projection_2.Account]
     projection_2['Contribution'] = [__try_get(projection_data_2, acc, [0, 0, 0])[2] for acc in projection_2.Account]
 
 
     r = range(0, nb_years)
-    (w1, w1_low, w1_up, w1_low_ex, w1_up_ex) = pj.project_full(projection_1, r, CUMULATED_AMOUNT_CURRENCY)
-    (w2, w2_low, w2_up, w2_low_ex, w2_up_ex) = pj.project_full(projection_2, r, CUMULATED_AMOUNT_CURRENCY)
+    (w1, w1_low, w1_up, w1_low_ex, w1_up_ex) = pj.project_full(projection_1, r, CUMULATED_AMOUNT_CCY)
+    (w2, w2_low, w2_up, w2_low_ex, w2_up_ex) = pj.project_full(projection_2, r, CUMULATED_AMOUNT_CCY)
 
     piv = pd.DataFrame(
-        pd.pivot_table(df, values=CUMULATED_AMOUNT_CURRENCY, index=[DATE], columns=[], aggfunc=sum).to_records())
+        pd.pivot_table(df, values=CUMULATED_AMOUNT_CCY, index=[DATE], columns=[], aggfunc=sum).to_records())
 
     fig = go.Figure()
 
-    fig.add_trace(go.Scatter(x=piv[DATE], y=piv[CUMULATED_AMOUNT_CURRENCY],
+    fig.add_trace(go.Scatter(x=piv[DATE], y=piv[CUMULATED_AMOUNT_CCY],
                              mode='lines', name='wealth'))
 
     projection_x = [pd.Timestamp(piv[DATE].values[-1] + np.timedelta64(365 * i, 'D')) for i in r]
