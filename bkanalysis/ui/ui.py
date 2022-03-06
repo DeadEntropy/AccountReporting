@@ -119,27 +119,43 @@ def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10
                          for (instr, date) in zip(df.reset_index().Currency, df.reset_index().Date)]
     df[CUMULATED_AMOUNT_CCY] = df[CUMULATED_AMOUNT] * price_in_currency
     df[AMOUNT_CCY] = df[AMOUNT] * price_in_currency
-    df[MEMO_MAPPED] = [[(k, v * p) for (k, v) in memo] if memo != '' else {} 
+    df[MEMO_MAPPED] = [[(k, v * p) for (k, v) in memo] if memo != '' else [] 
                        for (memo, p) in zip(
                                             df[MEMO_MAPPED], 
                                             price_in_currency)]
 
+    cap_series = []
+    for idx in df.index.unique():
+        cap_series.append(__running_capital_gains(df.loc[idx]))
+
+    df[MEMO_MAPPED] =  [memo + [('CAPITAL', c)] if c != 0 else memo for (memo, c) in zip(df[MEMO_MAPPED], pd.concat(cap_series))]
+
     return df
+
+
+def __running_capital_gains(df):
+    assert DATE in df.columns, f'{DATE} not in columns'
+    assert CUMULATED_AMOUNT_CCY in df.columns, f'{CUMULATED_AMOUNT_CCY} not in columns'
+    assert AMOUNT_CCY in df.columns, f'{AMOUNT_CCY} not in columns'
+
+    df = df.sort_values(DATE)
+    return (df[CUMULATED_AMOUNT_CCY].diff() - df[AMOUNT_CCY]).fillna(0)
 
 
 def add_mappings(df, ref_currency, config=None):
     assert MEMO_MAPPED in df.columns, f'{MEMO_MAPPED} not in columns'
-    
+
     df_exp = df.explode(MEMO_MAPPED)
     df_exp[AMOUNT_CCY] = [memoMapped[1] if not isinstance(memoMapped, float) else 0 for memoMapped in df_exp[MEMO_MAPPED]]
     df_exp[MEMO_MAPPED] = [memoMapped[0] if not isinstance(memoMapped, float) else '' for memoMapped in df_exp[MEMO_MAPPED]]
     
-    assert round(df[AMOUNT_CCY].sum(), 2) == round(df_exp[AMOUNT_CCY].sum(), 2), f'{AMOUNT_CCY} Mismatch'
+    # Now includes the capital gain
+    # assert round(df[AMOUNT_CCY].sum(), 2) == round(df_exp[AMOUNT_CCY].sum(), 2), f'{AMOUNT_CCY} Mismatch'
 
     df_exp[MEMO_MAPPED] = df_exp[MEMO_MAPPED].fillna('')
 
     pr = process.Process(config)
-    df_exp = pr.extend_types(df_exp.reset_index(), False, True)
+    df_exp = pr.extend_types(df_exp.reset_index(), True, True)
     df_exp['Currency'] = ref_currency
 
     return pr.remove_offsetting(df_exp, False, AMOUNT_CCY, False)
@@ -148,29 +164,6 @@ def add_mappings(df, ref_currency, config=None):
 def get_status(df):
     st = status.LastUpdate()
     return st.last_update(df)
-
-
-def capital_gain(df: pd.DataFrame, start=None, end=None):
-    assert CUMULATED_AMOUNT_CCY in df.columns, f'Expect "{CUMULATED_AMOUNT_CCY}" to be in the columns.'
-    assert AMOUNT_CCY in df.columns, f'Expect "{AMOUNT_CCY}" to be in the columns.'
-    assert DATE in df.columns, f'Expect "{DATE}" to be in the columns.'
-
-    if start is not None and end is not None:
-        df_range = df[(df.Date > dt.datetime.strptime(start, "%Y-%m-%d")) & (df.Date <= dt.datetime.strptime(end, "%Y-%m-%d"))]
-    elif start is not None or end is not None:
-        raise Exception(f'start and end must either be both none or both be a date.')
-
-    if len(df_range) == 0:
-        return 0
-
-    assert len(df_range.Date) == len(set(df_range.Date)), 'Duplicate Values found in "Date".'
-
-    df_range = df_range.sort_values('Date')
-    price_end = list(df_range[CUMULATED_AMOUNT_CCY])[-1]
-    price_start = list(df_range[CUMULATED_AMOUNT_CCY])[0] - list(df_range[AMOUNT_CCY])[0]
-    total_invested = df_range[AMOUNT_CCY].sum()
-    price_change = price_end - price_start - total_invested
-    return price_change
 
 
 # l is a list of tuple with duplicate keys
@@ -205,16 +198,10 @@ def plot_wealth(df, freq='w', date_range=None, include_internal=False, by=CUMULA
                         AMOUNT_CCY: sum,
                         MEMO_MAPPED:__sum_to_dict})
 
-    df2 = df_on_dates.reset_index()
-    def capital_gain_so_far(date):
-        return capital_gain(df2, start='2013-11-25', end=date)
-
-    df_on_dates[CAPITAL_GAIN] = [capital_gain_so_far(date.strftime('%Y-%m-%d')) for date in df_on_dates.index]
-
     values = df_on_dates[by]
-    labels = ['<br>'.join([f'{k}: {v:,.0f}' for (k, v) in memo.items()]) + f"<br><br>TRANSACT: {sum([v for (k, v) in memo.items()]):,.0f}<br>CAPITAL: {cap:,.0f}<br>TOTAL: {d:,.0f}"\
+    labels = ['<br>'.join([f'{k}: {v:,.0f}' for (k, v) in memo.items()]) + f"<br><br>TOTAL: {d:,.0f}"\
                 if d != 0 else ','.join(memo)\
-                for (memo, d, cap) in zip(df_on_dates[MEMO_MAPPED], df_on_dates[by].diff(), df_on_dates[CAPITAL_GAIN].diff())]
+                for (memo, d) in zip(df_on_dates[MEMO_MAPPED], df_on_dates[by].diff())]
     fig = go.Figure(data=go.Scatter(x=values.index, y=values.values, hovertext=labels))
     
 

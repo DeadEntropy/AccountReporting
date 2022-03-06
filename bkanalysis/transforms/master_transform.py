@@ -8,7 +8,7 @@ import configparser
 from bkanalysis.transforms.account_transforms import barclays_transform as barc, clone_transform, citi_transform, \
     lloyds_mortgage_transform as lloyds_mort, revolut_transform as rev_transform, \
     lloyds_current_transform as lloyds_curr, nutmeg_isa_transform as nut_transform, ubs_pension_transform, \
-    static_data as sd, vault_transform, coinbase_transform, bnp_stock_transform, chase_transform, \
+    static_data as sd, vault_transform, coinbase_transform, coinbase_pro_transform, bnp_stock_transform, chase_transform, \
     revolut_transform_2 as rev_transform_2, fidelity_transform
 from bkanalysis.config import config_helper as ch
 from bkanalysis.market.market import Market
@@ -60,6 +60,8 @@ class Loader:
             return ubs_pension_transform.load(file, self.config['UbsPension'], self.market, ref_currency)
         elif vault_transform.can_handle(file, self.config['Vault']):
             return vault_transform.load(file, self.config['Vault'])
+        elif coinbase_pro_transform.can_handle(file, self.config['CoinbasePro']):
+            return coinbase_pro_transform.load(file, self.config['CoinbasePro'])
         elif coinbase_transform.can_handle(file, self.config['Coinbase']):
             return coinbase_transform.load(file, self.config['Coinbase'])
         elif bnp_stock_transform.can_handle(file, self.config['BnpStocks']):

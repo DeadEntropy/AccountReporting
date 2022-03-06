@@ -26,12 +26,12 @@ def load(path_in, config, sep=','):
         f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Coinbase)'
 
     df_out = pd.DataFrame(columns=sd.target_columns)
-    df_out.Date = pd.to_datetime(df["Timestamp"]).dt.tz_convert(None)
+    df_out.Date = pd.to_datetime(df["time"]).dt.tz_convert(None)
     df_out.Account = config['account_name']
-    df_out.Currency = df["Asset"]
-    df_out.Amount = df["Quantity Transacted"]
-    df_out.Subcategory = [f'COINBASE_{t}' for t in df["Transaction Type"]]
-    df_out.Memo = [f'COINBASE_{t}' for t in df["Transaction Type"]]
+    df_out.Currency = df["amount/balance unit"]
+    df_out.Amount = df["amount"]
+    df_out.Subcategory = [f'COINBASE_{t}' for t in df["type"]]
+    df_out.Memo = [f'COINBASE_{t}' for t in df["type"]]
     df_out['AccountType'] = config['account_type']
 
     return df_out
