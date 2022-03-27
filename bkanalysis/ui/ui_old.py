@@ -63,170 +63,6 @@ def get_current(df, by=['AccountType', 'Currency'], ref_currency=None):
     return df_by
 
 
-def convert_fx_spot(df, currency='GBP', key_currency='Currency', key_value='Amount'):
-    if isinstance(currency, str):
-        df_ccy = df
-        fx_spots = mp.get_spot_prices(df_ccy[key_currency].unique(), currency)
-        return df_ccy[key_value] * [fx_spots[ccy] for ccy in df_ccy.Currency]
-    else:
-        raise Exception(f'currency is not set to a correct value ({currency}). Expected None or String.')
-
-
-def plot_wealth(df, freq='w', currency='GBP', date_range=None, include_internal=False, include_labels=False):
-    if include_internal:
-        df_ccy = df
-    else:
-        df_ccy = df[df.FacingAccount == '']
-
-    if date_range is not None:
-        if len(date_range) == 2:
-            df_ccy = df_ccy[(df_ccy.Date > date_range[0]) & (df_ccy.Date < date_range[1])]
-        else:
-            raise Exception(f'date_range is not set to a correct value ({date_range}). Expected None or String.')
-
-    if f'Amount_{currency}' not in df_ccy.columns:
-        df_ccy[f'Amount_{currency}'] = convert_fx_spot(df_ccy, currency)
-
-    values = df_ccy.set_index('Date').groupby(pd.Grouper(freq=freq))[f'Amount_{currency}'].sum()
-    values.update(pd.Series(np.cumsum(values.values), index=values.index))
-
-    if include_labels:
-        df_ccy['MemoDetailed'] = df_ccy.MemoMapped + ": " + df_ccy.Amount.map('{:,.0f}'.format)
-        df_agg = df_ccy.groupby(['Date', 'MemoDetailed']).agg({f'Amount_{currency}': sum})
-        g = df_agg[f'Amount_{currency}'].groupby(level=0, group_keys=False)
-        res = g.apply(lambda x: x.sort_values(ascending=False))
-        labels = pd.DataFrame(res.to_frame().to_records()).groupby(pd.Grouper(key='Date', freq=freq))[
-            'MemoDetailed'].apply(lambda x: '<br>'.join(x.unique()))
-        fig = go.Figure(data=go.Scatter(x=values.index, y=values.values, hovertext=labels))
-    else:
-        fig = go.Figure(data=go.Scatter(x=values.index, y=values.values))
-
-    fig.update_layout(
-        title="Total Wealth",
-        xaxis_title="Date",
-        yaxis_title=currency)
-
-    return fig
-
-
-def try_get(d, k, default=None):
-    if k in d:
-        return d[k]
-    elif not (default is None):
-        return default
-    raise Exception(f'Key {k} is not in dictionary.')
-
-
-def project(df, currency='GBP', nb_years=11, projection_data={}):
-    projection = get_current(df, ['AccountType', 'Currency', 'Account']).copy()
-    projection['Return'] = [try_get(projection_data, acc, [0, 0, 0])[0] for acc in projection.Account]
-    projection['Volatility'] = [try_get(projection_data, acc, [0, 0, 0])[1] for acc in projection.Account]
-    projection['Contribution'] = [try_get(projection_data, acc, [0, 0, 0])[2] for acc in projection.Account]
-
-    projection['Amount'] = convert_fx_spot(projection, currency, 'Currency', 'Amount')
-    projection['Contribution'] = convert_fx_spot(projection, currency, 'Currency', 'Contribution')
-
-    r = range(0, nb_years)
-    (w, w_low, w_up, w_low_ex, w_up_ex) = pj.project_full(projection, r)
-
-    if f'Amount_{currency}' not in df.columns:
-        df[f'Amount_{currency}'] = convert_fx_spot(df, currency)
-
-    piv = pd.DataFrame(
-        pd.pivot_table(df, values=f'Amount_{currency}', index=['Date'], columns=[], aggfunc=sum).to_records())
-
-    fig = go.Figure()
-
-    fig.add_trace(go.Scatter(x=piv['Date'], y=piv[f'Amount_{currency}'].cumsum(),
-                             mode='lines', name='wealth'))
-
-    projection_x = [pd.Timestamp(piv['Date'].values[-1] + np.timedelta64(365 * i, 'D')) for i in r]
-
-    colours = ['#636EFA', '#abbeed', '#bdccf0']
-
-    fig.add_trace(go.Scatter(x=projection_x, y=w_low_ex,
-                             fill=None, mode='lines', line_color=colours[2], showlegend=False))
-    fig.add_trace(go.Scatter(x=projection_x, y=w_up_ex,
-                             fill='tonexty', mode='lines', name='95% interval', line_color=colours[2]))
-
-    fig.add_trace(go.Scatter(x=projection_x, y=w_low,
-                             fill=None, mode='lines', line_color=colours[1], showlegend=False))
-    fig.add_trace(go.Scatter(x=projection_x, y=w_up,
-                             fill='tonexty', mode='lines', name='80% interval', line_color=colours[1]))
-
-    fig.add_trace(go.Scatter(x=projection_x, y=w,
-                             mode='lines+markers', name='expectation', line_color=colours[0]))
-
-    fig.update_layout(
-        title="Projected Wealth with confidence interval",
-        xaxis_title="Date")
-
-    return fig
-
-
-def get_projection_template(df):
-    return {acc: [0, 0, 0] for acc in df.Account.unique()}
-
-
-def project_compare(df, currency='GBP', nb_years=11, projection_data_1={}, projection_data_2={}):
-    projection_1 = get_current(df, ['AccountType', 'Currency', 'Account']).copy()
-    projection_1['Return'] = [try_get(projection_data_1, acc, [0, 0, 0])[0] for acc in projection_1.Account]
-    projection_1['Volatility'] = [try_get(projection_data_1, acc, [0, 0, 0])[1] for acc in projection_1.Account]
-    projection_1['Contribution'] = [try_get(projection_data_1, acc, [0, 0, 0])[2] for acc in projection_1.Account]
-
-    projection_1['Amount'] = convert_fx_spot(projection_1, currency, 'Currency', 'Amount')
-    projection_1['Contribution'] = convert_fx_spot(projection_1, currency, 'Currency', 'Contribution')
-
-    projection_2 = get_current(df, ['AccountType', 'Currency', 'Account']).copy()
-    projection_2['Return'] = [try_get(projection_data_2, acc, [0, 0, 0])[0] for acc in projection_2.Account]
-    projection_2['Volatility'] = [try_get(projection_data_2, acc, [0, 0, 0])[1] for acc in projection_2.Account]
-    projection_2['Contribution'] = [try_get(projection_data_2, acc, [0, 0, 0])[2] for acc in projection_2.Account]
-
-    projection_2['Amount'] = convert_fx_spot(projection_2, currency, 'Currency', 'Amount')
-    projection_2['Contribution'] = convert_fx_spot(projection_2, currency, 'Currency', 'Contribution')
-
-    r = range(0, nb_years)
-    (w1, w1_low, w1_up, w1_low_ex, w1_up_ex) = pj.project_full(projection_1, r)
-    (w2, w2_low, w2_up, w2_low_ex, w2_up_ex) = pj.project_full(projection_2, r)
-
-    if f'Amount_{currency}' not in df.columns:
-        df[f'Amount_{currency}'] = convert_fx_spot(df, currency)
-
-    piv = pd.DataFrame(
-        pd.pivot_table(df, values=f'Amount_{currency}', index=['Date'], columns=[], aggfunc=sum).to_records())
-
-    fig = go.Figure()
-
-    fig.add_trace(go.Scatter(x=piv['Date'], y=piv[f'Amount_{currency}'].cumsum(),
-                             mode='lines', name='wealth'))
-
-    projection_x = [pd.Timestamp(piv['Date'].values[-1] + np.timedelta64(365 * i, 'D')) for i in r]
-
-    colours1 = ['#636EFA', '#838bfb', '#b5bafd']
-
-    fig.add_trace(go.Scatter(x=projection_x, y=w1_low_ex,
-                             fill=None, mode='lines', line_color=colours1[2], showlegend=False))
-    fig.add_trace(go.Scatter(x=projection_x, y=w1_up_ex,
-                             fill='tonexty', mode='lines', name='95% interval', line_color=colours1[2]))
-    fig.add_trace(go.Scatter(x=projection_x, y=w1,
-                             mode='lines+markers', name='expectation', line_color=colours1[0]))
-
-    colours2 = ['#ffb84d', '#ffcc80', '#ffe0b3']
-
-    fig.add_trace(go.Scatter(x=projection_x, y=w2_low_ex,
-                             fill=None, mode='lines', line_color=colours2[2], showlegend=False))
-    fig.add_trace(go.Scatter(x=projection_x, y=w2_up_ex,
-                             fill='tonexty', mode='lines', name='95% interval', line_color=colours2[2]))
-    fig.add_trace(go.Scatter(x=projection_x, y=w2,
-                             mode='lines+markers', name='expectation', line_color=colours2[0]))
-
-    fig.update_layout(
-        title="Comparison of Projected Wealth with confidence interval",
-        xaxis_title="Date")
-
-    return fig
-
-
 def internal_flows(df):
     df_internal = df[(df.FacingAccount != '') & (df.Amount > 1000) & (df.YearToDate < 5)]
     df_internal = pd.DataFrame(
@@ -277,7 +113,7 @@ def get_reimbursement(df, date_range=None, values='Amount'):
     return df_expenses
 
 
-def get_expenses(df, date_range=None, values='Amount'):
+def get_expenses(df, date_range=None, values='Amount', inc_reimbursement=False):
     if date_range is not None:
         df = df[(df.Date > date_range[0]) & (df.Date < date_range[1])]
         if len(df) == 0:
@@ -294,7 +130,10 @@ def get_expenses(df, date_range=None, values='Amount'):
                      & (df.FullType != 'Intra-Account Transfert')]
     df_expenses[values] = (-1) * df_expenses[values]
 
-    return df_expenses.append(get_reimbursement(df, date_range, values))
+    if inc_reimbursement:
+        return df_expenses.append(get_reimbursement(df, date_range, values))
+
+    return df_expenses
 
 
 __DATE_FORMAT = '%Y-%m-%d'
@@ -314,14 +153,14 @@ def get_title(dates, amounts):
     return title
 
 
-def plot_sunburst(df, path, date_range=None, values='Amount'):
-    df_expenses = get_expenses(df, date_range, values)
+def plot_sunburst(df, path, date_range=None, values='Amount', inc_reimbursement=False):
+    df_expenses = get_expenses(df, date_range, values, inc_reimbursement)
     title = get_title(df_expenses.Date, df_expenses[values])
     sb = px.sunburst(df_expenses, path=path, values=values, title=title)
     return sb
 
 
-def plot_pie(df, index='Account', date_range=None, minimal_amount=1000):
+def plot_pie(df, index='Account', date_range=None, minimal_amount=1000, inc_reimbursement=False):
     fig, ax = plt.subplots(subplot_kw=dict(aspect="equal"))
     plt.close()
 
@@ -331,7 +170,7 @@ def plot_pie(df, index='Account', date_range=None, minimal_amount=1000):
             return ''
         return "{:.1f}%\n{:,}".format(pct, absolute)
 
-    df_expenses = get_expenses(df)
+    df_expenses = get_expenses(df, date_range, inc_reimbursement=inc_reimbursement)
     df_expenses["Amount"] = pd.to_numeric(df_expenses["Amount"])
     df_account = pd.DataFrame(pd.pivot_table(df_expenses, values=['Amount'], index=index, aggfunc=sum).to_records())
     df_account = df_account[df_account.Amount > minimal_amount]
@@ -372,10 +211,10 @@ def plot_expenses_pie(df, full_type=None, values='Amount', year_end=2021):
     return fig
 
 
-def compare_expenses(df_trans, year_end=2021):
+def compare_expenses(df_trans, year_end=2021, inc_reimbursement=False):
     df_expenses = {}
     for year in range(year_end - 1, year_end + 1):
-        df_expenses[year] = get_expenses(df_trans, date_range=[f'{year}-01-01', f'{year}-12-31'])
+        df_expenses[year] = get_expenses(df_trans, date_range=[f'{year}-01-01', f'{year}-12-31'], inc_reimbursement=inc_reimbursement)
 
     labels = list(set(df_expenses[year_end - 1].FullType) | set(df_expenses[year_end].FullType))
     values_2020 = [(-1) * df_expenses[year_end - 1][df_expenses[year_end - 1].FullType == label].Amount_USD.sum() for
@@ -427,12 +266,14 @@ def plot_budget_bar(df, year_end=2021):
     fig.tight_layout()
 
 
-def capital_gain(df: pd.DataFrame, account: str, currency: str, start='2020-12-31', end='2021-12-31'):
-    df_1 = df.loc[(account, currency)]
+def capital_gain(df, start='2020-12-31', end='2021-12-31'):
+    df_1 = df
     df_1 = df_1[(df_1.Date > datetime.datetime.strptime(start, "%Y-%m-%d")) & (df_1.Date <= datetime.datetime.strptime(end, "%Y-%m-%d"))]
-    df_1 = df_1.sort_values('Date')
-    price_end = df_1.CumulatedAmountInCurrency[-1]
-    price_start = df_1.CumulatedAmountInCurrency[0] - df_1.AmountInCurrency[0]
-    total_invested = df_1.AmountInCurrency.sum()
+    df_1 = df_1.sort_values('Date').set_index('Date')
+    if len(df_1) == 0:
+        return 0.0
+    price_end = df_1.CumulatedAmountCcy[-1]
+    price_start = df_1.CumulatedAmountCcy[0] - df_1.AmountCcy[0]
+    total_invested = df_1.AmountCcy.sum()
     price_change = price_end - price_start - total_invested
     return price_change
