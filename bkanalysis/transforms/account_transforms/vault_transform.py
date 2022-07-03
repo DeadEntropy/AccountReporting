@@ -66,7 +66,7 @@ def get_dates_from_description(df, fallback_year):
 
 
 def load(path_in, config):
-    df = pd.read_csv(path_in)
+    df = pd.read_csv(path_in, parse_dates=['Completed Date'])
     expected_columns = parse_list(config['expected_columns'])
     assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
                                                      f'are [{", ".join(df.columns)}]. (Lloyds Current)'
@@ -80,9 +80,7 @@ def load(path_in, config):
 
     df_out = pd.DataFrame(columns=sd.target_columns)
 
-    df_out.Date = get_dates_from_description(df[["Description", "Completed Date"]], config['year'])
-    # df_out.Date = get_year(pd.to_datetime(df["Completed Date"] + ", " + config['year'], format='%b %d, %Y'))
-
+    df_out.Date = df["Completed Date"]
     df_out.Account = get_product_name(df["Product name"])
     df_out.Currency = config['currency']
     df_out.Amount = df["Money in (GBP)"] + df["Money out (GBP)"]

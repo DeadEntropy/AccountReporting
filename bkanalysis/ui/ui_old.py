@@ -155,6 +155,7 @@ def get_title(dates, amounts):
 
 def plot_sunburst(df, path, date_range=None, values='Amount', inc_reimbursement=False):
     df_expenses = get_expenses(df, date_range, values, inc_reimbursement)
+    df_expenses['FullSubType'] = [fullSubType if fullSubType != '' else 'Other' for fullSubType in df_expenses['FullSubType']]
     title = get_title(df_expenses.Date, df_expenses[values])
     sb = px.sunburst(df_expenses, path=path, values=values, title=title)
     return sb
@@ -264,16 +265,4 @@ def plot_budget_bar(df, year_end=2021):
     ax.bar_label(rects_budget, padding=3, rotation=45, labels=[f'{v.get_height():,.0f}' for v in rects_budget],
                  fontsize=7)
     fig.tight_layout()
-
-
-def capital_gain(df, start='2020-12-31', end='2021-12-31'):
-    df_1 = df
-    df_1 = df_1[(df_1.Date > datetime.datetime.strptime(start, "%Y-%m-%d")) & (df_1.Date <= datetime.datetime.strptime(end, "%Y-%m-%d"))]
-    df_1 = df_1.sort_values('Date').set_index('Date')
-    if len(df_1) == 0:
-        return 0.0
-    price_end = df_1.CumulatedAmountCcy[-1]
-    price_start = df_1.CumulatedAmountCcy[0] - df_1.AmountCcy[0]
-    total_invested = df_1.AmountCcy.sum()
-    price_change = price_end - price_start - total_invested
-    return price_change
+    
