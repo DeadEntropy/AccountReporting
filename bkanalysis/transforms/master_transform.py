@@ -9,7 +9,8 @@ from bkanalysis.transforms.account_transforms import barclays_transform as barc,
     lloyds_mortgage_transform as lloyds_mort, revolut_transform as rev_transform, \
     lloyds_current_transform as lloyds_curr, nutmeg_isa_transform as nut_transform, ubs_pension_transform, \
     static_data as sd, vault_transform, coinbase_transform, coinbase_pro_transform, bnp_stock_transform, \
-    bnp_cash_transform, chase_transform, revolut_transform_2 as rev_transform_2, fidelity_transform
+    bnp_cash_transform, chase_transform, revolut_transform_2 as rev_transform_2, fidelity_transform, discovery_transform, \
+    marcus_transform
 from bkanalysis.config import config_helper as ch
 from bkanalysis.market.market import Market
 from bkanalysis.market import market_loader as ml
@@ -72,6 +73,10 @@ class Loader:
             return chase_transform.load(file, self.config['Chase'])
         elif fidelity_transform.can_handle(file, self.config['Fidelity']):
             return fidelity_transform.load(file, self.config['Fidelity'])
+        elif discovery_transform.can_handle(file, self.config['Discovery']):
+            return discovery_transform.load(file, self.config['Discovery'])
+        elif marcus_transform.can_handle(file, self.config['Marcus']):
+            return marcus_transform.load(file, self.config['Marcus'])
 
         raise ValueError(f'file {file} could not be processed by any of the loaders.')
 
