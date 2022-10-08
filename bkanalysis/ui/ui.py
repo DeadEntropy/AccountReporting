@@ -25,6 +25,8 @@ CUMULATED_AMOUNT_CCY = 'CumulatedAmountCcy'
 CAPITAL_GAIN = 'CapitalGains'
 CUMULATED_AMOUNT_CCY_EXCL_CAPITAL = 'CumulatedAmountCcyExclCapGains'
 MEMO_MAPPED = 'MemoMapped'
+CAPITAL_GAIN = 'CapitalGain'
+CUMULATED_CAPITAL_GAIN = 'CumulatedCapitalGain'
 
 
 def currency_sign(ccy):
@@ -58,6 +60,12 @@ def __interpolate(x):
     z[AMOUNT] = x[AMOUNT].fillna(0.0)
     z[MEMO_MAPPED] = x[MEMO_MAPPED].fillna('')
     return z
+
+
+def add_no_capital_column(df):
+    df[CAPITAL_GAIN] = [next((float(x[1]) for x in l if x[0] == 'CAPITAL'), 0.0) for l in df[MEMO_MAPPED]]
+    df[CUMULATED_CAPITAL_GAIN] = df.groupby(['Account', 'Currency'])[CAPITAL_GAIN].transform(pd.Series.cumsum)
+    df[CUMULATED_AMOUNT_CCY_EXCL_CAPITAL] = df[CUMULATED_AMOUNT_CCY] - df[CUMULATED_CAPITAL_GAIN]
 
 
 def transactions_to_values(df):
@@ -128,8 +136,8 @@ def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10
     for idx in df.index.unique():
         cap_series.append(__running_capital_gains(df.loc[idx]))
 
-    df[MEMO_MAPPED] =  [memo + [('CAPITAL', c)] if c != 0 else memo for (memo, c) in zip(df[MEMO_MAPPED], pd.concat(cap_series))]
-
+    df[MEMO_MAPPED] = [memo + [('CAPITAL', c)] if c != 0 else memo for (memo, c) in zip(df[MEMO_MAPPED], pd.concat(cap_series))]
+    add_no_capital_column(df)
     return df
 
 
@@ -179,11 +187,10 @@ def __sum_to_dict(l: []):
     return out
 
 
-def plot_wealth(df, freq='w', date_range=None, include_internal=False, by=CUMULATED_AMOUNT_CCY):
+def _get_plot_data(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
     assert by in df.columns, f'Expect "{by}" to be in the columns.'
     assert DATE in df.columns, f'Expect "{DATE}" to be in the columns.'
     assert MEMO_MAPPED in df.columns, f'Expect "{MEMO_MAPPED}" to be in the columns.'
-
 
     if date_range is not None:
         if len(date_range) == 2:
@@ -202,8 +209,21 @@ def plot_wealth(df, freq='w', date_range=None, include_internal=False, by=CUMULA
     labels = ['<br>'.join([f'{k}: {v:,.0f}' for (k, v) in memo.items()]) + f"<br><br>TOTAL: {d:,.0f}"\
                 if d != 0 else ','.join(memo)\
                 for (memo, d) in zip(df_on_dates[MEMO_MAPPED], df_on_dates[by].diff())]
-    fig = go.Figure(data=go.Scatter(x=values.index, y=values.values, hovertext=labels))
-    
+
+    return values, labels
+
+
+def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
+    if isinstance(by, str):
+        values, labels = _get_plot_data(df, date_range, by)
+        fig = go.Figure(data=go.Scatter(x=values.index, y=values.values, hovertext=labels))
+    elif isinstance(by, list):
+        fig = go.Figure()
+        for b in by:
+            values, labels = _get_plot_data(df, date_range, b)
+            fig.add_trace(go.Scatter(x=values.index, y=values.values, hovertext=labels, name=b))
+    else:
+        raise Exception(f'by should be either a float or a list')
 
     fig.update_layout(
         title="Total Wealth",
