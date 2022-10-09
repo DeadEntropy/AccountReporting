@@ -38,7 +38,8 @@ def currency_sign(ccy):
     return ccy
 
 
-def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True, config=None, include_market=True):
+def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True, config=None, include_market=True,
+                      ignore_overrides=False):
     mt = master_transform.Loader(config, include_market)
     df_raw = mt.load_all(include_xls)
     if save_to_csv:
@@ -48,7 +49,7 @@ def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True
         return df_raw
 
     pr = process.Process(config)
-    df = pr.process(df_raw)
+    df = pr.process(df_raw, ignore_overrides=ignore_overrides)
     if save_to_csv:
         pr.save(df)
     pr.__del__()

@@ -8,6 +8,7 @@ class Market:
 
     def __init__(self, dict_of_values):
         self._dict = dict_of_values
+        self._dict_sorted_dates = {}
 
     def supported_instr(self):
         return list(self._dict.keys())
@@ -19,12 +20,20 @@ class Market:
         if len(self._dict[instr].keys()) == 0:
             raise Exception(f'No Data available for {instr} in the Market.')
 
-        if date < min(list(self._dict[instr].keys())):
+        if instr not in self._dict_sorted_dates:
+            sorted_list = sorted(list(self._dict[instr].keys()), reverse=True)
+            self._dict_sorted_dates[instr] = sorted_list
+        else:
+            sorted_list = self._dict_sorted_dates[instr]
+
+        min_date = sorted_list[-1]
+
+        if date < min_date:
             if self._EXTRAPOLATE_LEFT:
-                return min(list(self._dict[instr].keys()))
+                return min_date
             raise Exception(f'{date} is before the first available date for {instr} in the Market.')
 
-        return next(d for d in sorted(list(self._dict[instr].keys()), reverse=True) if d < date)
+        return next(d for d in sorted_list if d < date)
 
     def get_price(self, instr: str, date: dt.datetime):
         if instr not in self._dict.keys():
