@@ -29,7 +29,7 @@ def load(path_in, config, sep=','):
     df_out.Date = pd.to_datetime(df["Trans. Date"].str.strip(), format='%m/%d/%Y')
     df_out.Account = 'Discovery Credit'
     df_out.Currency = config['currency']
-    df_out.Amount = df['Amount']
+    df_out.Amount = -df['Amount']
     df_out.Memo = df['Description']
     df_out.Subcategory = df['Category']
     df_out['AccountType'] = config['account_type']
