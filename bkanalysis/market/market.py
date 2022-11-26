@@ -1,5 +1,7 @@
 import datetime as dt
+import pandas as pd
 from bkanalysis.market.price import Price
+from typing import Union
 
 
 class Market:
@@ -13,7 +15,7 @@ class Market:
     def supported_instr(self):
         return list(self._dict.keys())
 
-    def __get_previous_date(self, instr: str, date: dt.datetime):
+    def __get_previous_date(self, instr: str, date: Union[dt.datetime, pd.Timestamp]):
         if instr not in self._dict.keys():
             raise Exception(f'{instr} is not in the Market.')
 
@@ -28,12 +30,15 @@ class Market:
 
         min_date = sorted_list[-1]
 
-        if date < min_date:
+        date = pd.Timestamp(date)
+        min_date = pd.Timestamp(min_date)
+
+        if date.tz_localize(None) < min_date.tz_localize(None):
             if self._EXTRAPOLATE_LEFT:
                 return min_date
             raise Exception(f'{date} is before the first available date for {instr} in the Market.')
 
-        return next(d for d in sorted_list if d < date)
+        return next(d for d in sorted_list if pd.Timestamp(d).tz_localize(None) < date.tz_localize(None))
 
     def get_price(self, instr: str, date: dt.datetime):
         if instr not in self._dict.keys():

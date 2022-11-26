@@ -1,6 +1,7 @@
 *.pyc
 *.iml
 *.ipynb
+*.ini
 .idea/dictionaries/nicol.xml
 .idea/inspectionProfiles/profiles_settings.xml
 .idea/misc.xml

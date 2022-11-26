@@ -25,6 +25,7 @@ CUMULATED_AMOUNT_CCY = 'CumulatedAmountCcy'
 CAPITAL_GAIN = 'CapitalGains'
 CUMULATED_AMOUNT_CCY_EXCL_CAPITAL = 'CumulatedAmountCcyExclCapGains'
 MEMO_MAPPED = 'MemoMapped'
+TYPE = 'Type'
 CAPITAL_GAIN = 'CapitalGain'
 CUMULATED_CAPITAL_GAIN = 'CumulatedCapitalGain'
 
@@ -74,15 +75,19 @@ def transactions_to_values(df):
     df.Date = [dt.datetime(old_date.year, old_date.month, old_date.day) for old_date in df.Date]
 
     # Ensure there all (Account, Currency, Date) tuples are unique
-    df.drop(df.columns.difference(['Account', 'Currency', DATE, MEMO_MAPPED, AMOUNT]), 1, inplace=True)
+    df.drop(df.columns.difference(['Account', 'Currency', DATE, MEMO_MAPPED, AMOUNT, 'Type']), 1, inplace=True)
     df = df.groupby(['Account', 'Currency', DATE]).agg(
-        {AMOUNT: [sum, list], MEMO_MAPPED: list}).reset_index().set_index(['Account', 'Currency', 'Date'])
+        {AMOUNT: [sum, list], MEMO_MAPPED: list, 'Type': list}).reset_index().set_index(['Account', 'Currency', 'Date'])
 
     df.columns = [" ".join(a) for a in df.columns.to_flat_index()]
-    df.rename(columns={f'{AMOUNT} sum': AMOUNT, f'{AMOUNT} list': f'{AMOUNT}Details', f'{MEMO_MAPPED} list': MEMO_MAPPED}, inplace=True)
-    df[MEMO_MAPPED] = [[(i1, i2) for (i1, i2) in zip(l1, l2)] for (l1, l2) in zip(df[MEMO_MAPPED], df[f'{AMOUNT}Details'])]
+    df.rename(columns={f'{AMOUNT} sum': AMOUNT,
+                       f'{AMOUNT} list': f'{AMOUNT}Details',
+                       f'{MEMO_MAPPED} list': MEMO_MAPPED,
+                       f'{TYPE} list': TYPE}, inplace=True)
+    df[MEMO_MAPPED] = [[(i1, i2, t) for (i1, i2, t) in zip(l1, l2, types)]
+                       for (l1, l2, types) in zip(df[MEMO_MAPPED], df[f'{AMOUNT}Details'], df[TYPE])]
     df[MEMO_MAPPED] = [memo if memo != '' else {} for memo in df[MEMO_MAPPED]]
-    df.drop(f'{AMOUNT}Details', axis=1, inplace=True)
+    df.drop([f'{AMOUNT}Details', TYPE], axis=1, inplace=True)
 
     # Compute the running sum for each tuple (Account, Currency)
     df = df.sort_values(DATE)
@@ -128,7 +133,7 @@ def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10
                          for (instr, date) in zip(df.reset_index().Currency, df.reset_index().Date)]
     df[CUMULATED_AMOUNT_CCY] = df[CUMULATED_AMOUNT] * price_in_currency
     df[AMOUNT_CCY] = df[AMOUNT] * price_in_currency
-    df[MEMO_MAPPED] = [[(k, v * p) for (k, v) in memo] if memo != '' else [] 
+    df[MEMO_MAPPED] = [[(k, v * p, t) for (k, v, t) in memo] if memo != '' else []
                        for (memo, p) in zip(
                                             df[MEMO_MAPPED], 
                                             price_in_currency)]
@@ -137,7 +142,7 @@ def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10
     for idx in df.index.unique():
         cap_series.append(__running_capital_gains(df.loc[idx]))
 
-    df[MEMO_MAPPED] = [memo + [('CAPITAL', c)] if c != 0 else memo for (memo, c) in zip(df[MEMO_MAPPED], pd.concat(cap_series))]
+    df[MEMO_MAPPED] = [memo + [('CAPITAL', c, 'C')] if c != 0 else memo for (memo, c) in zip(df[MEMO_MAPPED], pd.concat(cap_series))]
     add_no_capital_column(df)
     return df
 
@@ -179,11 +184,11 @@ def get_status(df):
 def __sum_to_dict(l: []):
     out = {}
     for d in l:
-        for key in set([e1 for (e1, _) in d]):
+        for key in set([e1 for (e1, _, t) in d]):
             if key not in out:
-                out[key] = sum([v for (k, v) in d if k == key])
+                out[key] = sum([v for (k, v, t) in d if k == key])
             else:
-                out[key] += sum([v for (k, v) in d if k == key])
+                out[key] += sum([v for (k, v, t) in d if k == key])
                 
     return out
 
