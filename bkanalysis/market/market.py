@@ -9,7 +9,11 @@ class Market:
     _EXTRAPOLATE_LEFT = True
 
     def __init__(self, dict_of_values):
-        self._dict = dict_of_values
+        self._dict = {
+            asset: {
+                pd.Timestamp(k).tz_localize(None): v for k, v in dict_of_values[asset].items()
+                } for asset in dict_of_values
+            }
         self._dict_sorted_dates = {}
 
     def supported_instr(self):
@@ -30,15 +34,14 @@ class Market:
 
         min_date = sorted_list[-1]
 
-        date = pd.Timestamp(date)
-        min_date = pd.Timestamp(min_date)
+        date = pd.Timestamp(date).tz_localize(None)
 
-        if date.tz_localize(None) < min_date.tz_localize(None):
+        if date < min_date:
             if self._EXTRAPOLATE_LEFT:
                 return min_date
             raise Exception(f'{date} is before the first available date for {instr} in the Market.')
 
-        return next(d for d in sorted_list if pd.Timestamp(d).tz_localize(None) < date.tz_localize(None))
+        return next(d for d in sorted_list if d < date)
 
     def get_price(self, instr: str, date: dt.datetime):
         if instr not in self._dict.keys():
