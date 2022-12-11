@@ -207,10 +207,21 @@ class Process:
 
         return df_out
 
+
+    @staticmethod
+    def _clean_amazon_memo(s: str) -> str:
+        if isinstance(s, str):
+            if 'AMZN MKTP' in s.upper():
+                return 'AMAZON'
+            if 'AMAZON.COM' in s.upper():
+                return 'AMAZON'
+        return s
+
+
     @staticmethod
     def __clean_memo(s):
         if isinstance(s, str):
-            return re.sub('\*', '', re.sub(' +', ' ', s.split(' ON ')[0])).replace(',', '').strip()
+            return Process._clean_amazon_memo(re.sub('\*', '', re.sub(' +', ' ', s.split(' ON ')[0])).replace(',', '').strip())
         return s
 
     def extend(self, df, ignore_overrides=False):
