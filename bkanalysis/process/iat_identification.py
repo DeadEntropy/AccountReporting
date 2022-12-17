@@ -9,6 +9,7 @@ class IatIdentification:
     iat_types = ['SA', 'IAT', 'W_IN', 'W_OUT', 'SC', 'R', 'MC', 'O', 'FR', 'TAX', 'FPC', 'FLC', 'FLL', 'FSC']
     iat_full_types = ['Savings', 'Intra-Account Transfert', 'Wire In', 'Wire Out', 'Service Charge', 'Rent/Mortgage', 'Others', 'Tax', 'Flat Capital', 'Flat Living Cost']
     iat_fx_types = ['FX']
+    relative_tolerance: float = 0.0
 
     def __init__(self, config=None):
         if config is None:
@@ -25,7 +26,7 @@ class IatIdentification:
 
         df['IDX'] = df.index
         ndf = pd.merge(left=df, right=df, on=('Account', 'Memo', 'AccountType', 'Currency'), how='inner')
-        out = ndf[(ndf.Amount_x == (-1) * ndf.Amount_y)
+        out = ndf[(abs(ndf.Amount_x + ndf.Amount_y) < ndf.Amount_x * self.relative_tolerance)
                   & (ndf.Date_x - ndf.Date_y < pd.Timedelta(7, 'D'))
                   & (ndf.IDX_x < ndf.IDX_y)
                   & (ndf.Amount_x != 0)]
@@ -44,7 +45,7 @@ class IatIdentification:
 
         return df.drop(offsetting_rows)
 
-    def map_iat(self, df, iat_value_col='Amount'):
+    def map_iat(self, df, iat_value_col='Amount', adjust_dates:bool=False):
         # print('mapping transactions between accounts...')
         columns_req = ['Currency', 'FullType', 'Date', 'Account'] + [iat_value_col]
         assert all([col_req in df.columns for col_req in columns_req]), f'columns do not match expectation. Expected : {columns_req} but receive {df.columns}'
@@ -71,6 +72,11 @@ class IatIdentification:
             offsetting_rows.append(dup[1])
 
         for dup in iat_transfers_unique:
+            if adjust_dates:
+                adjusted_date = max(df.loc[dup[0], 'Date'], df.loc[dup[1], 'Date'])
+                df.loc[dup[0], 'Date'] = adjusted_date
+                df.loc[dup[1], 'Date'] = adjusted_date
+
             df.loc[dup[0], 'FacingAccount'] = df.loc[dup[1], 'Account']
             df.loc[dup[1], 'FacingAccount'] = df.loc[dup[0], 'Account']
 
