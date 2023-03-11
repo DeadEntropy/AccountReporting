@@ -361,7 +361,7 @@ def get_by_subtype(df_exp:pd.DataFrame, by: str, key: str, nb_days: int = 365, s
 
     df['Year'] = [d.year for d in df['Date']]
     df['Month'] = [f"{d.year}-{d.month}" for d in df['Date']]
-    df = df[df.Month != f"{datetime.now().year}-{datetime.now().month}"]
+    df = df[df.Month != f"{dt.datetime.now().year}-{dt.datetime.now().month}"]
     
     if len(df) == 0:
         raise Exception(f"No records found for {key}.")

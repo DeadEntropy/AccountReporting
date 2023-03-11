@@ -2,7 +2,6 @@
 import pandas as pd
 import numpy as np
 
-import datetime
 
 from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
@@ -48,7 +47,7 @@ def get_current(df, by=['AccountType', 'Currency'], ref_currency=None):
     elif len(ref_currency) == 3:
         value_str = f'Amount_{ref_currency}'
         if value_str not in df.columns:
-            df[f'Amount_{ref_currency}'] = convert_fx_spot(df, ref_currency)
+            df[f'Amount_{ref_currency}'] = None # convert_fx_spot(df, ref_currency)
     else:
         raise Exception(f'{ref_currency} is not a valid ref_currency.')
 
