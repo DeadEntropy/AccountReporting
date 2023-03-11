@@ -173,7 +173,7 @@ def get_currency(symbol):
     r = requests.get(__query_yahoo_url_quote, params=params, headers=headers)
     sleep(0.05)
 
-    assert r.status_code == 200, f'Yahoo Request Failed for {isin}. Status code: {r.status_code}'
+    assert r.status_code == 200, f'Yahoo Request Failed for {symbol}. Status code: {r.status_code}'
 
     data = r.json()
     
