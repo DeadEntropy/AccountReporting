@@ -29,7 +29,7 @@ def get_year_to_date(dt):
 def get_missing_map(memo, mapping):
     if memo == '' or memo == '000001':
         return ''
-    suggested_keys = difflib.get_close_matches(memo, list(mapping.keys()))
+    suggested_keys = difflib.get_close_matches(memo, [str(k) for k in mapping.keys()])
     suggestions = list(set([mapping[x] for x in suggested_keys]))
     if len(suggestions) > 0:
         value = input(f'Please enter the mapping for "{memo}". Suggestions:\n {suggestions}\n '

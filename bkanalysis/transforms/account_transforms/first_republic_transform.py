@@ -28,9 +28,9 @@ def load(path_in, config):
     df_out.Date = pd.to_datetime(df['Date'], format='%m/%d/%Y')
     df_out.Account = "First Republic"
     df_out.Currency = "USD"
-    memo = list(df['Description'].fillna('N/A'))
+    memo = list(df['Description'].fillna('Empty Description'))
     df_out.Memo = memo
-    subcategory = list(df["Category"].fillna('N/A'))
+    subcategory = list(df["Category"].fillna('Empty Category'))
     df_out.Subcategory = subcategory
     df_out['AccountType'] = config['account_type']
     amounts = list(df['Debit'].fillna(0.0) + df['Credit'].fillna(0.0))
