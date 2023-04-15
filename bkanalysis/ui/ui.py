@@ -224,7 +224,7 @@ def aggregate_memos(memo):
         return '<br>'.join([f'{k}: {v:,.0f}' for (k, v) in memo.items()])
     largest_memos = [(k,v) for (k,v) in memo.items() if abs(v) > sorted([abs(v) for (k,v) in memo.items()], reverse=True)[19]]
     remainging_amount = sum([v for k, v in memo.items()]) - sum([v for k, v in largest_memos])
-    return '<br>'.join([f'{k}: {v:,.0f}' for (k, v) in largest_memos]) + '<br>OTHER: {remainging_amount:,.0f}'
+    return '<br>'.join([f'{k}: {v:,.0f}' for (k, v) in largest_memos]) + f'<br>OTHER: {remainging_amount:,.0f}'
 
 
 def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
