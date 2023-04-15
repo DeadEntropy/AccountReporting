@@ -213,11 +213,18 @@ def _get_plot_data(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
                         MEMO_MAPPED:__sum_to_dict})
 
     values = df_on_dates[by]
-    labels = ['<br>'.join([f'{k}: {v:,.0f}' for (k, v) in memo.items()]) + f"<br><br>TOTAL: {d:,.0f}"\
+    labels = [aggregate_memos(memo) + f"<br><br>TOTAL: {d:,.0f}"\
                 if d != 0 else ','.join(memo)\
                 for (memo, d) in zip(df_on_dates[MEMO_MAPPED], df_on_dates[by].diff())]
 
     return values, labels
+
+def aggregate_memos(memo):
+    if len(memo) < 20:
+        return '<br>'.join([f'{k}: {v:,.0f}' for (k, v) in memo.items()])
+    largest_memos = [(k,v) for (k,v) in memo.items() if abs(v) > sorted([abs(v) for (k,v) in memo.items()], reverse=True)[19]]
+    remainging_amount = sum([v for k, v in memo.items()]) - sum([v for k, v in largest_memos])
+    return '<br>'.join([f'{k}: {v:,.0f}' for (k, v) in largest_memos]) + '<br>OTHER: {remainging_amount:,.0f}'
 
 
 def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
