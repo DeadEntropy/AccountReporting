@@ -11,7 +11,7 @@ class Market:
     def __init__(self, dict_of_values):
         self._dict = {
             asset: {
-                pd.Timestamp(k).tz_localize(None): v for k, v in dict_of_values[asset].items()
+                pd.Timestamp(k).tz_convert(None) if pd.Timestamp(k).tzinfo is not None else pd.Timestamp(k): v for k, v in dict_of_values[asset].items()
                 } for asset in dict_of_values
             }
         self._dict_sorted_dates = {}
