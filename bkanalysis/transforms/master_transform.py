@@ -40,53 +40,53 @@ class Loader:
 
     def load_internal(self, file, ref_currency='GBP'):
         # print(f'Loading {file}')
-        if barc.can_handle(file, self.config['Barclays']):
+        if 'Barclays' in self.config and barc.can_handle(file, self.config['Barclays']):
             return barc.load(file, self.config['Barclays'])
-        elif lloyds_curr.can_handle(file, self.config['LloydsCurrent']):
+        elif 'LloydsCurrent' in self.config and lloyds_curr.can_handle(file, self.config['LloydsCurrent']):
             return lloyds_curr.load(file, self.config['LloydsCurrent'])
-        elif lloyds_mort.can_handle(file, self.config['LloydsMortgage']):
+        elif 'LloydsMortgage' in self.config and lloyds_mort.can_handle(file, self.config['LloydsMortgage']):
             return lloyds_mort.load(file, self.config['LloydsMortgage'])
-        elif nut_transform.can_handle(file, self.config['Nutmeg']):
+        elif 'Nutmeg' in self.config and nut_transform.can_handle(file, self.config['Nutmeg']):
             return nut_transform.load(file, self.config['Nutmeg'], self.market, ref_currency)
-        elif rev_transform.can_handle(file, self.config['Revolut'], ';'):
+        elif 'Revolut' in self.config and rev_transform.can_handle(file, self.config['Revolut'], ';'):
             return rev_transform.load(file, self.config['Revolut'], ';')
-        elif rev_transform.can_handle(file, self.config['Revolut'], ','):
+        elif 'Revolut' in self.config and rev_transform.can_handle(file, self.config['Revolut'], ','):
             return rev_transform.load(file, self.config['Revolut'], ',')
-        elif rev_transform_2.can_handle(file, self.config['Revolut2'], ','):
+        elif 'Revolut2' in self.config and rev_transform_2.can_handle(file, self.config['Revolut2'], ','):
             return rev_transform_2.load(file, self.config['Revolut2'], ',')
-        elif citi_transform.can_handle(file, self.config['Citi']):
+        elif 'Citi' in self.config and citi_transform.can_handle(file, self.config['Citi']):
             return citi_transform.load(file, self.config['Citi'])
         elif clone_transform.can_handle(file):
             return clone_transform.load(file)
-        elif ubs_pension_transform.can_handle(file, self.config['UbsPension']):
+        elif 'UbsPension' in self.config and ubs_pension_transform.can_handle(file, self.config['UbsPension']):
             return ubs_pension_transform.load(file, self.config['UbsPension'], self.market, ref_currency)
-        elif ubs_us_pension_transform.can_handle(file, self.config['UbsUsPension']):
+        elif 'UbsUsPension' in self.config and ubs_us_pension_transform.can_handle(file, self.config['UbsUsPension']):
             return ubs_us_pension_transform.load(file, self.config['UbsUsPension'], None, ref_currency)
-        elif vault_transform.can_handle(file, self.config['Vault']):
+        elif 'Vault' in self.config and vault_transform.can_handle(file, self.config['Vault']):
             return vault_transform.load(file, self.config['Vault'])
-        elif coinbase_pro_transform.can_handle(file, self.config['CoinbasePro']):
+        elif 'CoinbasePro' in self.config and coinbase_pro_transform.can_handle(file, self.config['CoinbasePro']):
             return coinbase_pro_transform.load(file, self.config['CoinbasePro'])
-        elif coinbase_transform.can_handle(file, self.config['Coinbase']):
+        elif 'Coinbase' in self.config and coinbase_transform.can_handle(file, self.config['Coinbase']):
             return coinbase_transform.load(file, self.config['Coinbase'])
-        elif bnp_stock_transform.can_handle(file, self.config['BnpStocks']):
+        elif 'BnpStocks' in self.config and bnp_stock_transform.can_handle(file, self.config['BnpStocks']):
             return bnp_stock_transform.load(file, self.config['BnpStocks'])
-        elif bnp_cash_transform.can_handle(file, self.config['BnpCash']):
+        elif 'BnpCash' in self.config and bnp_cash_transform.can_handle(file, self.config['BnpCash']):
             return bnp_cash_transform.load(file, self.config['BnpCash'])
-        elif chase_transform.can_handle(file, self.config['Chase']):
+        elif 'Chase' in self.config and chase_transform.can_handle(file, self.config['Chase']):
             return chase_transform.load(file, self.config['Chase'])
-        elif fidelity_transform.can_handle(file, self.config['Fidelity']):
+        elif 'Fidelity' in self.config and fidelity_transform.can_handle(file, self.config['Fidelity']):
             return fidelity_transform.load(file, self.config['Fidelity'])
-        elif discovery_transform.can_handle(file, self.config['Discovery']):
+        elif 'Discovery' in self.config and discovery_transform.can_handle(file, self.config['Discovery']):
             return discovery_transform.load(file, self.config['Discovery'])
-        elif marcus_transform.can_handle(file, self.config['Marcus']):
+        elif 'Marcus' in self.config and marcus_transform.can_handle(file, self.config['Marcus']):
             return marcus_transform.load(file, self.config['Marcus'])
-        elif discovery_credit_transform.can_handle(file, self.config['DiscoveryCredit']):
+        elif 'DiscoveryCredit' in self.config and discovery_credit_transform.can_handle(file, self.config['DiscoveryCredit']):
             return discovery_credit_transform.load(file, self.config['DiscoveryCredit'])
-        elif capital_one_transform.can_handle(file, self.config['CapitalOne']):
+        elif 'CapitalOne' in self.config and capital_one_transform.can_handle(file, self.config['CapitalOne']):
             return capital_one_transform.load(file, self.config['CapitalOne'])
-        elif first_republic_transform.can_handle(file, self.config['FirstRepublic']):
+        elif 'FirstRepublic' in self.config and first_republic_transform.can_handle(file, self.config['FirstRepublic']):
             return first_republic_transform.load(file, self.config['FirstRepublic'])
-        elif first_republic_mtg_transform.can_handle(file, self.config['FirstRepublicMortgage']):
+        elif 'FirstRepublicMortgage' in self.config and first_republic_mtg_transform.can_handle(file, self.config['FirstRepublicMortgage']):
             return first_republic_mtg_transform.load(file, self.config['FirstRepublicMortgage'])
 
         raise ValueError(f'file {file} could not be processed by any of the loaders.')
