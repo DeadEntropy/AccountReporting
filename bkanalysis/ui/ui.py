@@ -359,7 +359,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
 
     return fig
 
-def get_by_subtype(df_exp:pd.DataFrame, by: str, key: str, nb_days: int = 365, show_count: int = 5, exclude: list = []):
+def get_by_subtype(df_exp:pd.DataFrame, by: str, key: str, nb_days: int = 365, show_count: int = 5, exclude: list = [], max_char: int = 12):
     if by not in ['FullSubType', 'FullType']:
         raise Exception(f"by must be in {['FullSubType', 'FullType']}")
     df = pd.pivot_table(df_exp[(df_exp.Date>df_exp.Date.max()-timedelta(nb_days)) & (df_exp[by] == key)], \
@@ -379,7 +379,7 @@ def get_by_subtype(df_exp:pd.DataFrame, by: str, key: str, nb_days: int = 365, s
     top_memos = list([s for s in pd.pivot_table(df, index=['MemoMapped'], values='AmountCcy', aggfunc=sum)\
                       .sort_values(by='AmountCcy').head(show_count).index])
     
-    df['Memo'] = [s[:12] if s in top_memos else 'Other' for s in df.MemoMapped]
+    df['Memo'] = [s[:max_char] if s in top_memos else 'Other' for s in df.MemoMapped]
 
     df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', 'Memo'], values='AmountCcy', aggfunc=sum).to_records())\
     .sort_values(by='AmountCcy')

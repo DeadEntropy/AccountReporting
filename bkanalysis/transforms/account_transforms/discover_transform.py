@@ -26,12 +26,13 @@ def load(path_in, config, sep=','):
         f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Discovery)'
 
     df_out = pd.DataFrame(columns=sd.target_columns)
-    df_out.Date = pd.to_datetime(df["Trans. Date"].str.strip(), format='%m/%d/%Y')
-    df_out.Account = 'Discovery Credit'
+    df_out.Date = pd.to_datetime(df["Transaction Date"].str.strip(), format='%m/%d/%Y')
+    df_out.Account = 'Discover'
     df_out.Currency = config['currency']
-    df_out.Amount = -df['Amount']
-    df_out.Memo = df['Description']
-    df_out.Subcategory = df['Category']
+    df_out.Amount = [c - d for c, d in zip(pd.to_numeric(df['Credit'].str.replace('$', ''), errors='coerce'),
+                                           pd.to_numeric(df['Debit'].str.replace('$', ''), errors='coerce'))]
+    df_out.Memo = df['Transaction Description']
+    df_out.Subcategory = df['Transaction Type']
     df_out['AccountType'] = config['account_type']
 
     return df_out

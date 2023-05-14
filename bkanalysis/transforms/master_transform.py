@@ -9,8 +9,8 @@ from bkanalysis.transforms.account_transforms import barclays_transform as barc,
     lloyds_mortgage_transform as lloyds_mort, revolut_transform as rev_transform, \
     lloyds_current_transform as lloyds_curr, nutmeg_isa_transform as nut_transform, ubs_pension_transform, \
     static_data as sd, vault_transform, coinbase_transform, coinbase_pro_transform, bnp_stock_transform, \
-    bnp_cash_transform, chase_transform, revolut_transform_2 as rev_transform_2, fidelity_transform, discovery_transform, \
-    marcus_transform, discovery_credit_transform, ubs_us_pension_transform, capital_one_transform, \
+    bnp_cash_transform, chase_transform, revolut_transform_2 as rev_transform_2, fidelity_transform, discover_transform, \
+    marcus_transform, discover_credit_transform, ubs_us_pension_transform, capital_one_transform, \
     first_republic_transform, first_republic_mtg_transform
 from bkanalysis.config import config_helper as ch
 from bkanalysis.market.market import Market
@@ -76,12 +76,12 @@ class Loader:
             return chase_transform.load(file, self.config['Chase'])
         elif 'Fidelity' in self.config and fidelity_transform.can_handle(file, self.config['Fidelity']):
             return fidelity_transform.load(file, self.config['Fidelity'])
-        elif 'Discovery' in self.config and discovery_transform.can_handle(file, self.config['Discovery']):
-            return discovery_transform.load(file, self.config['Discovery'])
+        elif 'Discover' in self.config and discover_transform.can_handle(file, self.config['Discover']):
+            return discover_transform.load(file, self.config['Discover'])
         elif 'Marcus' in self.config and marcus_transform.can_handle(file, self.config['Marcus']):
             return marcus_transform.load(file, self.config['Marcus'])
-        elif 'DiscoveryCredit' in self.config and discovery_credit_transform.can_handle(file, self.config['DiscoveryCredit']):
-            return discovery_credit_transform.load(file, self.config['DiscoveryCredit'])
+        elif 'DiscoverCredit' in self.config and discover_credit_transform.can_handle(file, self.config['DiscoverCredit']):
+            return discover_credit_transform.load(file, self.config['DiscoverCredit'])
         elif 'CapitalOne' in self.config and capital_one_transform.can_handle(file, self.config['CapitalOne']):
             return capital_one_transform.load(file, self.config['CapitalOne'])
         elif 'FirstRepublic' in self.config and first_republic_transform.can_handle(file, self.config['FirstRepublic']):
