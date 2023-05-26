@@ -182,7 +182,7 @@ def get_status(df):
 
 
 # l is a list of tuple with duplicate keys
-def __sum_to_dict(l: []):
+def __sum_to_dict(l: list):
     out = {}
     for d in l:
         for key in set([e1 for (e1, _, t) in d]):

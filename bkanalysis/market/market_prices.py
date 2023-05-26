@@ -11,7 +11,6 @@ mem_cache_currency = LRUCache(maxsize=1024)
 mem_cache_symbol = LRUCache(maxsize=1024)
 
 __query_yahoo_url_search = "https://query2.finance.yahoo.com/v1/finance/search"
-__query_yahoo_url_quote = "https://query2.finance.yahoo.com/v7/finance/quote"
 
 regex_ticker = re.compile(r'^[a-zA-Z][a-zA-Z][0-9]+')
 
@@ -165,21 +164,7 @@ __currency_map = {
     'PBF7.F': 'EUR'
 }
 
-
 @cached(mem_cache_currency)
 def get_currency(symbol):
-    params = {'symbols': symbol}
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
-    r = requests.get(__query_yahoo_url_quote, params=params, headers=headers)
-    sleep(0.05)
-
-    assert r.status_code == 200, f'Yahoo Request Failed for {symbol}. Status code: {r.status_code}'
-
-    data = r.json()
+    return yf.Ticker(symbol).info['currency']
     
-    assert 'quoteResponse' in data, f'Yahoo request for {symbol} didnt return a quoteResponse.'
-    assert 'result' in data['quoteResponse'], f'Yahoo request for {symbol} didnt return a quoteResponse.'
-    assert len(data['quoteResponse']['result']) > 0, f'Yahoo request for {symbol} didnt return a quoteResponse.'
-    assert 'currency' in data['quoteResponse']['result'][0], f'Yahoo request for {symbol} didnt return a symbol.'
-
-    return data['quoteResponse']['result'][0]['currency']
