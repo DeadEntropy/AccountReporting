@@ -220,11 +220,13 @@ def _get_plot_data(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
     return values, labels
 
 def aggregate_memos(memo):
-    if len(memo) < 20:
-        return '<br>'.join([f'{k}: {v:,.0f}' for (k, v) in memo.items()])
-    largest_memos = [(k,v) for (k,v) in memo.items() if abs(v) > sorted([abs(v) for (k,v) in memo.items()], reverse=True)[19]]
-    remainging_amount = sum([v for k, v in memo.items()]) - sum([v for k, v in largest_memos])
-    return '<br>'.join([f'{k}: {v:,.0f}' for (k, v) in largest_memos]) + f'<br>OTHER: {remainging_amount:,.0f}'
+    sorted_memo = dict(sorted(memo.items(), key=lambda item: -abs(item[1])))
+    if len(sorted_memo) < 20:
+        return '<br>'.join([f'{v:>7,.0f}: {k[:25]}' for (k, v) in sorted_memo.items()])
+    largest_memos = [(k,v) for (k,v) in sorted_memo.items() if abs(v) > sorted([abs(v) for (k,v) in sorted_memo.items()], reverse=True)[19]]
+    remainging_amount = sum([v for k, v in sorted_memo.items()]) - sum([v for k, v in largest_memos])
+    largest_memos = dict(sorted({**dict(largest_memos), **{'OTHER': remainging_amount}}.items(), key=lambda item: -abs(item[1])))
+    return '<br>'.join([f'{v:>7,.0f}: {k[:25]}' for (k, v) in largest_memos.items()]) 
 
 
 def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
