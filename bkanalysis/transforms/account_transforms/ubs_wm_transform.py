@@ -23,29 +23,16 @@ def load(path_in, config, sep=','):
     expected_columns = parse_list(config['expected_columns'], False)
 
     assert set(df.columns) == set(expected_columns), \
-        f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Fidelity)'
+        f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (UBS WM)'
 
     df_out = pd.DataFrame(columns=sd.target_columns)
-    df_out.Date = pd.to_datetime(df["Run Date"].str.strip(), format='%m/%d/%Y')
-    df_out.Account = 'Fidelity Brokerage'
-    df_out.Currency = [config['cash_account'] if s.isspace() else s.strip() for s in df.Symbol]
-    df_out.Amount = [a if ccy == config['cash_account'] else q for (q, a, ccy) in
-                     zip(df.Quantity, df['Amount ($)'], df_out.Currency)]
-    df_out.Memo = df.Action
-    df_out.Subcategory = df['Security Description']
+    df_out.Date = pd.to_datetime(df["Date"].str.strip(), format='%m/%d/%Y')
+    df_out.Account = df['Account Number']
+    df_out.Currency = df['Symbol'].fillna('USD')
+    df_out.Amount = [q if t =='Investment' else a for t, q, a in zip(df['Type'], df['Quantity'], df['Amount'])]
+    df_out.Memo = [f'{a}: {d}' for a, d in zip(df['Activity'], df['Description'])]
+    df_out.Subcategory = df['Activity']
     df_out['AccountType'] = config['account_type']
-
-    # Fidelity doesnt give the outflows from t he cash_account, so we need to manually add them
-    df_cash_account = df[~df.Symbol.str.isspace()]
-    df_cash_out = pd.DataFrame(columns=sd.target_columns)
-    df_cash_out.Date = pd.to_datetime(df_cash_account["Run Date"].str.strip(), format='%m/%d/%Y')
-    df_cash_out.Account = 'Fidelity Brokerage'
-    df_cash_out.Currency = config['cash_account']
-    df_cash_out.Amount = df_cash_account['Amount ($)']
-    df_cash_out.Memo = df_cash_account.Action
-    df_cash_out.Subcategory = df_cash_account['Security Description']
-
-    df_out = df_out.append(df_cash_out).sort_values('Date', ascending=False).reset_index(drop=True)
 
     return df_out
 
@@ -68,4 +55,4 @@ def load_save_default():
     if len(config.read(ch.source)) != 1:
         raise OSError(f'no config found in {ch.source}')
 
-    load_save(config['Fidelity'])
+    load_save(config['UbsWealthManagement'])
