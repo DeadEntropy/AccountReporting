@@ -70,7 +70,13 @@ class MarketLoader:
 
         if self.source_default == SOURCE.YAHOO:
             logging.info(f'Getting {period} of data for {symbol} from {SOURCE.YAHOO}')
-            return self.get_history_from_yahoo(symbol, period)
+            hist = self.get_history_from_yahoo(symbol, period)
+            if len(hist) == 0:
+                raise Exception(f'No Yahoo history found for {symbol}. Check that the symbol is correct. ' \
+                                + f'Or add a custom source for that symbol in the market config ({ch.source}).')
+            return hist
+        
+
 
         raise Exception(f'default source can not be {self.source_default}.')
 

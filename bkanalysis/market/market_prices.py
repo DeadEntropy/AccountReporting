@@ -161,10 +161,15 @@ def get_history(symbol, period):
 
 __currency_map = {
     'FHQP.F': 'EUR',
-    'PBF7.F': 'EUR'
+    'PBF7.F': 'EUR',
+    '34153P7M4':'USD'
 }
 
 @cached(mem_cache_currency)
 def get_currency(symbol):
-    return yf.Ticker(symbol).info['currency']
-    
+    try:
+        if symbol in __currency_map:
+            return __currency_map[symbol]
+        return yf.Ticker(symbol).info['currency'].upper()
+    except Exception as e:
+         raise Exception(f"Failed to query currency for {symbol}", e)

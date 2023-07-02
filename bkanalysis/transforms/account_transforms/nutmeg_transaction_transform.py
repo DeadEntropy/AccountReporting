@@ -8,6 +8,7 @@ from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
 from bkanalysis.market.market import Market
 from bkanalysis.transforms.account_transforms import transformation_helper as helper
+import bkanalysis.tax.nutmeg as tax_nut
 import re
 
 
@@ -24,8 +25,8 @@ def can_handle(path_in, config):
     return set(columns) == set(expected_columns)
 
 
-def load(path_in, config, market: Market, ref_currency: str):
-    df = pd.read_csv(path_in, sep=',')
+def load(path_in, config):
+    df = pd.read_csv(path_in, sep=',', parse_dates=['Date'])
     try:
         expected_columns = [re.sub(regex, '', s) for s in parse_list(config['expected_columns'])]
     except Exception:
@@ -36,29 +37,30 @@ def load(path_in, config, market: Market, ref_currency: str):
     assert set(columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
                                                      f'are [{", ".join(df.columns)}]. (Nutmeg)'
 
-    df_out = pd.DataFrame(columns=sd.target_columns)
-    df_out.Date = pd.to_datetime(df.Date, format='%d-%b-%y')
-    df_out.Account = 'Nutmeg_OLD: ' + df['Pot']
-    df_out.Currency = config['currency']
-    df_out.Amount = df["Amount (£)"]
-    df_out.Subcategory = df.Description
-    df_out.Memo = 'Nutmeg: ' + df['Pot']
-    account_types = ast.literal_eval(config['account_types'])
-    df_out['AccountType'] = [account_types[acc.replace('_OLD', '')] for acc in df_out.Account]
+    df_piv = tax_nut.clean_nutmeg_activity_report(df, include_fund=True)
+    df_temp = pd.pivot_table(df_piv,index=['Date', 'Type', 'Fund'], values='Value', aggfunc=sum).fillna(0)
 
-    if market is not None:
-        proportions = parse_list(config['proportions'], False)
-        df_per_account = []
-        for account in df_out.Account.unique():
-            if account.replace('_OLD', '') not in proportions:
-                continue
-            df_per_account.append(helper.get_transaction(df_out[df_out.Account == account],
-                                                         market,
-                                                         proportions[account.replace('_OLD', '')],
-                                                         {},
-                                                         ref_currency,
-                                                         account.replace('_OLD', '')))
-        df_out = pd.concat(df_per_account)
+    capital_gain_dfs = []
+    for fund in df_piv.Fund.unique():
+        df_cap = tax_nut.get_capital_gain_table(df_piv[df_piv.Fund == fund])[['taxable_amount']]
+        df_cap['Fund'] = fund
+        capital_gain_dfs.append(df_cap)
+        
+    capital_gain = pd.concat(capital_gain_dfs, axis=0).rename(columns={'taxable_amount': 'Value'})
+    capital_gain['Type'] = 'CAP'
+
+    df_temp = df_temp.reset_index().set_index('Date')
+    df = pd.concat([df_temp, capital_gain], axis=0).sort_index().reset_index().rename(columns={'index': 'Date'})
+
+    df_out = pd.DataFrame(columns=sd.target_columns)
+    df_out.Date = df.Date
+    df_out.Account = [f'Nutmeg: {fund[1].strip()}' for fund in df.Fund.str.split(':')]
+    df_out.Currency = config['currency']
+    df_out.Amount = df.Value
+    df_out.Subcategory = df.Type
+    df_out.Memo = [f"Nutmeg_{t}" for t in df.Type]
+    account_types = ast.literal_eval(config['account_types'])
+    df_out['AccountType'] = [account_types[acc] for acc in df_out.Account]
 
     return df_out
 

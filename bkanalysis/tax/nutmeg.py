@@ -3,8 +3,10 @@ import numpy as np
 
 __EPSILON = 0.01
 
-def clean_nutmeg_activity_report(df_activity):
-    df = df_activity[df_activity.Fund.isin(['Djokovic, Nicolas : Rainy day pot', 'Djokovic, Nicolas : My ISA'])]
+def clean_nutmeg_activity_report(df_activity, fund_list: list = None, include_fund: bool = False):
+    if fund_list is None:
+        fund_list = ['Djokovic, Nicolas : Rainy day pot', 'Djokovic, Nicolas : My ISA']
+    df = df_activity[df_activity.Fund.isin(fund_list)]
 
     df.Value = df.Value.str.replace(',', '').astype('float')
     df.Units = df.Units.str.replace(',', '').astype('float')
@@ -15,7 +17,10 @@ def clean_nutmeg_activity_report(df_activity):
 
     df = df.set_index('Date', drop=True).sort_index()
 
-    df_piv = pd.DataFrame(pd.pivot_table(df, index=['Date', 'Asset Code', 'Type', 'Narrative'], values=['Units(S)', 'Value(S)', 'Unitary Value'], aggfunc={'Units(S)': sum, 'Value(S)': sum, 'Unitary Value': np.mean}).to_records()).sort_values('Date')
+    index = ['Date', 'Asset Code', 'Type', 'Narrative']
+    if include_fund:
+        index = index + ['Fund']
+    df_piv = pd.DataFrame(pd.pivot_table(df, index=index, values=['Units(S)', 'Value(S)', 'Unitary Value'], aggfunc={'Units(S)': sum, 'Value(S)': sum, 'Unitary Value': np.mean}).to_records()).sort_values('Date')
     df_piv = df_piv.rename({'Units(S)':'Units', 'Value(S)':'Value'}, axis=1)
     df_piv = df_piv.set_index('Date', drop=True)
 
@@ -115,3 +120,20 @@ def get_taxable_event_from_single_asset(df: pd.DataFrame) -> pd.DataFrame:
     sales_df['holding_period'] = sales_df.index - sales_df['purchase_date']
 
     return sales_df
+
+def get_capital_gain_table(df: pd.DataFrame) -> pd.DataFrame:
+    df = df[df.Type != 'DIV']
+    tax_tables = []
+    for asset_code in df['Asset Code'].unique():
+        if asset_code == 'CASH':
+            continue
+        df_small = df[(df.Narrative.str.contains(asset_code)) & (df['Asset Code'] != 'CASH')]
+        df_mini = pd.pivot_table(pd.DataFrame(df_small.to_records()), index='Date', values=['Units', 'Unitary Value'], aggfunc={'Units': sum, 'Unitary Value': np.mean})
+        df_mini = df_mini[abs(df_mini.Units) > 0.0001]
+        try:
+            tax_tbl = get_taxable_event_from_single_asset(df_mini)
+            tax_tbl['Asset Code'] = asset_code
+            tax_tables.append(tax_tbl)
+        except Exception as e:
+            print(f"Failed to process: {asset_code}: {e}")
+    return pd.concat(tax_tables).sort_index()

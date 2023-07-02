@@ -11,7 +11,7 @@ from bkanalysis.transforms.account_transforms import barclays_transform as barc,
     static_data as sd, vault_transform, coinbase_transform, coinbase_pro_transform, bnp_stock_transform, \
     bnp_cash_transform, chase_transform, revolut_transform_2 as rev_transform_2, fidelity_transform, discover_transform, \
     marcus_transform, discover_credit_transform, ubs_us_pension_transform, capital_one_transform, \
-    first_republic_transform, first_republic_mtg_transform
+    first_republic_transform, first_republic_mtg_transform, nutmeg_transaction_transform
 from bkanalysis.config import config_helper as ch
 from bkanalysis.market.market import Market
 from bkanalysis.market import market_loader as ml
@@ -88,6 +88,8 @@ class Loader:
             return first_republic_transform.load(file, self.config['FirstRepublic'])
         elif 'FirstRepublicMortgage' in self.config and first_republic_mtg_transform.can_handle(file, self.config['FirstRepublicMortgage']):
             return first_republic_mtg_transform.load(file, self.config['FirstRepublicMortgage'])
+        elif 'NutmegInvestment' in self.config and nutmeg_transaction_transform.can_handle(file, self.config['NutmegInvestment']):
+            return nutmeg_transaction_transform.load(file, self.config['NutmegInvestment'])
 
         raise ValueError(f'file {file} could not be processed by any of the loaders.')
 
