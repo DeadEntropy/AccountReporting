@@ -25,12 +25,18 @@ def load(path_in, config, sep=','):
     assert set(df.columns) == set(expected_columns), \
         f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (UBS WM)'
 
+    df['New Value'] = [[q, a] for q, a in zip(df['Quantity'], df['Amount'])]
+    df['New Type'] = [['Investment', 'Cash'] for a in df['Amount']]
+    df = df.explode(['New Value', 'New Type']).dropna(subset=['New Value'])
+    df = df[df['New Value'] != 0]
+
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Date"].str.strip(), format='%m/%d/%Y')
     df_out.Account = df['Account Number']
-    df_out.Currency = df['Symbol'].fillna('USD')
-    df_out.Amount = [q if t =='Investment' else a for t, q, a in zip(df['Type'], df['Quantity'], df['Amount'])]
-    df_out.Memo = [f'{a}: {d}' for a, d in zip(df['Activity'], df['Description'])]
+    df_out.Currency = [s if t =='Investment' else 'USD' for t, s in zip(df['New Type'], df['Symbol'])]
+    df_out.Amount =  df['New Value']
+    df_out.Memo = [f'{a}: {d} ({s})' if s != '' else f'{a}: {d}' for a, d, s in \
+                   zip(df['Activity'], df['Description'].str.replace(' ON ', ' '), df['Symbol'].fillna(''))]
     df_out.Subcategory = df['Activity']
     df_out['AccountType'] = config['account_type']
 
