@@ -29,8 +29,8 @@ def load(path_in, config, sep=','):
     df_out.Date = pd.to_datetime(df["Transaction Date"].str.strip(), format='%m/%d/%Y')
     df_out.Account = 'Discover'
     df_out.Currency = config['currency']
-    df_out.Amount = [c - d for c, d in zip(pd.to_numeric(df['Credit'].str.replace('$', ''), errors='coerce'),
-                                           pd.to_numeric(df['Debit'].str.replace('$', ''), errors='coerce'))]
+    df_out.Amount = [c - d for c, d in zip(pd.to_numeric(df['Credit'].str.replace('$', '', regex=False), errors='coerce'),
+                                           pd.to_numeric(df['Debit'].str.replace('$', '', regex=False), errors='coerce'))]
     df_out.Memo = df['Transaction Description']
     df_out.Subcategory = df['Transaction Type']
     df_out['AccountType'] = config['account_type']

@@ -1,7 +1,6 @@
 # coding=utf8
 import datetime as dt
 import itertools
-import warnings
 import pandas as pd
 import numpy as np
 import logging
@@ -15,7 +14,6 @@ from bkanalysis.projection import projection as pj
 
 
 pd.options.display.float_format = '{:,.0f}'.format
-warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.WARNING)
 
 DATE = 'Date'
