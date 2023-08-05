@@ -18,8 +18,6 @@ def can_handle(path_in, config):
 
     try:
         df = pd.read_csv(path_in)
-        # df = df.dropna(axis=1, how='all').dropna(axis=0, how='any').reset_index(drop=True)
-        # df.columns = [__remove_accents(v) for v in list(df.iloc[0])]
     except Exception:
         return False
 
@@ -30,16 +28,13 @@ def can_handle(path_in, config):
 
 def load(path_in, config):
     df = pd.read_csv(path_in)
-    # df = df.dropna(axis=1, how='all').dropna(axis=0, how='any').reset_index(drop=True)
-    # df.columns = [__remove_accents(v) for v in list(df.iloc[0])]
-    # df = df.drop(0)
     expected_columns = parse_list(config['expected_columns'], False)
 
     assert set(df.columns) == set(expected_columns), \
         f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (BNP Stock)'
 
     df_out = pd.DataFrame(columns=sd.target_columns)
-    df_out.Date = pd.to_datetime(df["Date"])
+    df_out.Date = pd.to_datetime(df["Date"], dayfirst=True)
     df_out.Account = config['account_name']
     df_out.Currency = df["ISIN"]
     df_out.Amount = df["Quantite"]

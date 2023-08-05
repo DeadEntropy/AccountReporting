@@ -100,7 +100,7 @@ class MarketLoader:
     def get_history_from_yahoo(symbol: str, period: str):
         logging.debug(f'Getting History from YAHOO for {symbol} {period}')
         currency = MarketLoader.get_currency(symbol)
-        return {date: Price(close, currency) for (date, close) in mp.get_history(symbol, period).Close.iteritems()}
+        return {date: Price(close, currency) for (date, close) in mp.get_history(symbol, period).Close.items()}
 
     @staticmethod
     def get_symbol(instr: str, ref_currency: str):

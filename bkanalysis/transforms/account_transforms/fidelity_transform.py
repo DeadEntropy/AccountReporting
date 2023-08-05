@@ -35,7 +35,7 @@ def load(path_in, config, sep=','):
     df_out.Subcategory = df['Security Description']
     df_out['AccountType'] = config['account_type']
 
-    # Fidelity doesnt give the outflows from t he cash_account, so we need to manually add them
+    # Fidelity doesnt give the outflows from the cash_account, so we need to manually add them
     df_cash_account = df[~df.Symbol.str.isspace()]
     df_cash_out = pd.DataFrame(columns=sd.target_columns)
     df_cash_out.Date = pd.to_datetime(df_cash_account["Run Date"].str.strip(), format='%m/%d/%Y')
@@ -45,7 +45,7 @@ def load(path_in, config, sep=','):
     df_cash_out.Memo = df_cash_account.Action
     df_cash_out.Subcategory = df_cash_account['Security Description']
 
-    df_out = df_out.append(df_cash_out).sort_values('Date', ascending=False).reset_index(drop=True)
+    df_out = pd.concat([df_out, df_cash_out]).sort_values('Date', ascending=False).reset_index(drop=True)
 
     return df_out
 

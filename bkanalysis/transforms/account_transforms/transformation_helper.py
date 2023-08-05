@@ -59,7 +59,7 @@ def get_transaction(df: str, market: Market, proportion: {}, switch: {}, ref_cur
         for fund_name, fund_units in v.items():
             row = [dt.datetime.strptime(k, SWITCH_DATE_FORMAT), df_transaction['Account'][0], fund_units,\
                    f'{memo} Fund Switch', f'{memo} Fund Switch', fund_name, df_transaction['AccountType'][0]]
-            result = result.append(pd.DataFrame([row], columns=result.columns))
+            result = pd.concat([result, pd.DataFrame([row], columns=result.columns)])
 
     result['Date'] = pd.to_datetime(result['Date'], format=date_format)
     result = result.sort_values('Date', ascending=False).reset_index(drop=True)
