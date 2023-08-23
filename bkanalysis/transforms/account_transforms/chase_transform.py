@@ -17,15 +17,25 @@ def can_handle(path_in, config):
     return set(df.columns) == set(expected_columns)
 
 
+def try_get_account_name(file_name, config):
+    try:
+        return ' '.join([s.capitalize() for s in file_name.split('-')])
+    except:
+        return config['account_name']
+
+
 def load(path_in, config):
     df = pd.read_csv(path_in)
+
+    account_name = try_get_account_name(os.path.basename(path_in).split('.')[0], config)
+
     expected_columns = parse_list(config['expected_columns'])
     assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
-                                                     f'are [{", ".join(df.columns)}]. (Barclays)'
+                                                     f'are [{", ".join(df.columns)}]. (Chase)'
 
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df['Transaction Date'], format='%m/%d/%Y')
-    df_out.Account = config['account_name']
+    df_out.Account = account_name
     df_out.Currency = "USD"
     df_out.Memo = df['Description']
     df_out.Subcategory = df["Category"]

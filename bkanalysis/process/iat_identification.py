@@ -44,8 +44,41 @@ class IatIdentification:
             offsetting_rows.append(dup[1])
 
         return df.drop(offsetting_rows)
+    
+    @staticmethod
+    def mark_facing_accounts(grp, adjust_dates: bool = False):
+        if len(grp) == 1:
+            return grp 
+        
+        if grp.Amount.iloc[0] == 0:
+            return grp
+        
+        i = 1
+        while i < len(grp):
+            if grp.Amount.iloc[i-1] == -grp.Amount.iloc[i] \
+                and abs(grp.Date.iloc[i-1] - grp.Date.iloc[i]) < pd.Timedelta(7, "d") \
+                and grp.Account.iloc[i-1] != grp.Account.iloc[i]:
+                grp.FacingAccount.iloc[i-1] = grp.Account.iloc[i]
+                grp.FacingAccount.iloc[i] = grp.Account.iloc[i-1]            
+            
+                if adjust_dates:
+                    adjusted_date = max(grp.Date.iloc[i-1], grp.Date.iloc[i])
+                    grp.Date.iloc[i-1] = adjusted_date
+                    grp.Date.iloc[i] = adjusted_date
+                
+                i = i + 2
+            else:
+                i = i + 1
+                
+        return grp
+    
+    def map_iat_new(self, df, iat_value_col='Amount', adjust_dates:bool=False):
+        return df\
+            .groupby(lambda x: (abs(df.loc[x, iat_value_col]), df.loc[x, 'Currency']), group_keys=False)\
+                .apply(lambda y: IatIdentification.mark_facing_accounts(y, adjust_dates))\
+                    .reset_index(level=0, drop=True)
 
-    def map_iat(self, df, iat_value_col='Amount', adjust_dates:bool=False):
+    def map_iat_old(self, df, iat_value_col='Amount', adjust_dates:bool=False):
         # print('mapping transactions between accounts...')
         columns_req = ['Currency', 'FullType', 'Date', 'Account'] + [iat_value_col]
         assert all([col_req in df.columns for col_req in columns_req]), f'columns do not match expectation. Expected : {columns_req} but receive {df.columns}'
@@ -81,6 +114,9 @@ class IatIdentification:
             df.loc[dup[1], 'FacingAccount'] = df.loc[dup[0], 'Account']
 
         return df
+    
+    def map_iat(self, df, iat_value_col='Amount', adjust_dates:bool=False):
+        return self.map_iat_old(df, iat_value_col, adjust_dates)
 
     def map_iat_fx(self, df):
         # print('mapping transactions between accounts...')

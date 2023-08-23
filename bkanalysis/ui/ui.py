@@ -6,11 +6,14 @@ import numpy as np
 import logging
 import plotly.graph_objects as go
 from datetime import timedelta
+import collections
 
 from bkanalysis.market import market as mkt, market_loader as ml
 from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
 from bkanalysis.projection import projection as pj
+
+from bkanalysis.process.iat_identification import IatIdentification
 
 
 pd.options.display.float_format = '{:,.0f}'.format
@@ -227,7 +230,25 @@ def aggregate_memos(memo):
     return '<br>'.join([f'{v:>7,.0f}: {k[:25]}' for (k, v) in largest_memos.items()]) 
 
 
-def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
+def get_annotations(df, top_items_count = 10):
+    l = [[[amt, d] + list(memo) for memo in memos if not memo[2] in IatIdentification.iat_types + ['C', 'S']] for (amt, memos, d)\
+         in zip(df.CumulatedAmountCcyExclCapGains, df.MemoMapped, df.Date)]
+    flat_list = [item for sublist in l for item in sublist]
+    flat_list.sort(key = lambda x: x[3])
+    top_list = flat_list[:top_items_count]
+
+    annotation_data = {}
+    for l in top_list:
+        if l[1] not in annotation_data:
+            annotation_data[l[1]] = (l[0], {l[2]: l[3]})
+        elif l[2] in annotation_data[l[1]][1]:
+            annotation_data[l[1]][1][l[2]] += l[3]
+        else:
+            annotation_data[l[1]][1][l[2]] = l[3]            
+    
+    return annotation_data
+
+def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY, top_items_count = 0):
     if isinstance(by, str):
         values, labels = _get_plot_data(df, date_range, by)
         fig = go.Figure(data=go.Scatter(x=values.index, y=values.values, hovertext=labels))
@@ -239,10 +260,48 @@ def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
     else:
         raise Exception(f'by should be either a float or a list')
 
+    if date_range is None:
+        annotations = get_annotations(df, top_items_count)
+        values, labels = _get_plot_data(df, date_range, CUMULATED_AMOUNT_CCY_EXCL_CAPITAL)
+    else:
+        annotations = get_annotations(df[(df.Date > date_range[0]) & (df.Date < date_range[1])], top_items_count)
+        values, labels = _get_plot_data(df, date_range, CUMULATED_AMOUNT_CCY_EXCL_CAPITAL)
+
     fig.update_layout(
         title="Total Wealth",
         xaxis_title="Date",
         yaxis_title="Currency")
+    
+    i = 0
+    for annotation_date in collections.OrderedDict(sorted(annotations.items())):
+        dict_text = annotations[annotation_date][1]
+        ann_text = '<br>'.join([f'{k[:15]}: {dict_text[k]:,.0f}' for k in dict_text])
+        fig.add_annotation(
+            x=annotation_date,
+            y=values[annotation_date],
+            xref="x",
+            yref="y",
+            text=ann_text,
+            showarrow=True,
+            font=dict(
+                family="Courier New, monospace",
+                size=12,
+                color="#ffffff"
+                ),
+            align="center",
+            arrowhead=2,
+            arrowsize=1,
+            arrowwidth=2,
+            arrowcolor="#636363",
+            ax=20,
+            ay=-100 if (i % 4) == 0 else 50 if (i % 3) == 0 else -50 if (i % 2) == 0 else 100,
+            bordercolor="#c7c7c7",
+            borderwidth=2,
+            borderpad=4,
+            bgcolor="#ff7f0e",
+            opacity=0.65
+            )
+        i = i+1
 
     return fig
 
@@ -359,11 +418,15 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
 
     return fig
 
-def get_by_subtype(df_exp:pd.DataFrame, by: str, key: str, nb_days: int = 365, show_count: int = 5, exclude: list = [], max_char: int = 12):
-    if by not in ['FullSubType', 'FullType']:
-        raise Exception(f"by must be in {['FullSubType', 'FullType']}")
-    df = pd.pivot_table(df_exp[(df_exp.Date>df_exp.Date.max()-timedelta(nb_days)) & (df_exp[by] == key)], \
-                        index=['Date', 'FullSubType', 'MemoMapped'], values='AmountCcy', aggfunc=sum)
+def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, nb_days: int = 365, show_count: int = 5, exclude: list = [], max_char: int = 12):
+    if by not in ['FullMasterType', 'FullSubType', 'FullType']:
+        raise Exception(f"by must be in {['FullMasterType', 'FullSubType', 'FullType']}")
+    if key is None:
+        df = pd.pivot_table(df_exp[(df_exp.Date>df_exp.Date.max()-timedelta(nb_days)) & (df_exp['FullType'] != 'Intra-Account Transfert')], \
+                        index=['Date', by, label], values='AmountCcy', aggfunc=sum)
+    else:
+        df = pd.pivot_table(df_exp[(df_exp.Date>df_exp.Date.max()-timedelta(nb_days)) & (df_exp[by] == key) & (df_exp['FullType'] != 'Intra-Account Transfert')], \
+                            index=['Date', by, label], values='AmountCcy', aggfunc=sum)
     df = pd.DataFrame(df.to_records())
 
     df['Year'] = [d.year for d in df['Date']]
@@ -373,13 +436,13 @@ def get_by_subtype(df_exp:pd.DataFrame, by: str, key: str, nb_days: int = 365, s
     if len(df) == 0:
         raise Exception(f"No records found for {key}.")
 
-    df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', 'MemoMapped'], values='AmountCcy', aggfunc=sum).to_records())
+    df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', label], values='AmountCcy', aggfunc=sum).to_records())
     if len(exclude) > 0:
-        df = df[[m not in exclude for m in df.MemoMapped]]
-    top_memos = list([s for s in pd.pivot_table(df, index=['MemoMapped'], values='AmountCcy', aggfunc=sum)\
+        df = df[[m not in exclude for m in df[label]]]
+    top_memos = list([s for s in pd.pivot_table(df, index=[label], values='AmountCcy', aggfunc=sum)\
                       .sort_values(by='AmountCcy').head(show_count).index])
     
-    df['Memo'] = [s[:max_char] if s in top_memos else 'Other' for s in df.MemoMapped]
+    df['Memo'] = [s[:max_char] if s in top_memos else 'Other' for s in df[label]]
 
     df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', 'Memo'], values='AmountCcy', aggfunc=sum).to_records())\
     .sort_values(by='AmountCcy')
