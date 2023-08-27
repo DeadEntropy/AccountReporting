@@ -418,7 +418,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
 
     return fig
 
-def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, nb_days: int = 365, show_count: int = 5, exclude: list = [], max_char: int = 12):
+def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, nb_days: int = 365, show_count: int = 5, exclude: list = [], max_char: int = 12, include_tail_memos: bool = False):
     if by not in ['FullMasterType', 'FullSubType', 'FullType']:
         raise Exception(f"by must be in {['FullMasterType', 'FullSubType', 'FullType']}")
     if key is None:
@@ -441,6 +441,10 @@ def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, nb_days: int = 36
         df = df[[m not in exclude for m in df[label]]]
     top_memos = list([s for s in pd.pivot_table(df, index=[label], values='AmountCcy', aggfunc=sum)\
                       .sort_values(by='AmountCcy').head(show_count).index])
+    if include_tail_memos:
+        low_memos = list([s for s in pd.pivot_table(df, index=[label], values='AmountCcy', aggfunc=sum)\
+                        .sort_values(by='AmountCcy').tail(show_count).index])
+        top_memos = top_memos + low_memos
     
     df['Memo'] = [s[:max_char] if s in top_memos else 'Other' for s in df[label]]
 
