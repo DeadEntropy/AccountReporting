@@ -2,11 +2,6 @@
 *.iml
 *.ipynb
 *.ini
-.idea/dictionaries/nicol.xml
-.idea/inspectionProfiles/profiles_settings.xml
-.idea/misc.xml
-.idea/modules.xml
-.idea/vcs.xml
 env
 notebooks/config
 notebooks/.ipynb_checkpoints
@@ -19,3 +14,4 @@ bkanalysis/ui/requirements.txt
 Dockerfile
 notebooks/trips.csv
 tests/run.py
+.vscode
