@@ -16,6 +16,15 @@ def can_handle(path_in, config):
     expected_columns = parse_list(config['expected_columns'])
     return set(df.columns) == set(expected_columns)
 
+def _postprocess_memo(memos: list, dates: list, amounts: list) -> list:
+    idx = 1
+    for i in range(len(memos)):
+        if memos[i] == "Mobile Deposit":
+            memos[i] = f"Mobile Deposit - {dates[i].strftime('%Y%m%d')} - {amounts[i]:.2f}"
+            idx = idx + 1
+
+    return memos
+
 
 def load(path_in, config):
     df = pd.read_csv(path_in)
@@ -28,13 +37,13 @@ def load(path_in, config):
     df_out.Date = pd.to_datetime(df['Date'], format='%m/%d/%Y')
     df_out.Account = "First Republic"
     df_out.Currency = "USD"
-    memo = list(df['Description'].fillna('Empty Description'))
-    df_out.Memo = memo
     subcategory = list(df["Category"].fillna('Empty Category'))
     df_out.Subcategory = subcategory
     df_out['AccountType'] = config['account_type']
     amounts = list(df['Debit'].fillna(0.0) + df['Credit'].fillna(0.0))
     df_out.Amount = amounts
+    memo = _postprocess_memo(list(df['Description'].fillna('Empty Description')), list(df_out.Date), list(df_out.Amount))
+    df_out.Memo = memo
 
     return df_out
 

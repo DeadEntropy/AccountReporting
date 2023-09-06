@@ -77,7 +77,7 @@ def transactions_to_values(df):
     df.Date = [dt.datetime(old_date.year, old_date.month, old_date.day) for old_date in df.Date]
 
     # Ensure there all (Account, Currency, Date) tuples are unique
-    df.drop(df.columns.difference(['Account', 'Currency', DATE, MEMO_MAPPED, AMOUNT, 'Type']), 1, inplace=True)
+    df.drop(df.columns.difference(['Account', 'Currency', DATE, MEMO_MAPPED, AMOUNT, 'Type']), axis=1, inplace=True)
     df = df.groupby(['Account', 'Currency', DATE]).agg(
         {AMOUNT: [sum, list], MEMO_MAPPED: list, 'Type': list}).reset_index().set_index(['Account', 'Currency', 'Date'])
 
