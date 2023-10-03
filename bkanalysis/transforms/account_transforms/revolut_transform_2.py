@@ -20,6 +20,17 @@ def can_handle(path_in, config, sep=';'):
 
     return set([s.strip() for s in df.columns]) == set(expected_columns)
 
+def _get_payment_fees(df: pd.DataFrame):
+    df_fees = pd.DataFrame(columns=sd.target_columns)
+
+    df_fees.Date = pd.to_datetime(df["Started Date"].str.strip(), format='%Y-%m-%d %H:%M:%S')
+    df_fees.Date = [dt.datetime(d.year, d.month, d.day) for d in df_fees.Date]
+    df_fees.Currency = df.Currency
+    df_fees.Amount = -df.Fee
+    df_fees.Subcategory = 'FEES'
+    df_fees.Memo = 'Bank Fees'
+
+    return None
 
 def load(path_in, config, sep=';'):
     df = pd.read_csv(path_in, sep=sep)
@@ -37,12 +48,16 @@ def load(path_in, config, sep=';'):
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Started Date"].str.strip(), format='%Y-%m-%d %H:%M:%S')
     df_out.Date = [dt.datetime(d.year, d.month, d.day) for d in df_out.Date]
-    df_out.Account = config['account_name'] + " " + currency
     df_out.Currency = df.Currency
-    df_out.Amount = df.Amount + df.Fee
+    df_out.Amount = df.Amount
     df_out.Subcategory = df.Type
     df_out.Memo = df.Description
+
+    df_fees = _get_payment_fees(df[df.Fee != 0])
+    df_out = pd.concat([df_out, df_fees]).sort_values(by='Date', ascending=False)
+    
     df_out['AccountType'] = config['account_type']
+    df_out.Account = config['account_name'] + " " + currency
 
     return df_out
 

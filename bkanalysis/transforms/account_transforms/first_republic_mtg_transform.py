@@ -54,14 +54,14 @@ def get_payment_breakdown(sorted_dates: list, config) -> pd.DataFrame:
 
 def get_payment_adjustment(df_special: pd.DataFrame):
     df_escrow = df_special[df_special.Memo.str.contains('ESCROW BALANCE')]
-    df_escrow.Amount = -df_escrow.Amount
-    df_escrow.Memo = "Mortgage Escrow - Flood Insurance"
-    df_escrow.Subcategory = "Escrow"
+    df_escrow['Amount'] = -df_escrow.Amount
+    df_escrow['Memo'] = "Mortgage Escrow - Flood Insurance"
+    df_escrow['Subcategory'] = "Escrow"
     
     df_interest = df_special[df_special.Memo.str.contains('PREPAID INTEREST')]
-    df_interest.Amount = -df_interest.Amount
-    df_interest.Memo = "Mortgage Interest"
-    df_interest.Subcategory = "Interest"
+    df_interest['Amount'] = -df_interest.Amount
+    df_interest['Memo'] = "Mortgage Interest"
+    df_interest['Subcategory'] = "Interest"
 
     return pd.concat([df_interest, df_escrow])
 
@@ -90,7 +90,7 @@ def load(path_in, config):
 
     df_out = pd.concat([df_out, df_payment_breakdown, df_payment_adjustment]).sort_values(by='Date', ascending=False)
 
-    assert -df_out.Amount.sum() == df.iloc[0].Balance
+    assert -df_out.Amount.sum() == df.iloc[0].Balance, 'Balance Mismatch'
 
     return df_out
 

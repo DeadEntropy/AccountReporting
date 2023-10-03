@@ -130,7 +130,7 @@ def get_expenses(df, date_range=None, values='Amount', inc_reimbursement=False):
     df_expenses[values] = (-1) * df_expenses[values]
 
     if inc_reimbursement:
-        return df_expenses.append(get_reimbursement(df, date_range, values))
+        return pd.concat([df_expenses, get_reimbursement(df, date_range, values)])
 
     return df_expenses
 
