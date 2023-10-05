@@ -21,16 +21,16 @@ def can_handle(path_in, config, sep=';'):
     return set([s.strip() for s in df.columns]) == set(expected_columns)
 
 def _get_payment_fees(df: pd.DataFrame):
-    df_fees = pd.DataFrame(columns=sd.target_columns)
+    df_fees_only = pd.DataFrame(columns=sd.target_columns)
 
-    df_fees.Date = pd.to_datetime(df["Started Date"].str.strip(), format='%Y-%m-%d %H:%M:%S')
-    df_fees.Date = [dt.datetime(d.year, d.month, d.day) for d in df_fees.Date]
-    df_fees.Currency = df.Currency
-    df_fees.Amount = -df.Fee
-    df_fees.Subcategory = 'FEES'
-    df_fees.Memo = 'Bank Fees'
+    df_fees_only.Date = pd.to_datetime(df["Started Date"].str.strip(), format='%Y-%m-%d %H:%M:%S')
+    df_fees_only.Date = [dt.datetime(d.year, d.month, d.day) for d in df_fees_only.Date]
+    df_fees_only.Currency = df.Currency
+    df_fees_only.Amount = -df.Fee
+    df_fees_only.Subcategory = 'FEES'
+    df_fees_only.Memo = 'Bank Fees'
 
-    return None
+    return df_fees_only
 
 def load(path_in, config, sep=';'):
     df = pd.read_csv(path_in, sep=sep)
@@ -49,7 +49,7 @@ def load(path_in, config, sep=';'):
     df_out.Date = pd.to_datetime(df["Started Date"].str.strip(), format='%Y-%m-%d %H:%M:%S')
     df_out.Date = [dt.datetime(d.year, d.month, d.day) for d in df_out.Date]
     df_out.Currency = df.Currency
-    df_out.Amount = df.Amount
+    df_out.Amount = [amt + fee if tp == 'TRANSFER' else amt for (amt, fee, tp) in zip(df.Amount, df.Fee, df.Type)]
     df_out.Subcategory = df.Type
     df_out.Memo = df.Description
 

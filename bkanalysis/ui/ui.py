@@ -42,9 +42,9 @@ def currency_sign(ccy):
 
 
 def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True, config=None, include_market=True,
-                      ignore_overrides=False):
+                      ignore_overrides=False, include_json=True):
     mt = master_transform.Loader(config, include_market)
-    df_raw = mt.load_all(include_xls)
+    df_raw = mt.load_all(include_xls, include_json)
     if save_to_csv:
         mt.save(df_raw)
 

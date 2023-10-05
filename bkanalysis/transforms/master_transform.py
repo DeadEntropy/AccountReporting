@@ -11,7 +11,7 @@ from bkanalysis.transforms.account_transforms import barclays_transform as barc,
     static_data as sd, vault_transform, coinbase_transform, coinbase_pro_transform, bnp_stock_transform, \
     bnp_cash_transform, chase_transform, revolut_transform_2 as rev_transform_2, fidelity_transform, discover_transform, \
     marcus_transform, discover_credit_transform, ubs_us_pension_transform, capital_one_transform, \
-    first_republic_transform, first_republic_mtg_transform, nutmeg_transaction_transform, ubs_wm_transform
+    first_republic_transform, first_republic_mtg_transform, nutmeg_transaction_transform, ubs_wm_transform, script_transform
 from bkanalysis.config import config_helper as ch
 from bkanalysis.market.market import Market
 from bkanalysis.market import market_loader as ml
@@ -92,11 +92,13 @@ class Loader:
             return nutmeg_transaction_transform.load(file, self.config['NutmegInvestment'])
         elif 'UbsWealthManagement' in self.config and ubs_wm_transform.can_handle(file, self.config['UbsWealthManagement']):
             return ubs_wm_transform.load(file, self.config['UbsWealthManagement'])
+        elif script_transform.can_handle(file, None):
+            return script_transform.load(file, None)
 
         raise ValueError(f'file {file} could not be processed by any of the loaders.')
 
     @staticmethod
-    def get_files(folder_lake, root=None, include_xls=True):
+    def get_files(folder_lake, root=None, include_xls=True, include_json=True):
         print(f'Loading files from {os.path.abspath(folder_lake)}.')
         if root is None:
             csv_files = glob.glob(os.path.join(folder_lake, '*.csv'))
@@ -111,14 +113,22 @@ class Loader:
         else:
             xls_files = []
 
-        print(f"Loading {len(csv_files)} CSV file(s) and {len(xls_files)} XLS file(s).")
-        return csv_files + xls_files
-
-    def load_all(self, include_xls=True):
-        if 'folder_root' in self.config['IO']:
-            files = self.get_files(self.config['IO']['folder_lake'], self.config['IO']['folder_root'], include_xls)
+        if include_json:
+            if root is None:
+                json_files = glob.glob(os.path.join(folder_lake, '*.json'))
+            else:
+                json_files = glob.glob(os.path.join(root, folder_lake, '*.json'))
         else:
-            files = self.get_files(self.config['IO']['folder_lake'], include_xls=include_xls)
+            json_files = []
+
+        print(f"Loading {len(csv_files)} CSV file(s), {len(xls_files)} XLS file(s), and {len(json_files)} JSON file(s).")
+        return csv_files + xls_files + json_files
+
+    def load_all(self, include_xls=True, include_json=True):
+        if 'folder_root' in self.config['IO']:
+            files = self.get_files(self.config['IO']['folder_lake'], self.config['IO']['folder_root'], include_xls, include_json)
+        else:
+            files = self.get_files(self.config['IO']['folder_lake'], include_xls=include_xls, include_json=include_json)
         if len(files) == 0:
             return
 
