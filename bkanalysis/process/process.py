@@ -240,12 +240,6 @@ class Process:
         df_out.Currency = df.Currency
         df_out.SourceFile = df.SourceFile
 
-        df_out.Day = df.Date.dt.day
-        df_out.Month = df.Date.dt.month
-        df_out.Year = df.Date.dt.year
-        df_out.AdjustedMonth = [get_adjusted_month(dt) for dt in df.Date]
-        df_out.AdjustedYear = [get_adjusted_year(dt) for dt in df.Date]
-        df_out.FiscalYear = [get_fiscal_year(dt) for dt in df.Date]
         df_out.MemoSimple = [self.__clean_memo(s) for s in df.Memo]
 
         memo_mapped = self.map_memo(df_out.MemoSimple)

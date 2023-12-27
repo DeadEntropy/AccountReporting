@@ -11,7 +11,8 @@ from bkanalysis.transforms.account_transforms import barclays_transform as barc,
     static_data as sd, vault_transform, coinbase_transform, coinbase_pro_transform, bnp_stock_transform, \
     bnp_cash_transform, chase_transform, revolut_transform_2 as rev_transform_2, fidelity_transform, discover_transform, \
     marcus_transform, discover_credit_transform, ubs_us_pension_transform, capital_one_transform, \
-    first_republic_transform, first_republic_mtg_transform, nutmeg_transaction_transform, ubs_wm_transform, script_transform
+    first_republic_transform, first_republic_mtg_transform, nutmeg_transaction_transform, ubs_wm_transform, script_transform, \
+    chasebusiness_transform
 from bkanalysis.config import config_helper as ch
 from bkanalysis.market.market import Market
 from bkanalysis.market import market_loader as ml
@@ -74,6 +75,8 @@ class Loader:
             return bnp_cash_transform.load(file, self.config['BnpCash'])
         elif 'Chase' in self.config and chase_transform.can_handle(file, self.config['Chase']):
             return chase_transform.load(file, self.config['Chase'])
+        elif 'ChaseBusiness' in self.config and chasebusiness_transform.can_handle(file, self.config['ChaseBusiness']):
+            return chasebusiness_transform.load(file, self.config['ChaseBusiness'])
         elif 'Fidelity' in self.config and fidelity_transform.can_handle(file, self.config['Fidelity']):
             return fidelity_transform.load(file, self.config['Fidelity'])
         elif 'Discover' in self.config and discover_transform.can_handle(file, self.config['Discover']):
