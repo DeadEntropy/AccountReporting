@@ -8,7 +8,7 @@ from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
 
 
-def can_handle(path_in, config):
+def can_handle(path_in, config, *args):
     if not path_in.endswith('csv'):
         return False
 
@@ -22,7 +22,7 @@ def can_handle(path_in, config):
     return set(df.columns) == set(expected_columns)
 
 
-def load(path_in, config):
+def load(path_in, config, *args):
     df = pd.read_csv(path_in)
     expected_columns = parse_list(config['expected_columns'], False)
 

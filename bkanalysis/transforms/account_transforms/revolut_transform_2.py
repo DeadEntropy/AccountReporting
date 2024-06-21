@@ -9,7 +9,7 @@ from bkanalysis.config import config_helper as ch
 import datetime as dt
 
 
-def can_handle(path_in, config, sep=';'):
+def can_handle(path_in, config, sep=';', *args):
     if not path_in.endswith('csv'):
         return False
     df = pd.read_csv(path_in, sep=sep, nrows=1)
@@ -32,7 +32,7 @@ def _get_payment_fees(df: pd.DataFrame):
 
     return df_fees_only
 
-def load(path_in, config, sep=';'):
+def load(path_in, config, sep=';', *args):
     df = pd.read_csv(path_in, sep=sep)
     df.columns = [s.strip() for s in df.columns]
     expected_columns = parse_list(config['expected_columns'], False)

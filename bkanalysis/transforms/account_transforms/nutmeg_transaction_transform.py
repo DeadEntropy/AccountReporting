@@ -15,7 +15,7 @@ import re
 regex = re.compile('\((.*?)\)')
 
 
-def can_handle(path_in, config):
+def can_handle(path_in, config, *args):
     if not path_in.endswith('csv'):
         return False
     df = pd.read_csv(path_in, nrows=1)
@@ -25,7 +25,7 @@ def can_handle(path_in, config):
     return set(columns) == set(expected_columns)
 
 
-def load(path_in, config):
+def load(path_in, config, *args):
     df = pd.read_csv(path_in, sep=',', parse_dates=['Date'])
     try:
         expected_columns = [re.sub(regex, '', s) for s in parse_list(config['expected_columns'])]

@@ -14,7 +14,7 @@ import re
 regex = re.compile('\((.*?)\)')
 
 
-def can_handle(path_in, config):
+def can_handle(path_in, config, *args):
     if not path_in.endswith('csv'):
         return False
     df = pd.read_csv(path_in, nrows=1)

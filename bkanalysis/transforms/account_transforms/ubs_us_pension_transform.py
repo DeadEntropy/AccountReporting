@@ -9,7 +9,7 @@ from bkanalysis.config import config_helper as ch
 from bkanalysis.transforms.account_transforms import transformation_helper as helper
 
 
-def can_handle(path_in, config):
+def can_handle(path_in, config, *args):
     if not path_in.endswith('csv'):
         return False
     df = pd.read_csv(path_in, nrows=1)

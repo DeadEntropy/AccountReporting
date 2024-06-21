@@ -11,6 +11,8 @@ import os
 
 
 class Process:
+    _use_old = False
+
     @staticmethod
     def __initialise_map(config, path, root='folder_root', default_columns=None, parse_dates=None):
         try:
@@ -54,21 +56,21 @@ class Process:
         self.__save_to_csv(self.config['Mapping'], self.map_full_subtype, 'path_map_full_subtype')
         self.__save_to_csv(self.config['Mapping'], self.map_master, 'path_map_full_master_type')
 
+    @staticmethod
+    def _mapping(memo, mapping):
+        if memo in mapping:
+            return mapping[memo]
+        else:
+            return get_missing_map(memo, mapping)   
+        
     def map_memo(self, memo_series):
         self.map_simple['Memo Mapped'] = self.map_simple['Memo Mapped'].str.strip().str.upper()
         self.map_simple['Memo Simple'] = self.map_simple['Memo Simple'].str.strip().str.upper()
 
         mapping = pd.Series(self.map_simple['Memo Mapped'].values, index=self.map_simple['Memo Simple']).to_dict()
-        memo_mapped = []
-        for memo in memo_series.str.upper():
-            if memo in mapping.keys():
-                try:
-                    memo_mapped.append(mapping[memo].strip())
-                except AttributeError:
-                    raise AttributeError(
-                        f'Failed to strip {memo}: {mapping[memo]}. Please ensure the value is a string.')
-            else:
-                memo_mapped.append(get_missing_map(memo, mapping))
+
+        memo_series_upper = memo_series.str.upper()
+        memo_mapped = memo_series_upper.map(lambda x : Process._mapping(x, mapping))
 
         self.map_simple = pd.DataFrame(mapping.items(), columns=['Memo Simple', 'Memo Mapped'])
         return memo_mapped
@@ -155,48 +157,38 @@ class Process:
 
         return type, full_type, subtype, full_subtype, master_type, full_master_type
 
-    def apply_overrides(self, df):
+    
+    def apply_overrides(self, df):        
         self.mapping_override_df['Date'] = self.mapping_override_df['Date'].apply(lambda x: x.strftime('%d-%b-%Y'))
-        self.mapping_override_df['MemoMapped'] = self.mapping_override_df['MemoMapped'].fillna(
-            '').str.strip().str.upper()
+        self.mapping_override_df['MemoMapped'] = self.mapping_override_df['MemoMapped'].fillna('').str.strip().str.upper()
         self.mapping_override_df['Account'] = self.mapping_override_df['Account'].fillna('').str.strip().str.upper()
-        self.mapping_override_df['OverridesType'] = self.mapping_override_df['OverridesType'].fillna(
-            '').str.strip().str.upper()
-        self.mapping_override_df['OverrideSubType'] = self.mapping_override_df['OverrideSubType'].fillna(
-            '').str.strip().str.upper()
+        self.mapping_override_df['OverridesType'] = self.mapping_override_df['OverridesType'].fillna('').str.strip().str.upper()
+        self.mapping_override_df['OverrideSubType'] = self.mapping_override_df['OverrideSubType'].fillna('').str.strip().str.upper()
 
-        subset_values = self.mapping_override_df[['OverridesType', 'OverrideSubType']]
-        subset_keys = self.mapping_override_df[['Date', 'Account', 'MemoMapped']]
-        dict_overrides = pd.Series([tuple(x) for x in subset_values.to_numpy()],
-                                   index=[tuple(x) for x in subset_keys.to_numpy()]).to_dict()
+        overrides_dict = {
+            (row['Date'], row['Account'], row['MemoMapped']): (row['OverridesType'], row['OverrideSubType'])
+            for _, row in self.mapping_override_df.iterrows()
+        }
 
-        self.map_full_type['MasterType'] = self.map_full_type['MasterType'].fillna('').str.strip()
         type_mapping = pd.Series(self.map_full_type['FullType'].values, index=self.map_full_type['Type']).to_dict()
-        subtype_mapping = pd.Series(self.map_full_subtype['FullSubType'].values,
-                                    index=self.map_full_subtype['SubType']).to_dict()
-        master_type_mapping = pd.Series(self.map_full_type['MasterType'].values,
-                                        index=self.map_full_type['Type']).to_dict()
-        full_master_type_mapping = pd.Series(self.map_master['FullMasterType'].values,
-                                             index=self.map_master['MasterType']).to_dict()
+        subtype_mapping = pd.Series(self.map_full_subtype['FullSubType'].values, index=self.map_full_subtype['SubType']).to_dict()
+        master_type_mapping = pd.Series(self.map_full_type['MasterType'].values, index=self.map_full_type['Type']).to_dict()
+        full_master_type_mapping = pd.Series(self.map_master['FullMasterType'].values, index=self.map_master['MasterType']).to_dict()
 
-        for index, row in df.iterrows():
-            try:
-                key = (row['Date'].strftime("%d-%b-%Y"), row['Account'].strip(), row['MemoMapped'].strip())
-            except AttributeError:
-                print(row)
-                raise
-            if key in dict_overrides.keys():
-                if dict_overrides[key][0] != '':
-                    df.loc[index, 'Type'] = dict_overrides[key][0]
-                    df.loc[index, 'FullType'] = self.get_full_type(dict_overrides[key][0], type_mapping)
-                    df.loc[index, 'MasterType'], df.loc[index, 'FullMasterType'] = self.get_master_type(
-                        dict_overrides[key][0],
-                        master_type_mapping,
-                        full_master_type_mapping)
-                if dict_overrides[key][1] != '':
-                    df.loc[index, 'SubType'] = dict_overrides[key][1]
-                    df.loc[index, 'FullSubType'] = self.get_full_type(dict_overrides[key][1], subtype_mapping)
+        def apply_override(row):
+            key = (row['Date'].strftime("%d-%b-%Y"), row['Account'].strip(), row['MemoMapped'].strip())
+            if key in overrides_dict:
+                overrides = overrides_dict[key]
+                if overrides[0]:
+                    row['Type'] = overrides[0]
+                    row['FullType'] = self.get_full_type(overrides[0], type_mapping)
+                    row['MasterType'], row['FullMasterType'] = self.get_master_type(overrides[0], master_type_mapping, full_master_type_mapping)
+                if overrides[1]:
+                    row['SubType'] = overrides[1]
+                    row['FullSubType'] = self.get_full_type(overrides[1], subtype_mapping)
+            return row
 
+        df = df.apply(apply_override, axis=1)
         return df
 
     def remove_offsetting(self, df, remove_duplicate=True, iat_value_col=None, map_iat_fx=True, adjust_dates=False):
@@ -223,8 +215,9 @@ class Process:
         if isinstance(s, str):
             return Process._clean_amazon_memo(re.sub('\*', '', re.sub(' +', ' ', s.split(' ON ')[0])).replace(',', '').strip())
         return s
+    
 
-    def extend(self, df, ignore_overrides=False):
+    def extend(self, df, ignore_overrides=True):
         expected_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['expected_columns'])]
         assert set(df.columns) == set(expected_columns), f'Columns do not match expectation. Expected: [{expected_columns}]'
 
@@ -248,11 +241,11 @@ class Process:
         return self.extend_types(df_out, False, ignore_overrides)
 
 
-    def extend_types(self, df_out, only_full=True, ignore_overrides=True):
-        df_out['YearToDate'] = [get_year_to_date(dt) for dt in df_out.Date]
+    def extend_types(self, df_out, only_full=True, ignore_overrides=True):        
+        df_out['YearToDate'] = df_out['Date'].apply(get_year_to_date)
 
         type_, full_type, subtype, full_subtype, master_type, full_master_type = \
-            self.map_type(df_out.MemoMapped)
+            self.map_type(df_out['MemoMapped'])
 
         if not only_full:
             df_out['Type'] = type_
@@ -262,7 +255,7 @@ class Process:
         df_out['FullSubType'] = full_subtype
 
         if not ignore_overrides:
-            self.apply_overrides(df_out)
+            df_out = self.apply_overrides(df_out)
 
         if not only_full:
             df_out['MasterType'] = master_type
@@ -272,7 +265,7 @@ class Process:
 
         return df_out
 
-    def process(self, df, ignore_overrides=False):
+    def process(self, df, ignore_overrides=True):
         df.Amount = df.Amount.astype(float)
         df_out = self.extend(df, ignore_overrides)
         df_out = self.remove_offsetting(df_out, iat_value_col='Amount', adjust_dates=True)

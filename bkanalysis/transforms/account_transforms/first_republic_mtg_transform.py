@@ -11,7 +11,7 @@ from bkanalysis.config import config_helper as ch
 from mortgage import Loan
 
 
-def can_handle(path_in, config):
+def can_handle(path_in, config, *args):
     if not path_in.lower().endswith('csv'):
         return False
     df = pd.read_csv(path_in, nrows=1)
@@ -65,7 +65,7 @@ def get_payment_adjustment(df_special: pd.DataFrame):
 
     return pd.concat([df_interest, df_escrow])
 
-def load(path_in, config):
+def load(path_in, config, *args):
     df = pd.read_csv(path_in)
     expected_columns = parse_list(config['expected_columns'])
     assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \

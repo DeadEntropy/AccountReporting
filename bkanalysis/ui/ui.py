@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from datetime import timedelta
 import collections
 
-from bkanalysis.market import market as mkt, market_loader as ml
+
 from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
 from bkanalysis.projection import projection as pj
@@ -42,7 +42,7 @@ def currency_sign(ccy):
 
 
 def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True, config=None, include_market=True,
-                      ignore_overrides=False, include_json=True):
+                      ignore_overrides=True, include_json=True):
     mt = master_transform.Loader(config, include_market)
     df_raw = mt.load_all(include_xls, include_json)
     if save_to_csv:
@@ -120,10 +120,12 @@ def transactions_to_values(df):
 
 def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10y', config=None):
     # Load the market
+    from bkanalysis.market import market_loader as ml
     market_loader = ml.MarketLoader(config)
     values = market_loader.load(df.reset_index().Currency.unique(), ref_currency, period)
 
     # Build the market object
+    from bkanalysis.market import market as mkt
     market = mkt.Market(values)
 
     # Compute the value of the each (Account, Currency) in ref_currency

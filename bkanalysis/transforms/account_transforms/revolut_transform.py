@@ -9,7 +9,7 @@ from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
 
 
-def can_handle(path_in, config, sep=';'):
+def can_handle(path_in, config, sep=';', *args):
     if not path_in.endswith('csv'):
         return False
     df = pd.read_csv(path_in, sep=sep, nrows=1)
@@ -26,7 +26,7 @@ def can_handle(path_in, config, sep=';'):
     return set([s.strip() for s in df.columns]) == set(set([e.replace('CCY', currency) for e in expected_columns]))
 
 
-def load(path_in, config, sep=';'):
+def load(path_in, config, sep=';', *args):
     with open(path_in) as f:
         lines = f.readlines()
 

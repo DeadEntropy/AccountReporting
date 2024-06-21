@@ -6,6 +6,7 @@ from bkanalysis.config import config_helper as ch
 
 
 class IatIdentification:
+    _use_old = False
     iat_types = ['SA', 'IAT', 'W_IN', 'W_OUT', 'SC', 'R', 'MC', 'O', 'FR', 'TAX', 'FPC', 'FLC', 'FLL', 'FSC']
     iat_full_types = ['Savings', 'Intra-Account Transfert', 'Wire In', 'Wire Out', 'Service Charge', 'Rent/Mortgage', 'Others', 'Tax', 'Flat Capital', 'Flat Living Cost']
     iat_fx_types = ['FX']
@@ -19,135 +20,118 @@ class IatIdentification:
         else:
             self.config = config
 
+
     def remove_duplicate(self, df):
-        # print('removing offsetting transactions...')
+        # Ensure columns match the expected structure
         new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
         assert set(list(df.columns)) == set(new_columns), f'columns do not match expectation. Expected : [{new_columns}]'
 
         df['IDX'] = df.index
         ndf = pd.merge(left=df, right=df, on=('Account', 'Memo', 'AccountType', 'Currency'), how='inner')
         out = ndf[(abs(ndf.Amount_x + ndf.Amount_y) < ndf.Amount_x * self.relative_tolerance)
-                  & (ndf.Date_x - ndf.Date_y < pd.Timedelta(7, 'D'))
-                  & (ndf.IDX_x < ndf.IDX_y)
-                  & (ndf.Amount_x != 0)]
+                & (ndf.Date_x - ndf.Date_y < pd.Timedelta(7, 'D'))
+                & (ndf.IDX_x < ndf.IDX_y)
+                & (ndf.Amount_x != 0)]
 
         duplicate_couples = list(zip(list(out.IDX_x.values), list(out.IDX_y.values)))
         df.drop('IDX', axis=1, inplace=True)
 
-        offsetting_rows = []
+        offsetting_rows = set()
         for dup in duplicate_couples:
-            if dup[0] in offsetting_rows:
-                continue
-            if dup[1] in offsetting_rows:
-                continue
-            offsetting_rows.append(dup[0])
-            offsetting_rows.append(dup[1])
+            offsetting_rows.update(dup)
 
         return df.drop(offsetting_rows)
     
+    
     @staticmethod
     def mark_facing_accounts(grp, adjust_dates: bool = False):
-        if len(grp) == 1:
-            return grp 
-        
-        if grp.Amount.iloc[0] == 0:
+        if len(grp) == 1 or grp.Amount.iloc[0] == 0:
             return grp
         
+        pairs = []
         i = 1
         while i < len(grp):
             if grp.Amount.iloc[i-1] == -grp.Amount.iloc[i] \
                 and abs(grp.Date.iloc[i-1] - grp.Date.iloc[i]) < pd.Timedelta(7, "d") \
                 and grp.Account.iloc[i-1] != grp.Account.iloc[i]:
-                grp.FacingAccount.iloc[i-1] = grp.Account.iloc[i]
-                grp.FacingAccount.iloc[i] = grp.Account.iloc[i-1]            
-            
+                pairs.append((i-1, i))
                 if adjust_dates:
                     adjusted_date = max(grp.Date.iloc[i-1], grp.Date.iloc[i])
-                    grp.Date.iloc[i-1] = adjusted_date
-                    grp.Date.iloc[i] = adjusted_date
-                
-                i = i + 2
+                    grp.at[i-1, 'Date'] = adjusted_date
+                    grp.at[i, 'Date'] = adjusted_date
+                i += 2
             else:
-                i = i + 1
-                
+                i += 1
+
+        for i, j in pairs:
+            grp.at[i, 'FacingAccount'] = grp.Account.iloc[j]
+            grp.at[j, 'FacingAccount'] = grp.Account.iloc[i]
+
         return grp
     
-    def map_iat_new(self, df, iat_value_col='Amount', adjust_dates:bool=False):
-        return df\
-            .groupby(lambda x: (abs(df.loc[x, iat_value_col]), df.loc[x, 'Currency']), group_keys=False)\
-                .apply(lambda y: IatIdentification.mark_facing_accounts(y, adjust_dates))\
-                    .reset_index(level=0, drop=True)
-
-    def map_iat_old(self, df, iat_value_col='Amount', adjust_dates:bool=False):
-        # print('mapping transactions between accounts...')
+    def map_iat(self, df, iat_value_col='Amount', adjust_dates: bool = False):
+        # Ensure columns match the expected structure
         columns_req = ['Currency', 'FullType', 'Date', 'Account'] + [iat_value_col]
-        assert all([col_req in df.columns for col_req in columns_req]), f'columns do not match expectation. Expected : {columns_req} but receive {df.columns}'
+        assert all([col_req in df.columns for col_req in columns_req]), f'columns do not match expectation. Expected: {columns_req} but received: {df.columns}'
 
+        # Filter the DataFrame to include only relevant rows
         df['IDX'] = df.index
         df_mini = df[df.FullType.str.upper().isin([t.upper() for t in self.iat_full_types])][columns_req + ['IDX']]
-        ndf = pd.merge(left=df_mini, right=df_mini, on='Currency', how='inner')
-        out = ndf[(ndf[f'{iat_value_col}_x'] == (-1) * ndf[f'{iat_value_col}_y'])
-                  & (abs(ndf.Date_x - ndf.Date_y) < pd.Timedelta(7, 'D'))
-                  & (ndf.Account_x != ndf.Account_y)
-                  & (ndf[f'{iat_value_col}_x'] != 0)]
-        iat_transfers = list(zip(list(out.IDX_x.values), list(out.IDX_y.values)))
+
+        # Perform the merge operation
+        ndf = pd.merge(df_mini, df_mini, on='Currency', suffixes=('_x', '_y'))
+
+        # Filter the merged DataFrame to find matching transactions
+        out = ndf[(ndf[f'{iat_value_col}_x'] == -ndf[f'{iat_value_col}_y'])
+                & (abs(ndf.Date_x - ndf.Date_y) < pd.Timedelta(7, 'D'))
+                & (ndf.Account_x != ndf.Account_y)
+                & (ndf[f'{iat_value_col}_x'] != 0)]
+
+        # Identify the unique transaction pairs
+        iat_transfers = list(zip(out.IDX_x.values, out.IDX_y.values))
         df.drop('IDX', axis=1, inplace=True)
 
-        iat_transfers_unique = []
-        offsetting_rows = []
+        # Keep track of processed rows to avoid duplicates
+        processed_rows = set()
         for dup in iat_transfers:
-            if dup[0] in offsetting_rows:
+            if dup[0] in processed_rows or dup[1] in processed_rows:
                 continue
-            if dup[1] in offsetting_rows:
-                continue
-            iat_transfers_unique.append(dup)
-            offsetting_rows.append(dup[0])
-            offsetting_rows.append(dup[1])
+            processed_rows.update(dup)
 
-        for dup in iat_transfers_unique:
             if adjust_dates:
                 adjusted_date = max(df.loc[dup[0], 'Date'], df.loc[dup[1], 'Date'])
-                df.loc[dup[0], 'Date'] = adjusted_date
-                df.loc[dup[1], 'Date'] = adjusted_date
+                df.at[dup[0], 'Date'] = adjusted_date
+                df.at[dup[1], 'Date'] = adjusted_date
 
-            df.loc[dup[0], 'FacingAccount'] = df.loc[dup[1], 'Account']
-            df.loc[dup[1], 'FacingAccount'] = df.loc[dup[0], 'Account']
+            df.at[dup[0], 'FacingAccount'] = df.loc[dup[1], 'Account']
+            df.at[dup[1], 'FacingAccount'] = df.loc[dup[0], 'Account']
 
         return df
-    
-    def map_iat(self, df, iat_value_col='Amount', adjust_dates:bool=False):
-        return self.map_iat_old(df, iat_value_col, adjust_dates)
 
+    
     def map_iat_fx(self, df):
-        # print('mapping transactions between accounts...')
+        if self._use_old:
+            return self.map_iat_fx_OLD(df)
         new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
         assert set(list(df.columns)) == set(new_columns), 'columns do not match expectation.'
 
         df['IDX'] = df.index
-        df_mini = df[df.Type.str.upper().isin(self.iat_fx_types)][
-            ['AccountType', 'Currency', 'Type', 'IDX', 'Date', 'Account', 'Amount']]
+        df_mini = df[df.Type.str.upper().isin(self.iat_fx_types)][['AccountType', 'Currency', 'Type', 'IDX', 'Date', 'Account', 'Amount']]
         df_mini['dummy_key'] = 1
-        ndf = pd.merge(left=df_mini, right=df_mini, how='inner',on='dummy_key').drop('dummy_key', axis=1)
+        ndf = pd.merge(left=df_mini, right=df_mini, how='inner', on='dummy_key').drop('dummy_key', axis=1)
         out = ndf[(abs(ndf.Date_x - ndf.Date_y) < pd.Timedelta(7, 'D'))
-                  & (ndf.Account_x != ndf.Account_y)
-                  & (ndf.Currency_x != ndf.Currency_y)
-                  & (ndf.Amount_x != 0)]
+                & (ndf.Account_x != ndf.Account_y)
+                & (ndf.Currency_x != ndf.Currency_y)
+                & (ndf.Amount_x != 0)]
         iat_transfers = list(zip(list(out.IDX_x.values), list(out.IDX_y.values)))
         df.drop('IDX', axis=1, inplace=True)
 
-        iat_transfers_unique = []
-        offsetting_rows = []
+        offsetting_rows = set()
         for dup in iat_transfers:
-            if dup[0] in offsetting_rows:
-                continue
-            if dup[1] in offsetting_rows:
-                continue
-            iat_transfers_unique.append(dup)
-            offsetting_rows.append(dup[0])
-            offsetting_rows.append(dup[1])
+            offsetting_rows.update(dup)
 
-        for dup in iat_transfers_unique:
-            df.loc[dup[0], 'FacingAccount'] = df.loc[dup[1], 'Account']
-            df.loc[dup[1], 'FacingAccount'] = df.loc[dup[0], 'Account']
+        for dup in iat_transfers:
+            df.at[dup[0], 'FacingAccount'] = df.loc[dup[1], 'Account']
+            df.at[dup[1], 'FacingAccount'] = df.loc[dup[0], 'Account']
 
         return df

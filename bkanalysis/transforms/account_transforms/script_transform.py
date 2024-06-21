@@ -12,13 +12,13 @@ from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
 
 
-def can_handle(path_in, config):
+def can_handle(path_in, config, *args):
     if not path_in.lower().endswith('json'):
         return False
     return True
 
 
-def load(path_in: str, config):
+def load(path_in: str, config, *args):
     if os.path.exists(path_in):
         try:
             with open(path_in, 'r') as json_file:

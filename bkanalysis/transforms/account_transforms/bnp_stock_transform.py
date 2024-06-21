@@ -12,7 +12,7 @@ def __remove_accents(s):
     return ''.join(' ' if e == "'" else (e if (e.isalnum() or e == ' ') else 'e') for e in s)
 
 
-def can_handle(path_in, config):
+def can_handle(path_in, config, *args):
     if not path_in.endswith('csv'):
         return False
 
@@ -26,7 +26,7 @@ def can_handle(path_in, config):
     return set(df.columns) == set(expected_columns)
 
 
-def load(path_in, config):
+def load(path_in, config, *args):
     df = pd.read_csv(path_in)
     expected_columns = parse_list(config['expected_columns'], False)
 

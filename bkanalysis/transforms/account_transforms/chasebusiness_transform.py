@@ -9,7 +9,7 @@ from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
 
 
-def can_handle(path_in, config):
+def can_handle(path_in, config, *args):
     if not path_in.lower().endswith('csv'):
         return False
     df = pd.read_csv(path_in, nrows=1)
@@ -24,7 +24,7 @@ def try_get_account_name(file_name, config):
         return config['account_name']
 
 
-def load(path_in, config):
+def load(path_in, config, *args):
     df = pd.read_csv(path_in)
 
     account_name = try_get_account_name(os.path.basename(path_in).split('.')[0], config)
