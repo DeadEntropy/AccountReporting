@@ -12,7 +12,7 @@ from bkanalysis.transforms.account_transforms import barclays_transform as barc,
     bnp_cash_transform, chase_transform, revolut_transform_2 as rev_transform_2, fidelity_transform, discover_transform, \
     marcus_transform, discover_credit_transform, ubs_us_pension_transform, capital_one_transform, \
     first_republic_transform, first_republic_mtg_transform, nutmeg_transaction_transform, ubs_wm_transform, script_transform, \
-    chasebusiness_transform
+    chasebusiness_transform, mortgage_script_transform
 from bkanalysis.config import config_helper as ch
 from bkanalysis.market.market import Market
 from bkanalysis.market import market_loader as ml
@@ -95,6 +95,8 @@ class Loader:
             return nutmeg_transaction_transform.load(file, self.config['NutmegInvestment'])
         elif 'UbsWealthManagement' in self.config and ubs_wm_transform.can_handle(file, self.config['UbsWealthManagement']):
             return ubs_wm_transform.load(file, self.config['UbsWealthManagement'])
+        elif mortgage_script_transform.can_handle(file, None):
+            return mortgage_script_transform.load(file, None)
         elif script_transform.can_handle(file, None):
             return script_transform.load(file, None)
 

@@ -182,8 +182,6 @@ def plot_pie(df, index='Account', date_range=None, minimal_amount=1000, inc_reim
     wedges, texts, autotexts = ax.pie(amount, labels=account, autopct=lambda pct: func(pct, amount),
                                       textprops=dict(color="w"))
 
-    # plt.setp(autotexts, size=12, weight="bold")
-
     title = get_title(df_expenses.Date, df_expenses.Amount)
     ax.set_title(title)
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
@@ -192,15 +190,17 @@ def plot_pie(df, index='Account', date_range=None, minimal_amount=1000, inc_reim
     return fig
 
 
-def plot_expenses_pie(df, full_type=None, values='Amount', year_end=2021):
+def plot_expenses_pie(df, full_type=None, values='Amount', year_end=2021, inc_reimbursement=False):
     sunbursts = {}
     for year in range(year_end - 1, year_end+1):
         if full_type is None:
             sunbursts[year] = plot_sunburst(df, ['FullType', 'FullSubType'],
-                                            date_range=[f'{year}-01-01', f'{year}-12-31'], values=values)
+                                            date_range=[f'{year}-01-01', f'{year}-12-31'], 
+                                            values=values, inc_reimbursement=inc_reimbursement)
         else:
             sunbursts[year] = plot_sunburst(df[df.FullType == full_type], ['FullSubType','MemoMapped'],
-                                            date_range=[f'{year}-01-01', f'{year}-12-31'], values=values)
+                                            date_range=[f'{year}-01-01', f'{year}-12-31'], 
+                                            values=values, inc_reimbursement=inc_reimbursement)
 
     fig = make_subplots(rows=1, cols=2, specs=[
         [{"type": "sunburst"}, {"type": "sunburst"}]
@@ -211,28 +211,28 @@ def plot_expenses_pie(df, full_type=None, values='Amount', year_end=2021):
     return fig
 
 
-def compare_expenses(df_trans, year_end=2021, inc_reimbursement=False):
+def compare_expenses(df_trans, year_end, inc_reimbursement=False):
     df_expenses = {}
     for year in range(year_end - 1, year_end + 1):
         df_expenses[year] = get_expenses(df_trans, date_range=[f'{year}-01-01', f'{year}-12-31'], inc_reimbursement=inc_reimbursement)
 
     labels = list(set(df_expenses[year_end - 1].FullType) | set(df_expenses[year_end].FullType))
-    values_2020 = [(-1) * df_expenses[year_end - 1][df_expenses[year_end - 1].FullType == label].Amount_USD.sum() for
+    values_pre_year = [(-1) * df_expenses[year_end - 1][df_expenses[year_end - 1].FullType == label].Amount_USD.sum() for
                    label in labels]
-    values_2021 = [(-1) * df_expenses[year_end][df_expenses[year_end].FullType == label].Amount_USD.sum() for label in
+    values = [(-1) * df_expenses[year_end][df_expenses[year_end].FullType == label].Amount_USD.sum() for label in
                    labels]
     values_diff = [(-1) * df_expenses[year_end][df_expenses[year_end].FullType == label].Amount_USD.sum() - (-1) *
                    df_expenses[year_end - 1][df_expenses[year_end - 1].FullType == label].Amount_USD.sum() for label in
                    labels]
 
-    df = pd.DataFrame({'Label': labels, 'Values Diff': values_diff, f'Values {year_end - 1}': values_2020,
-                       f'Values {year_end}': values_2021})
+    df = pd.DataFrame({'Label': labels, 'Values Diff': values_diff, f'Values {year_end - 1}': values_pre_year,
+                       f'Values {year_end}': values})
     df = df.sort_values('Values Diff')
 
     return df
 
 
-def plot_expenses_bar(df, year_end=2021, figsize=(12, 6), dpi=320):
+def plot_expenses_bar(df, year_end, figsize=(12, 6), dpi=320):
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
 
     x = np.arange(df.shape[0])  # the label locations

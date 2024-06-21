@@ -40,7 +40,7 @@ def load(path_in, config):
     subcategory = list(df["Category"].fillna('Empty Category'))
     df_out.Subcategory = subcategory
     df_out['AccountType'] = config['account_type']
-    amounts = list(df['Debit'].fillna(0.0) + df['Credit'].fillna(0.0))
+    amounts = list(pd.to_numeric(df['Debit'].fillna(0.0)) + pd.to_numeric(df['Credit'].fillna(0.0)))
     df_out.Amount = amounts
     memo = _postprocess_memo(list(df['Description'].fillna('Empty Description')), list(df_out.Date), list(df_out.Amount))
     df_out.Memo = memo

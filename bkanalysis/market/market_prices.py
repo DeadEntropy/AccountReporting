@@ -1,6 +1,7 @@
 from json import JSONDecodeError
 
 import yfinance as yf
+from yahooquery import Ticker
 import pandas as pd
 from cachetools import cached, LRUCache
 import requests
@@ -173,3 +174,4 @@ def get_currency(symbol):
         return yf.Ticker(symbol).info['currency'].upper()
     except Exception as e:
          raise Exception(f"Failed to query currency for {symbol}", e)
+    
