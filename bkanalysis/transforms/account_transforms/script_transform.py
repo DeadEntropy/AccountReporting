@@ -30,17 +30,22 @@ def load(path_in: str, config, *args):
     
     dfs = []
     for _, data in json_obj.items():
-        start_dt = datetime.strptime(data['start_date'], '%d-%b-%Y')
-        end_dt = datetime.strptime(data['end_date'], '%d-%b-%Y')
-        
-        date_range = []
-        if data['freq'].upper() != 'MONTHLY':
-            raise Exception('Only Supports Monthly freq.')
-        
-        delta = relativedelta(months=1)
-        while start_dt < end_dt and start_dt < datetime.now():
-            date_range.append(start_dt)
-            start_dt += delta
+        freq = data['freq'].upper()
+        if freq== 'MONTHLY':
+            start_dt = datetime.strptime(data['start_date'], '%d-%b-%Y')
+            end_dt = datetime.strptime(data['end_date'], '%d-%b-%Y')
+            
+            date_range = []            
+            delta = relativedelta(months=1)
+            while start_dt < end_dt and start_dt < datetime.now():
+                date_range.append(start_dt)
+                start_dt += delta
+        elif freq == 'SINGLE':
+            start_dt = datetime.strptime(data['start_date'], '%d-%b-%Y')            
+            date_range = [start_dt]
+        else:
+            raise Exception('Only Supports Monthly freq & Single payments.')
+
             
         df_temp = pd.DataFrame(columns=sd.target_columns)
         df_temp.Date = date_range
