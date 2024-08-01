@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from bkanalysis.transforms.account_transforms import barclays_transform as barc, clone_transform, citi_transform, \
     lloyds_mortgage_transform as lloyds_mort, revolut_transform as rev_transform, \
-    lloyds_current_transform as lloyds_curr, nutmeg_isa_transform as nut_transform, ubs_pension_transform, \
+    lloyds_current_transform as lloyds_curr, nutmeg_isa_transform, nutmeg_transform, ubs_pension_transform, \
     static_data as sd, vault_transform, coinbase_transform, coinbase_pro_transform, bnp_stock_transform, \
     bnp_cash_transform, chase_transform, revolut_transform_2 as rev_transform_2, fidelity_transform, discover_transform, \
     marcus_transform, discover_credit_transform, ubs_us_pension_transform, capital_one_transform, \
@@ -55,7 +55,8 @@ class Loader:
             ('Barclays', barc),
             ('LloydsCurrent', lloyds_curr),
             ('LloydsMortgage', lloyds_mort),
-            ('Nutmeg', nut_transform, self.market, ref_currency),
+            ('Nutmeg', nutmeg_transform, self.market, ref_currency),
+            # ('NutmegIsa', nutmeg_isa_transform, self.market, ref_currency),
             ('Revolut', rev_transform, ';'),
             ('Revolut', rev_transform, ','),
             ('Revolut2', rev_transform_2, ','),
@@ -76,7 +77,7 @@ class Loader:
             ('CapitalOne', capital_one_transform),
             ('FirstRepublic', first_republic_transform),
             ('FirstRepublicMortgage', first_republic_mtg_transform),
-            ('NutmegInvestment', nutmeg_transaction_transform),
+            # ('NutmegInvestment', nutmeg_transaction_transform),
             ('UbsWealthManagement', ubs_wm_transform),
             ('MortgageScript', mortgage_script_transform),
             ('Script', script_transform),

@@ -115,7 +115,7 @@ def get_cashflows(data):
         df_escrow.Date = dates
         df_escrow.Account = account_name
         df_escrow.Currency = currency
-        df_escrow.Amount = -escrow
+        df_escrow.Amount = -escrow/payments_per_month
         df_escrow.Subcategory = 'Escrow'
         df_escrow.Memo = 'Mortgage Escrow - Flood Insurance'
         df_escrow['AccountType'] = 'mortgage'

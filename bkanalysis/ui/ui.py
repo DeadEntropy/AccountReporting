@@ -42,7 +42,7 @@ def currency_sign(ccy):
 
 
 def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True, config=None, include_market=True,
-                      ignore_overrides=True, include_json=True):
+                      ignore_overrides=True, include_json=True, remove_offsetting=True):
     mt = master_transform.Loader(config, include_market)
     df_raw = mt.load_all(include_xls, include_json)
     if save_to_csv:
@@ -52,7 +52,7 @@ def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True
         return df_raw
 
     pr = process.Process(config)
-    df = pr.process(df_raw, ignore_overrides=ignore_overrides)
+    df = pr.process(df_raw, ignore_overrides=ignore_overrides, remove_offsetting=remove_offsetting)
     if save_to_csv:
         pr.save(df)
     pr.__del__()
@@ -118,7 +118,7 @@ def transactions_to_values(df):
     return df
 
 
-def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10y', config=None):
+def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10y', config=None, linear_interpolation: bool=False):
     # Load the market
     from bkanalysis.market import market_loader as ml
     market_loader = ml.MarketLoader(config)
@@ -126,7 +126,7 @@ def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10
 
     # Build the market object
     from bkanalysis.market import market as mkt
-    market = mkt.Market(values)
+    market = mkt.Market(values, linear_interpolation)
 
     # Compute the value of the each (Account, Currency) in ref_currency
     price_in_currency = [market.get_price_in_currency(

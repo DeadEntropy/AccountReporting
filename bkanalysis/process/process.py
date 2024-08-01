@@ -265,10 +265,11 @@ class Process:
 
         return df_out
 
-    def process(self, df, ignore_overrides=True):
+    def process(self, df, ignore_overrides=True, remove_offsetting=False):
         df.Amount = df.Amount.astype(float)
         df_out = self.extend(df, ignore_overrides)
-        df_out = self.remove_offsetting(df_out, iat_value_col='Amount', adjust_dates=True)
+        if remove_offsetting:
+            df_out  = self.remove_offsetting(df_out, iat_value_col='Amount', adjust_dates=True)
         return df_out
 
     def save(self, df):

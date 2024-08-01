@@ -7,12 +7,14 @@ from datetime import datetime
 from bkanalysis.config import config_helper as ch
 from bkanalysis.market import market_prices as mp
 from bkanalysis.market.price import Price
+from bkanalysis.config.config_helper import parse_list
 
 
 class SOURCE(Enum):
     YAHOO = 1
     FILE = 2
     HARDCODED = 3
+    NUTMEG = 4
 
 
 class MarketLoader:
@@ -30,6 +32,14 @@ class MarketLoader:
         self.source_map = {}
         for (k,v) in ast.literal_eval(self.config['Market']['source_map']).items():
             self.source_map[k] = [SOURCE[v[0].upper()]] + list(v[1:])
+
+        if 'source_from_nutmeg' in self.config['Market']:
+            source_from_nutmeg = parse_list(self.config['Market']['source_from_nutmeg'])
+            for k in source_from_nutmeg:
+                self.source_map[k]= [SOURCE.NUTMEG]
+            if 'Nutmeg' not in self.config or 'path_activity' not in self.config['Nutmeg']:
+                raise Exception('Nutmeg.path_activity must be passed in is source_from_nutmeg is enabled.')
+            self.nutmeg_path = self.config['Nutmeg']['path_activity']
         self.source_default = SOURCE.YAHOO
 
     def load(self, instruments, ref_currency: str, period: str):
@@ -65,6 +75,11 @@ class MarketLoader:
                 if len(self.source_map[symbol]) != 3:
                     raise Exception('source is HARDCODED but not VALUE was passed in.')
                 return self.get_history_from_hardcoded(self.source_map[symbol][1], self.source_map[symbol][2])
+            elif self.source_map[symbol][0] == SOURCE.NUTMEG:
+                logging.info(f'Getting {period} of data for {symbol} from {SOURCE.NUTMEG}')
+                if len(self.source_map[symbol]) != 1:
+                    raise Exception('source is NUTMEG but too many arguments were passed in.')
+                return self.get_history_from_nutmeg(self.nutmeg_path, symbol)
             else:
                 raise Exception(f'{self.source_map[symbol][0]} source is not supported.')
 
@@ -87,6 +102,14 @@ class MarketLoader:
         logging.debug(f'Getting History from HARDCODED.')
         return {datetime.strptime(date, MarketLoader._FILE_DATE_FORMAT): Price(close, currency)\
                 for (date, close) in values.items()}
+
+    @staticmethod
+    def get_history_from_nutmeg(path:str, instr:str):
+        df = pd.read_csv(path,parse_dates=['Date']).rename({'Share Price (£)': 'Share Price', 'Total Value (£)': 'Total Value'},axis=1)
+        df_instr = df[df['Asset Code'] == instr]
+        currency ='GBP'
+        return {date: Price(close, currency) for (date, close) in pd.pivot_table(df_instr, index='Date', values='Share Price', aggfunc='first')['Share Price'].items()}
+
 
     @staticmethod
     def get_history_from_file(path: str):

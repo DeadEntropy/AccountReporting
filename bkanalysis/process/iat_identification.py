@@ -42,76 +42,48 @@ class IatIdentification:
 
         return df.drop(offsetting_rows)
     
-    
-    @staticmethod
-    def mark_facing_accounts(grp, adjust_dates: bool = False):
-        if len(grp) == 1 or grp.Amount.iloc[0] == 0:
-            return grp
-        
-        pairs = []
-        i = 1
-        while i < len(grp):
-            if grp.Amount.iloc[i-1] == -grp.Amount.iloc[i] \
-                and abs(grp.Date.iloc[i-1] - grp.Date.iloc[i]) < pd.Timedelta(7, "d") \
-                and grp.Account.iloc[i-1] != grp.Account.iloc[i]:
-                pairs.append((i-1, i))
-                if adjust_dates:
-                    adjusted_date = max(grp.Date.iloc[i-1], grp.Date.iloc[i])
-                    grp.at[i-1, 'Date'] = adjusted_date
-                    grp.at[i, 'Date'] = adjusted_date
-                i += 2
-            else:
-                i += 1
 
-        for i, j in pairs:
-            grp.at[i, 'FacingAccount'] = grp.Account.iloc[j]
-            grp.at[j, 'FacingAccount'] = grp.Account.iloc[i]
-
-        return grp
-    
     def map_iat(self, df, iat_value_col='Amount', adjust_dates: bool = False):
         # Ensure columns match the expected structure
         columns_req = ['Currency', 'FullType', 'Date', 'Account'] + [iat_value_col]
         assert all([col_req in df.columns for col_req in columns_req]), f'columns do not match expectation. Expected: {columns_req} but received: {df.columns}'
 
-        # Filter the DataFrame to include only relevant rows
-        df['IDX'] = df.index
-        df_mini = df[df.FullType.str.upper().isin([t.upper() for t in self.iat_full_types])][columns_req + ['IDX']]
+        # Ensure Date column is in datetime format
+        df['Date'] = pd.to_datetime(df['Date'])
+        
+        # Create a new column for the offsetting account
+        df['FacingAccount'] = None
 
-        # Perform the merge operation
-        ndf = pd.merge(df_mini, df_mini, on='Currency', suffixes=('_x', '_y'))
-
-        # Filter the merged DataFrame to find matching transactions
-        out = ndf[(ndf[f'{iat_value_col}_x'] == -ndf[f'{iat_value_col}_y'])
-                & (abs(ndf.Date_x - ndf.Date_y) < pd.Timedelta(7, 'D'))
-                & (ndf.Account_x != ndf.Account_y)
-                & (ndf[f'{iat_value_col}_x'] != 0)]
-
-        # Identify the unique transaction pairs
-        iat_transfers = list(zip(out.IDX_x.values, out.IDX_y.values))
-        df.drop('IDX', axis=1, inplace=True)
-
-        # Keep track of processed rows to avoid duplicates
-        processed_rows = set()
-        for dup in iat_transfers:
-            if dup[0] in processed_rows or dup[1] in processed_rows:
-                continue
-            processed_rows.update(dup)
-
-            if adjust_dates:
-                adjusted_date = max(df.loc[dup[0], 'Date'], df.loc[dup[1], 'Date'])
-                df.at[dup[0], 'Date'] = adjusted_date
-                df.at[dup[1], 'Date'] = adjusted_date
-
-            df.at[dup[0], 'FacingAccount'] = df.loc[dup[1], 'Account']
-            df.at[dup[1], 'FacingAccount'] = df.loc[dup[0], 'Account']
+        # Create a dictionary to store potential matches
+        transaction_dict = {}
+        df_mini = df[df.FullType.isin(self.iat_full_types)]
+        for i, row in df_mini.iterrows():
+            target_key = (row['Currency'], row['FullType'], -row[iat_value_col])
+            key_this_row = (row['Currency'], row['FullType'], row[iat_value_col])
+            date = row['Date']
+            
+            # Check if there is a matching transaction in the dictionary
+            if target_key in transaction_dict:
+                for match_index in transaction_dict[target_key]:
+                    if abs((date - df.loc[match_index, 'Date']).days) < 7 and df.loc[match_index, 'FacingAccount'] is None:
+                        df.loc[i, 'FacingAccount'] = df.loc[match_index, 'Account']
+                        df.loc[match_index, 'FacingAccount'] = row['Account']
+                        if adjust_dates:
+                            adjusted_date = max(df.loc[match_index, 'Date'], row['Date'])
+                            df.loc[match_index, 'Date'] = adjusted_date
+                            df.loc[i, 'Date'] = adjusted_date
+                        transaction_dict[target_key].remove(match_index)
+                        break
+            if key_this_row in transaction_dict:
+                    transaction_dict[key_this_row].append(i)
+            else:
+                transaction_dict[key_this_row] = [i]
 
         return df
 
+
     
     def map_iat_fx(self, df):
-        if self._use_old:
-            return self.map_iat_fx_OLD(df)
         new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
         assert set(list(df.columns)) == set(new_columns), 'columns do not match expectation.'
 
