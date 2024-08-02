@@ -124,7 +124,7 @@ def get_expenses(df, date_range=None, values='Amount', inc_reimbursement=False):
 
     df_expenses = df[(~df.FullMasterType.isin(['Income', 'ExIncome']))
                      & (df.FullType != 'Savings')
-                     & (df.FacingAccount == '')
+                     & ((df.FacingAccount == '') | [facc is None for facc in df.FacingAccount])
                      & (df[values] < 0)
                      & (df.FullType != 'Intra-Account Transfert')]
     df_expenses[values] = (-1) * df_expenses[values]
