@@ -21,7 +21,7 @@ from bkanalysis.market import market_loader as ml
 
 
 class Loader:
-
+    GRANULAR_NUTMEG = True
     def __init__(self, config=None, include_market=True, ref_currency='GBP'):
         if config is None:
             self.config = configparser.ConfigParser()
@@ -35,9 +35,12 @@ class Loader:
             if 'instr_to_preload' in self.config['Market']:
                 self.market = Market(ml.MarketLoader().load(\
                     ast.literal_eval(self.config['Market']['instr_to_preload']), ref_currency, '10y'))
+        
+        self.nutmeg_transformer = ('Nutmeg', nutmeg_transform, self.market, ref_currency) if Loader.GRANULAR_NUTMEG \
+            else ('NutmegIsa', nutmeg_isa_transform, self.market, ref_currency)
 
     def load_multi_thread(self, files):
-        with ThreadPoolExecutor(max_workers=1) as executor:
+        with ThreadPoolExecutor() as executor:
             futures = {executor.submit(self.load_internal, file): file for file in files}
             results = []
             for future in as_completed(futures):
@@ -55,8 +58,7 @@ class Loader:
             ('Barclays', barc),
             ('LloydsCurrent', lloyds_curr),
             ('LloydsMortgage', lloyds_mort),
-            ('Nutmeg', nutmeg_transform, self.market, ref_currency),
-            # ('NutmegIsa', nutmeg_isa_transform, self.market, ref_currency),
+            self.nutmeg_transformer,
             ('Revolut', rev_transform, ';'),
             ('Revolut', rev_transform, ','),
             ('Revolut2', rev_transform_2, ','),

@@ -191,10 +191,9 @@ class Process:
         df = df.apply(apply_override, axis=1)
         return df
 
-    def remove_offsetting(self, df, remove_duplicate=True, iat_value_col=None, map_iat_fx=True, adjust_dates=False):
+    def remove_offsetting(self, df, iat_value_col=None, map_iat_fx=True, adjust_dates=False):
         iat = IatIdentification(self.config)
-        df_out = iat.remove_duplicate(df) if remove_duplicate else df
-        df_out = iat.map_iat(df_out, iat_value_col, adjust_dates=adjust_dates) if iat_value_col is not None else df_out
+        df_out = iat.map_iat(df, iat_value_col, adjust_dates=adjust_dates) if iat_value_col is not None else df_out
         df_out = iat.map_iat_fx(df_out) if map_iat_fx else df_out
 
         return df_out

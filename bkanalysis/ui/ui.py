@@ -166,9 +166,6 @@ def add_mappings(df, ref_currency, config=None):
     df_exp = df.explode(MEMO_MAPPED)
     df_exp[AMOUNT_CCY] = [memoMapped[1] if not isinstance(memoMapped, float) else 0 for memoMapped in df_exp[MEMO_MAPPED]]
     df_exp[MEMO_MAPPED] = [memoMapped[0] if not isinstance(memoMapped, float) else '' for memoMapped in df_exp[MEMO_MAPPED]]
-    
-    # Now includes the capital gain
-    # assert round(df[AMOUNT_CCY].sum(), 2) == round(df_exp[AMOUNT_CCY].sum(), 2), f'{AMOUNT_CCY} Mismatch'
 
     df_exp[MEMO_MAPPED] = df_exp[MEMO_MAPPED].fillna('')
 
@@ -176,7 +173,7 @@ def add_mappings(df, ref_currency, config=None):
     df_exp = pr.extend_types(df_exp.reset_index(), True, True)
     df_exp['Currency'] = ref_currency
 
-    return pr.remove_offsetting(df_exp, False, AMOUNT_CCY, False)
+    return pr.remove_offsetting(df_exp, AMOUNT_CCY, False)
 
 
 def get_status(df):

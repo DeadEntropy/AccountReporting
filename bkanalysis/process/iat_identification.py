@@ -6,7 +6,7 @@ from bkanalysis.config import config_helper as ch
 
 
 class IatIdentification:
-    _use_old = False
+    _use_old = True
     iat_types = ['SA', 'IAT', 'W_IN', 'W_OUT', 'SC', 'R', 'MC', 'O', 'FR', 'TAX', 'FPC', 'FLC', 'FLL', 'FSC']
     iat_full_types = ['Savings', 'Intra-Account Transfert', 'Wire In', 'Wire Out', 'Service Charge', 'Rent/Mortgage', 'Others', 'Tax', 'Flat Capital', 'Flat Living Cost']
     iat_fx_types = ['FX']
@@ -19,28 +19,6 @@ class IatIdentification:
                 raise OSError(f'no config found in {ch.source}')
         else:
             self.config = config
-
-
-    def remove_duplicate(self, df):
-        # Ensure columns match the expected structure
-        new_columns = [n.strip() for n in ast.literal_eval(self.config['Mapping']['new_columns'])]
-        assert set(list(df.columns)) == set(new_columns), f'columns do not match expectation. Expected : [{new_columns}]'
-
-        df['IDX'] = df.index
-        ndf = pd.merge(left=df, right=df, on=('Account', 'Memo', 'AccountType', 'Currency'), how='inner')
-        out = ndf[(abs(ndf.Amount_x + ndf.Amount_y) < ndf.Amount_x * self.relative_tolerance)
-                & (ndf.Date_x - ndf.Date_y < pd.Timedelta(7, 'D'))
-                & (ndf.IDX_x < ndf.IDX_y)
-                & (ndf.Amount_x != 0)]
-
-        duplicate_couples = list(zip(list(out.IDX_x.values), list(out.IDX_y.values)))
-        df.drop('IDX', axis=1, inplace=True)
-
-        offsetting_rows = set()
-        for dup in duplicate_couples:
-            offsetting_rows.update(dup)
-
-        return df.drop(offsetting_rows)
     
 
     def map_iat(self, df, iat_value_col='Amount', adjust_dates: bool = False):
