@@ -55,7 +55,7 @@ def clean_nutmeg_investment_activity(df_investment, fund_list: list = None, incl
 
     return df_piv
 
-def get_dividends(df, fee_for_avg_holding_period, SEDOL_MAP, start, end, to_sedol = {}):
+def get_dividends(df, fee_for_avg_holding_period, start, end, SEDOL_MAP, to_sedol = {}):
     df_piv_div = df[(df.Type == 'DIV') & (df.index <= end) & (df.index > start)]
     if all(df_piv_div.Narrative.str.startswith('Dividend')):
         df_piv_div["Asset Code"] =  df_piv_div["Narrative"].str[9:16]
@@ -63,10 +63,14 @@ def get_dividends(df, fee_for_avg_holding_period, SEDOL_MAP, start, end, to_sedo
         df_piv_div["Asset Code"] = df_piv_div["Asset Code"].map(to_sedol)
 
     df_piv_div['Asset Name'] = [SEDOL_MAP.loc[sedol].FULL_NAME if sedol in SEDOL_MAP.index else 'N/A' for sedol in df_piv_div['Asset Code']]
-    df_piv_div = pd.pivot_table(df_piv_div.reset_index(), index=['Date', 'Asset Name'], values='Value', aggfunc=sum)
+    df_piv_div = pd.pivot_table(df_piv_div.reset_index(), index=['Date', 'Asset Code', 'Asset Name'], values='Value', aggfunc=sum)
     df_piv_div = df_piv_div.reset_index().set_index('Date')
-    df_piv_div.Value = df_piv_div.Value + fee_for_avg_holding_period/len(df_piv_div.Value)
-    return df_piv_div
+    if fee_for_avg_holding_period + df_piv_div.Value.sum() < 0:
+        raise Exception('Fees are higher than Dividend, cannot embed the fees in the dividends.')
+    fee_ratio = 1 + fee_for_avg_holding_period / df_piv_div.Value.sum()
+    df_piv_div.Value *= fee_ratio
+    df_piv_div.Value = df_piv_div.Value.apply(lambda x : np.round(x,2))
+    return df_piv_div.rename({'Asset Code': 'SEDOL', 'Value': 'Dividend'}, axis=1)
 
 def get_tax_tbl(df_piv_no_div):
     tax_tables = []
@@ -102,18 +106,29 @@ def get_tax_report(df_tax, start, end, sedol_map, to_sedol = None):
          'purchase_price': 'Purchase Price', 
          'sale_price': 'Sale Price',
          'taxable_amount': 'Taxable Amount'})
-    return tax_output
+    return tax_output[['SEDOL', 'Asset Name', 'Purchase Date', 'Sale Date', 'Units' ,'Purchase Price', 'Sale Price', 'Taxable Amount']]
 
-def get_report_small(tax_tbl, start, end):
+def get_report_small(tax_tbl, start, end, sedol_map, to_sedol = None):
     tax = tax_tbl[(tax_tbl.index <= end) & (tax_tbl.index > start)]
     tax = pd.DataFrame(tax.to_records())
 
     tax_small = pd.pivot_table(tax, index='Asset Code', values=['units_sold', 'sale_price', 'purchase_price', 'purchase_date', 'taxable_amount', 'holding_period'],\
              aggfunc={'units_sold':sum, 'sale_price':np.mean, 'purchase_price':np.mean, 'taxable_amount':sum, 'holding_period':np.mean})
+    tax_small = pd.DataFrame(tax_small.to_records())
 
+    if to_sedol is not None:
+        tax_small['Asset Code'] = tax_small['Asset Code'].map(to_sedol)
+    tax_small['Asset Name'] = [sedol_map.loc[sedol].FULL_NAME if sedol in sedol_map.index else 'N/A' for sedol in tax_small['Asset Code']]
     tax_small.holding_period = tax_small.holding_period.round('1D')
     tax_small = tax_small.astype({'taxable_amount': 'float', 'units_sold': 'float'}).round(2)
-    return tax_small[['units_sold', 'purchase_price', 'sale_price', 'taxable_amount', 'holding_period']]
+    tax_small = tax_small.rename(
+        columns={'Asset Code': 'SEDOL', 
+         'units_sold': 'Units', 
+         'holding_period': 'Average Holding Period',
+         'purchase_price': 'Purchase Price', 
+         'sale_price': 'Sale Price',
+         'taxable_amount': 'Taxable Amount'})
+    return tax_small[['SEDOL', 'Asset Name', 'Units', 'Average Holding Period' ,'Purchase Price', 'Sale Price', 'Taxable Amount']]
 
 def get_relevant_purchases_for_sale(sale_units: float, purchases:dict)-> dict: 
     if sale_units == 0:
@@ -212,11 +227,13 @@ def get_taxable_event_from_single_asset(df: pd.DataFrame) -> pd.DataFrame:
 
 def get_capital_gain_table(df: pd.DataFrame) -> pd.DataFrame:
     df = df[df.Type != 'DIV']
+    df = df[df.Type != 'FEE']
+    df = df[df.Type != 'INT']
     tax_tables = []
     for asset_code in df['Asset Code'].unique():
-        if asset_code == 'CASH':
+        if (asset_code == 'CASH') or (asset_code == ''):
             continue
-        df_small = df[(df.Narrative.str.contains(asset_code)) & (df['Asset Code'] != 'CASH')]
+        df_small = df[(df.Narrative.str.contains(asset_code)) & (df['Asset Code'] != 'CASH')& (df['Asset Code'] != '')]
         df_mini = pd.pivot_table(pd.DataFrame(df_small.to_records()), index='Date', values=['Units', 'Unitary Value'], aggfunc={'Units': sum, 'Unitary Value': np.mean})
         df_mini = df_mini[abs(df_mini.Units) > 0.0001]
         try:
