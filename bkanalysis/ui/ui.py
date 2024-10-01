@@ -304,6 +304,43 @@ def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY, top_items_count = 
 
     return fig
 
+def plot_wealth_yearly(df, by=CUMULATED_AMOUNT_CCY_EXCL_CAPITAL, first_year=2016, last_year=None):
+    import plotly.graph_objects as go
+    from datetime import datetime
+    fig = go.Figure()
+
+    v, l = _get_plot_data(df, by=by)
+    labels_r = list(reversed(l))
+    i = 0
+
+    fig.update_layout(
+        title="Yearly Wealth",
+        xaxis_title="Date",
+        yaxis_title="Currency")
+
+    if last_year is None:
+        last_year = datetime.now().year
+    for year in reversed(range(first_year, last_year + 1)):
+        if year != last_year:
+            color= 'grey'
+        else:
+            color='blue'
+        v_year = v[f'{year}-01-01':f'{year}-12-31']
+        v_year = v_year - v_year.iloc[0]
+        v_year.index = v_year.index.strftime("%b-%d")
+
+        lab_year = list(reversed(labels_r[i:i+len(v_year)]))
+        i = i+len(v_year)
+
+        fig.add_trace(go.Scatter(x=v_year.index, y=v_year.values,
+                            mode='lines',
+                            name=year,
+                            line_color=color,
+                            opacity=(year-first_year + 1)/(last_year - first_year + 1),
+                            hovertext=lab_year))
+
+    fig.show()
+
 
 def __try_get(d, k, default=None):
     if k in d:
