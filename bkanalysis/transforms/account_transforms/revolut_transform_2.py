@@ -34,6 +34,8 @@ def _get_payment_fees(df: pd.DataFrame):
 
 def load(path_in, config, sep=';', *args):
     df = pd.read_csv(path_in, sep=sep)
+    if len(df) == 0:
+        return pd.DataFrame(columns=sd.target_columns)
     df.columns = [s.strip() for s in df.columns]
     expected_columns = parse_list(config['expected_columns'], False)
 

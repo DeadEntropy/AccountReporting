@@ -19,6 +19,8 @@ from bkanalysis.config import config_helper as ch
 from bkanalysis.market.market import Market
 from bkanalysis.market import market_loader as ml
 
+USE_LEGACY_LOADER = False
+
 
 class Loader:
     GRANULAR_NUTMEG = True
@@ -111,8 +113,8 @@ class Loader:
             return lloyds_curr.load(file, self.config['LloydsCurrent'])
         elif 'LloydsMortgage' in self.config and lloyds_mort.can_handle(file, self.config['LloydsMortgage']):
             return lloyds_mort.load(file, self.config['LloydsMortgage'])
-        elif 'Nutmeg' in self.config and nut_transform.can_handle(file, self.config['Nutmeg']):
-            return nut_transform.load(file, self.config['Nutmeg'], self.market, ref_currency)
+        #elif 'Nutmeg' in self.config and nut_transform.can_handle(file, self.config['Nutmeg']):
+        #    return nut_transform.load(file, self.config['Nutmeg'], self.market, ref_currency)
         elif 'Revolut' in self.config and rev_transform.can_handle(file, self.config['Revolut'], ';'):
             return rev_transform.load(file, self.config['Revolut'], ';')
         elif 'Revolut' in self.config and rev_transform.can_handle(file, self.config['Revolut'], ','):
@@ -200,15 +202,18 @@ class Loader:
             files = self.get_files(self.config['IO']['folder_lake'], include_xls=include_xls, include_json=include_json)
         if len(files) == 0:
             return
-        df = self.load_multi_thread(files)
+        if USE_LEGACY_LOADER:
+            df_list = [self.load_old(f) for f in files]
+            for df_temp in df_list:
+                df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
+            df = pd.concat(df_list)
+            df = df.drop_duplicates().drop(['count'], axis=1).sort_values(['Date', 'Account'], ascending=False)
+        else:
+            df = self.load_multi_thread(files)
         df = df.sort_values(['Date', 'Account'], ascending=False)
 
 
-        #df_list = [self.load_old(f) for f in files]
-        #for df_temp in df_list:
-        #    df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
-        #df = pd.concat(df_list)
-        #df = df.drop_duplicates().drop(['count'], axis=1).sort_values(['Date', 'Account'], ascending=False)
+
 
         df.Date = pd.to_datetime(df.Date)
         return df.reset_index(drop=True)

@@ -16,15 +16,18 @@ __query_yahoo_url_search = "https://query2.finance.yahoo.com/v1/finance/search"
 regex_ticker = re.compile(r'^[a-zA-Z][a-zA-Z][0-9]+')
 
 __currencies = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD', 'KRW', 'CNH']
-__crypto = ['BTC', 'ETH']
+__crypto = ['BTC', 'ETH', 'ETH2']
+__crypto_staking_map = {'ETH2': 'ETH'}
 
 
 @cached(mem_cache_symbol)
 def get_symbol(instr, currency):
     if instr is None:
         return None
-    elif (len(instr) == 3) and (instr in __currencies or instr in __crypto):  # its a currency/crypto
+    elif (len(instr) == 3 or len(instr) == 4) and (instr in __currencies or instr in __crypto):  # its a currency/crypto
         if instr in __crypto:
+            if instr in __crypto_staking_map:
+                return f'{__crypto_staking_map[instr]}-{currency}'
             return f'{instr}-{currency}'
         else:
             return f'{instr}{currency}=X'
