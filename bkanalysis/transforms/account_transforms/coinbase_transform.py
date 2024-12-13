@@ -18,17 +18,25 @@ def can_handle(path_in, config, sep=',', *args):
 
 
 def load(path_in, config, sep=',', *args):
-    df = pd.read_csv(path_in, sep=sep)
+    df = pd.read_csv(path_in, sep=sep, parse_dates=['Timestamp'])
     df.columns = [s.strip() for s in df.columns]
     expected_columns = parse_list(config['expected_columns'], False)
 
     assert set(df.columns) == set(expected_columns), \
         f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Coinbase)'
 
+    df_convert = df[[t == 'Convert' for t in df['Transaction Type']]]
+    df = df[[t not in ['Exchange Deposit', 'Pro Withdrawal', 'Convert'] for t in df['Transaction Type']]]
+    df_convert_mirror = df_convert.copy()
+    df_convert['Quantity Transacted'] = -df_convert['Quantity Transacted']
+    df_convert_mirror['Asset'] = [note[-1] for note in df_convert['Notes'].str.split(' ')]
+
+    df = pd.concat([df, df_convert, df_convert_mirror], axis=0)
+
     df_out = pd.DataFrame(columns=sd.target_columns)
-    df_out.Date = pd.to_datetime(df["Timestamp"]).dt.tz_convert(None)
-    df_out.Account = config['account_name']
     df_out.Currency = df["Asset"]
+    df_out.Date = [d.date() for d in df["Timestamp"]]
+    df_out.Account = config['account_name']
     df_out.Amount = df["Quantity Transacted"]
     df_out.Subcategory = [f'COINBASE_{t}' for t in df["Transaction Type"]]
     df_out.Memo = [f'COINBASE_{t}' for t in df["Transaction Type"]]
