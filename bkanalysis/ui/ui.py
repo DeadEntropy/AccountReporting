@@ -60,7 +60,7 @@ def load_transactions(save_to_csv=False, include_xls=True, map_transactions=True
 
 
 def __interpolate(x):
-    z = x.interpolate(method='ffill', limit_direction='forward').dropna()
+    z = x.ffill().dropna()
     z[AMOUNT] = x[AMOUNT].fillna(0.0)
     z[MEMO_MAPPED] = x[MEMO_MAPPED].fillna('')
     return z
@@ -79,7 +79,7 @@ def transactions_to_values(df):
     # Ensure there all (Account, Currency, Date) tuples are unique
     df.drop(df.columns.difference(['Account', 'Currency', DATE, MEMO_MAPPED, AMOUNT, 'Type']), axis=1, inplace=True)
     df = df.groupby(['Account', 'Currency', DATE]).agg(
-        {AMOUNT: [sum, list], MEMO_MAPPED: list, 'Type': list}).reset_index().set_index(['Account', 'Currency', 'Date'])
+        {AMOUNT: ['sum', list], MEMO_MAPPED: list, 'Type': list}).reset_index().set_index(['Account', 'Currency', 'Date'])
 
     df.columns = [" ".join(a) for a in df.columns.to_flat_index()]
     df.rename(columns={f'{AMOUNT} sum': AMOUNT,
@@ -118,7 +118,7 @@ def transactions_to_values(df):
     return df
 
 
-def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10y', config=None, linear_interpolation: bool=False):
+def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10y', config=None, linear_interpolation: bool=False, output_market: bool=False):
     # Load the market
     from bkanalysis.market import market_loader as ml
     market_loader = ml.MarketLoader(config)
@@ -148,6 +148,8 @@ def compute_price(df: pd.DataFrame, ref_currency: str = 'USD', period: str = '10
 
     df[MEMO_MAPPED] = [memo + [('CAPITAL', c, 'C')] if c != 0 else memo for (memo, c) in zip(df[MEMO_MAPPED], pd.concat(cap_series))]
     add_no_capital_column(df)
+    if output_market:
+        return df, values
     return df
 
 

@@ -69,11 +69,9 @@ def load(path_in, config, *args):
     df = pd.read_csv(path_in)
     expected_columns = parse_list(config['expected_columns'])
     assert set(df.columns) == set(expected_columns), f'Was expecting [{", ".join(expected_columns)}] but file columns ' \
-                                                     f'are [{", ".join(df.columns)}]. (First Republic)'
-    
+                                                     f'are [{", ".join(df.columns)}]. (First Republic)'    
 
     df_out = pd.DataFrame(columns=sd.target_columns)
-    # 
     df_out.Date = pd.to_datetime(df['Date'], format='%m/%d/%Y')
     df_out.Account = config['account_name']
     df_out.Currency = "USD"
@@ -88,9 +86,7 @@ def load(path_in, config, *args):
     df_payment_breakdown = get_payment_breakdown(list(df_out[df_out.Subcategory == 'Mortgage Payment'].sort_values(by='Date').Date), config)
     df_payment_adjustment = get_payment_adjustment(df_out[df_out.Memo.str.startswith('SPECIAL-PAYMENT')])
 
-    df_out = pd.concat([df_out, df_payment_breakdown, df_payment_adjustment]).sort_values(by='Date', ascending=False)
-
-    # assert -df_out.Amount.sum() == df.iloc[0].Balance, 'Balance Mismatch'
+    df_out = pd.concat([df for df in [df_out, df_payment_breakdown, df_payment_adjustment] if len(df) > 0]).sort_values(by='Date', ascending=False)
 
     return df_out
 

@@ -56,7 +56,8 @@ def load(path_in, config, sep=';', *args):
     df_out.Memo = df.Description
 
     df_fees = _get_payment_fees(df[df.Fee != 0])
-    df_out = pd.concat([df_out, df_fees]).sort_values(by='Date', ascending=False)
+    if len(df_fees) > 0:
+        df_out = pd.concat([df_out, df_fees]).sort_values(by='Date', ascending=False)
     
     df_out['AccountType'] = config['account_type']
     df_out.Account = config['account_name'] + " " + currency

@@ -120,7 +120,7 @@ def get_cashflows(data):
         df_escrow.Memo = 'Mortgage Escrow - Flood Insurance'
         df_escrow['AccountType'] = 'mortgage'
 
-    df_mtg = pd.concat([df_balance, df_payment, df_interest, df_escrow], axis=0)
+    df_mtg = pd.concat([df for df in [df_balance, df_payment, df_interest, df_escrow] if len(df) > 0], axis=0)
     return df_mtg[df_mtg.Date <= datetime.now()]
 
 def load_save(config):

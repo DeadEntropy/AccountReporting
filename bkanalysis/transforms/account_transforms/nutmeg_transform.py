@@ -26,7 +26,7 @@ def can_handle(path_in, config, *args):
 
 
 def load(path_in, config, *args):
-    df = pd.read_csv(path_in, sep=',', parse_dates=['Date'])
+    df = pd.read_csv(path_in, sep=',', parse_dates=['Date'], date_format="%d-%b-%y")
     try:
         expected_columns = [re.sub(regex, '', s) for s in parse_list(config['expected_columns'])]
     except Exception:
@@ -39,7 +39,7 @@ def load(path_in, config, *args):
 
     path_in_activity = config['path_activity']
     df = df.rename({'Amount (£)': 'Amount'},axis=1)
-    activity = pd.read_csv(path_in_activity,parse_dates=['Date'])\
+    activity = pd.read_csv(path_in_activity,parse_dates=['Date'], date_format="%d-%b-%y")\
         .rename({'Share Price (£)': 'Share Price', 'Total Value (£)': 'Total Value'},axis=1)
 
     dfs = []

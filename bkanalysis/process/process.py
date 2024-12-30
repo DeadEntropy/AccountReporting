@@ -14,9 +14,9 @@ class Process:
     _use_old = False
 
     @staticmethod
-    def __initialise_map(config, path, root='folder_root', default_columns=None, parse_dates=None):
+    def __initialise_map(config, path, root='folder_root', default_columns=None):
         try:
-            return pd.read_csv(ch.get_path(config, path, root), parse_dates=parse_dates)
+            return pd.read_csv(ch.get_path(config, path, root))
         except:
             print(f'Could not find mapping file in: {ch.get_path(config, path, root)}.')
             try:
@@ -46,7 +46,7 @@ class Process:
         self.map_full_type = Process.__initialise_map(self.config['Mapping'],'path_map_full_type', default_columns=['Type', 'FullType', 'MasterType'])
         self.map_full_subtype = Process.__initialise_map(self.config['Mapping'],'path_map_full_subtype', default_columns=['SubType', 'FullSubType'])
         self.map_master = Process.__initialise_map(self.config['Mapping'],'path_map_full_master_type', default_columns=['MasterType', 'FullMasterType'])
-        self.mapping_override_df = Process.__initialise_map(self.config['Mapping'],'path_override', parse_dates=[0], \
+        self.mapping_override_df = Process.__initialise_map(self.config['Mapping'],'path_override', \
                                                             default_columns=['Date', 'Account', 'MemoMapped', 'OverridesType','OverrideSubType'])
 
     def __del__(self):

@@ -90,9 +90,6 @@ class MarketLoader:
                 raise Exception(f'No Yahoo history found for {symbol}. Check that the symbol is correct. ' \
                                 + f'Or add a custom source for that symbol in the market config ({ch.source}).')
             return hist
-        
-
-
         raise Exception(f'default source can not be {self.source_default}.')
 
     _FILE_DATE_FORMAT = '%d/%m/%Y'
@@ -105,7 +102,7 @@ class MarketLoader:
 
     @staticmethod
     def get_history_from_nutmeg(path:str, instr:str):
-        df = pd.read_csv(path,parse_dates=['Date']).rename({'Share Price (£)': 'Share Price', 'Total Value (£)': 'Total Value'},axis=1)
+        df = pd.read_csv(path, parse_dates=['Date'], date_format="%d-%b-%y").rename({'Share Price (£)': 'Share Price', 'Total Value (£)': 'Total Value'},axis=1)
         df_instr = df[df['Asset Code'] == instr]
         currency ='GBP'
         return {date: Price(close, currency) for (date, close) in pd.pivot_table(df_instr, index='Date', values='Share Price', aggfunc='first')['Share Price'].items()}
