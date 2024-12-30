@@ -210,12 +210,8 @@ class Loader:
             df = df.drop_duplicates().drop(['count'], axis=1).sort_values(['Date', 'Account'], ascending=False)
         else:
             df = self.load_multi_thread(files)
-        df = df.sort_values(['Date', 'Account'], ascending=False)
-
-
-
-
         df.Date = pd.to_datetime(df.Date)
+        df = df.sort_values(['Date', 'Account'], ascending=False)
         return df.reset_index(drop=True)
 
     def save(self, df):
