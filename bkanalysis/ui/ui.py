@@ -210,8 +210,8 @@ def _get_plot_data(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
     df[MEMO_MAPPED] = [memo if memo != '' else {} for memo in df[MEMO_MAPPED]]
     
     df_on_dates = pd.pivot_table(df, index='Date', values=[by, AMOUNT_CCY, MEMO_MAPPED], 
-               aggfunc={by: sum, 
-                        AMOUNT_CCY: sum,
+               aggfunc={by: 'sum', 
+                        AMOUNT_CCY: 'sum',
                         MEMO_MAPPED:__sum_to_dict})
 
     values = df_on_dates[by]
@@ -358,7 +358,7 @@ def project(df, nb_years=11, projection_data={}):
 
     last_date = df.Date[-1]
     projection = pd.pivot_table(df[(df.Date == last_date)], values=CUMULATED_AMOUNT_CCY, index=['Account'], 
-                   aggfunc=sum).sort_values(CUMULATED_AMOUNT_CCY, ascending=False).reset_index()
+                   aggfunc='sum').sort_values(CUMULATED_AMOUNT_CCY, ascending=False).reset_index()
 
     projection['Return'] = [__try_get(projection_data, acc, [0, 0, 0])[0] for acc in projection.Account]
     projection['Volatility'] = [__try_get(projection_data, acc, [0, 0, 0])[1] for acc in projection.Account]
@@ -368,7 +368,7 @@ def project(df, nb_years=11, projection_data={}):
     (w, w_low, w_up, w_low_ex, w_up_ex) = pj.project_full(projection, r, CUMULATED_AMOUNT_CCY)
 
     piv = pd.DataFrame(
-        pd.pivot_table(df, values=CUMULATED_AMOUNT_CCY, index=DATE, columns=[], aggfunc=sum).to_records())
+        pd.pivot_table(df, values=CUMULATED_AMOUNT_CCY, index=DATE, columns=[], aggfunc='sum').to_records())
 
     fig = go.Figure()
 
@@ -405,14 +405,14 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
 
     last_date = df.Date[-1]
     projection_1 = pd.pivot_table(df[(df.Date == last_date)], values=CUMULATED_AMOUNT_CCY, index=['Account'], 
-                   aggfunc=sum).sort_values(CUMULATED_AMOUNT_CCY, ascending=False).reset_index()
+                   aggfunc='sum').sort_values(CUMULATED_AMOUNT_CCY, ascending=False).reset_index()
     projection_1['Return'] = [__try_get(projection_data_1, acc, [0, 0, 0])[0] for acc in projection_1.Account]
     projection_1['Volatility'] = [__try_get(projection_data_1, acc, [0, 0, 0])[1] for acc in projection_1.Account]
     projection_1['Contribution'] = [__try_get(projection_data_1, acc, [0, 0, 0])[2] for acc in projection_1.Account]
 
 
     projection_2 = pd.pivot_table(df[(df.Date == last_date)], values=CUMULATED_AMOUNT_CCY, index=['Account'], 
-                   aggfunc=sum).sort_values(CUMULATED_AMOUNT_CCY, ascending=False).reset_index()
+                   aggfunc='sum').sort_values(CUMULATED_AMOUNT_CCY, ascending=False).reset_index()
     projection_2['Return'] = [__try_get(projection_data_2, acc, [0, 0, 0])[0] for acc in projection_2.Account]
     projection_2['Volatility'] = [__try_get(projection_data_2, acc, [0, 0, 0])[1] for acc in projection_2.Account]
     projection_2['Contribution'] = [__try_get(projection_data_2, acc, [0, 0, 0])[2] for acc in projection_2.Account]
@@ -423,7 +423,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
     (w2, w2_low, w2_up, w2_low_ex, w2_up_ex) = pj.project_full(projection_2, r, CUMULATED_AMOUNT_CCY)
 
     piv = pd.DataFrame(
-        pd.pivot_table(df, values=CUMULATED_AMOUNT_CCY, index=[DATE], columns=[], aggfunc=sum).to_records())
+        pd.pivot_table(df, values=CUMULATED_AMOUNT_CCY, index=[DATE], columns=[], aggfunc='sum').to_records())
 
     fig = go.Figure()
 
@@ -461,10 +461,10 @@ def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, nb_days: int = 36
         raise Exception(f"by must be in {['FullMasterType', 'FullSubType', 'FullType']}")
     if key is None:
         df = pd.pivot_table(df_exp[(df_exp.Date>df_exp.Date.max()-timedelta(nb_days)) & (df_exp['FullType'] != 'Intra-Account Transfert')], \
-                        index=['Date', by, label], values='AmountCcy', aggfunc=sum)
+                        index=['Date', by, label], values='AmountCcy', aggfunc='sum')
     else:
         df = pd.pivot_table(df_exp[(df_exp.Date>df_exp.Date.max()-timedelta(nb_days)) & (df_exp[by] == key) & (df_exp['FullType'] != 'Intra-Account Transfert')], \
-                            index=['Date', by, label], values='AmountCcy', aggfunc=sum)
+                            index=['Date', by, label], values='AmountCcy', aggfunc='sum')
     df = pd.DataFrame(df.to_records())
 
     df['Year'] = [d.year for d in df['Date']]
@@ -474,19 +474,37 @@ def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, nb_days: int = 36
     if len(df) == 0:
         raise Exception(f"No records found for {key}.")
 
-    df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', label], values='AmountCcy', aggfunc=sum).to_records())
+    df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', label], values='AmountCcy', aggfunc='sum').to_records())
     if len(exclude) > 0:
         df = df[[m not in exclude for m in df[label]]]
-    top_memos = list([s for s in pd.pivot_table(df, index=[label], values='AmountCcy', aggfunc=sum)\
+    top_memos = list([s for s in pd.pivot_table(df, index=[label], values='AmountCcy', aggfunc='sum')\
                       .sort_values(by='AmountCcy').head(show_count).index])
     if include_tail_memos:
-        low_memos = list([s for s in pd.pivot_table(df, index=[label], values='AmountCcy', aggfunc=sum)\
+        low_memos = list([s for s in pd.pivot_table(df, index=[label], values='AmountCcy', aggfunc='sum')\
                         .sort_values(by='AmountCcy').tail(show_count).index])
         top_memos = top_memos + low_memos
     
     df['Memo'] = [s[:max_char] if s in top_memos else 'Other' for s in df[label]]
 
-    df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', 'Memo'], values='AmountCcy', aggfunc=sum).to_records())\
+    df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', 'Memo'], values='AmountCcy', aggfunc='sum').to_records())\
     .sort_values(by='AmountCcy')
     df['AmountCcy'] = -1 * df['AmountCcy']
     return df
+
+def plot_spend_waterfall(df_trans):
+    from bkanalysis.ui.charts.waterfall import plot_waterfall
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+
+    df_m = df_trans[['Date', 'Account', 'Amount', 'Subcategory', 'Memo', 'Currency', 'MemoSimple', 
+                    'MemoMapped', 'FullType', 'FullSubType', 'FullMasterType', 'SourceFile']]
+
+    df_waterfall = df_m[(df_m.Date > datetime.now()- relativedelta(months=12))\
+                                    & (df_trans.Type != 'IAT')\
+                                    & (df_trans.FullSubType != 'UBS Bonus')\
+                                    & (df_trans.FullSubType != 'UBS Pension')\
+                                    & (df_trans.FullSubType != 'Interest Earnings')\
+                                    & (df_trans.FullType != 'Cash-Back')]
+    inflows = pd.pivot_table(df_waterfall,
+                            index= 'FullType', values='Amount', aggfunc=sum)['Amount'].sort_values(ascending=False)
+    return plot_waterfall(inflows, "Income/Spending Summary 2023")

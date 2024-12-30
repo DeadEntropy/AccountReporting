@@ -33,7 +33,6 @@ def load(path_in, config, sep=',', *args):
                      zip(df.Quantity, df['Amount ($)'], df_out.Currency)]
     df_out.Memo = df.Action
     df_out.Subcategory = df['Security Description']
-    df_out['AccountType'] = config['account_type']
 
     # Fidelity doesnt give the outflows from the cash_account, so we need to manually add them
     df_cash_account = df[~df.Symbol.str.isspace()]
@@ -46,6 +45,7 @@ def load(path_in, config, sep=',', *args):
     df_cash_out.Subcategory = df_cash_account['Security Description']
 
     df_out = pd.concat([df_out, df_cash_out]).sort_values('Date', ascending=False).reset_index(drop=True)
+    df_out['AccountType'] = config['account_type']
 
     return df_out
 
