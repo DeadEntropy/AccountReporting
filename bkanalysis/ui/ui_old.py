@@ -34,7 +34,7 @@ def get_reimbursement(df, date_range=None, values='Amount'):
 
 def get_expenses(df, date_range=None, values='Amount', inc_reimbursement=False):
     if date_range is not None:
-        df = df[(df.Date > date_range[0]) & (df.Date < date_range[1])]
+        df = df[(df.Date >= date_range[0]) & (df.Date <= date_range[1])]
         if len(df) == 0:
             raise Exception(f'df is empty, check that date_range is correct.')
     else:

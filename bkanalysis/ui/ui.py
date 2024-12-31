@@ -465,7 +465,7 @@ def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, date_range=None, 
         df_exp_date = df_exp[(df_exp.Date>df_exp.Date.max()-timedelta(nb_days))]
     else:
         if len(date_range) == 2:
-            df_exp_date = df_exp[(df_exp.Date > date_range[0]) & (df_exp.Date < date_range[1])]
+            df_exp_date = df_exp[(df_exp.Date >= date_range[0]) & (df_exp.Date <= date_range[1])]
         else:
             raise Exception(f'date_range is not set to a correct value ({date_range}). Expected None or String.')
 
@@ -501,25 +501,31 @@ def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, date_range=None, 
     df[AMOUNT_CCY] = -1 * df[AMOUNT_CCY]
     return df
 
-def plot_spend_waterfall(df_trans):
+def plot_spend_waterfall(df_exp, date_range, exclude_fulltypes = ['Intra-Account Transfert'], exclude_subtypes=[], salary_override=None, inc_title=False):
     from bkanalysis.ui.charts.waterfall import plot_waterfall
-    from datetime import datetime
-    from dateutil.relativedelta import relativedelta
 
-    df_m = df_trans[['Date', 'Account', 'Amount', 'Subcategory', 'Memo', 'Currency', 'MemoSimple', 
-                    'MemoMapped', 'FullType', 'FullSubType', 'FullMasterType', 'SourceFile']]
+    df_exp_filter = df_exp[(~df_exp.FullSubType.isin(exclude_subtypes))\
+                        & (~df_exp.FullType.isin(exclude_fulltypes))\
+                        & (df_exp.Date >= date_range[0]) \
+                        & (df_exp.Date <= date_range[1])]
 
-    df_waterfall = df_m[(df_m.Date > datetime.now()- relativedelta(months=12))\
-                                    & (df_trans.Type != 'IAT')\
-                                    & (df_trans.FullSubType != 'UBS Bonus')\
-                                    & (df_trans.FullSubType != 'UBS Pension')\
-                                    & (df_trans.FullSubType != 'Interest Earnings')\
-                                    & (df_trans.FullType != 'Cash-Back')]
-    inflows = pd.pivot_table(df_waterfall,
-                            index= 'FullType', values='Amount', aggfunc=sum)['Amount'].sort_values(ascending=False)
-    return plot_waterfall(inflows, "Income/Spending Summary 2023")
+
+    categorised_flows = pd.pivot_table(df_exp_filter, index='FullType', values='AmountCcy', aggfunc=sum)['AmountCcy']
+    categorised_flows.loc['Pension'] = df_exp_filter[df_exp_filter.FullSubType == 'UBS Pension'].AmountCcy.sum()
+    if salary_override is not None:
+        categorised_flows.loc['Salary'] = salary_override.actual_salary
+
+    threshold = 2000
+    small_flows = categorised_flows[(categorised_flows > -threshold) & (categorised_flows < threshold) & (categorised_flows.index != 'Others')].sum() + categorised_flows.loc['Others']
+    categorised_flows = categorised_flows[(categorised_flows < -threshold) | (categorised_flows > threshold) | (categorised_flows.index == 'Others')]
+    categorised_flows.loc['Others'] = small_flows
+
+    categorised_flows = categorised_flows.sort_values(ascending=False)
+    
+    return plot_waterfall(categorised_flows, f"Income/Spending Summary {date_range[0]:%b-%y} to {date_range[1]:%b-%y}" if False else None)
 
 def plot_category_breakdown(df_exp:pd.DataFrame, by: str, key: str, label: str, date_range: list = None, nb_days: int = None, show_count: int = 5, exclude: list = [], max_char: int = 12, include_tail_memos: bool = False):
     df_temp = get_by(df_exp, by, key, label, date_range, nb_days, show_count, exclude, max_char, include_tail_memos)
     fig_category_brkdn = px.bar(df_temp, x="Month", y=AMOUNT_CCY, color="Memo", text="Memo")
     fig_category_brkdn.update_layout(title=f"{key} Spending")
+    return fig_category_brkdn

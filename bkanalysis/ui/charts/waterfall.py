@@ -14,8 +14,12 @@ def plot_waterfall(data: pd.Series, title: str):
         connector = {"line":{"color":"rgb(63, 63, 63)"}},
     ))
 
+    if title is not None:
+        fig.update_layout(
+                title = title,
+        )
+
     fig.update_layout(
-            title = title,
             showlegend = True,
             margin=dict(t=50)
     )
