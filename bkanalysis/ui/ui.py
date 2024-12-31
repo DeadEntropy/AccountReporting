@@ -7,7 +7,7 @@ import logging
 import plotly.graph_objects as go
 from datetime import timedelta
 import collections
-
+import plotly.express as px
 
 from bkanalysis.process import process, status
 from bkanalysis.transforms import master_transform
@@ -249,7 +249,7 @@ def get_annotations(df, top_items_count = 10):
     
     return annotation_data
 
-def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY, top_items_count = 0):
+def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY, top_items_count = 0, rename=None):
     if isinstance(by, str):
         values, labels = _get_plot_data(df, date_range, by)
         fig = go.Figure(data=go.Scatter(x=values.index, y=values.values, hovertext=labels))
@@ -257,7 +257,7 @@ def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY, top_items_count = 
         fig = go.Figure()
         for b in by:
             values, labels = _get_plot_data(df, date_range, b)
-            fig.add_trace(go.Scatter(x=values.index, y=values.values, hovertext=labels, name=b))
+            fig.add_trace(go.Scatter(x=values.index, y=values.values, hovertext=labels, name=b if (rename is None or b not in rename) else rename[b]))
     else:
         raise Exception(f'by should be either a float or a list')
 
@@ -271,7 +271,8 @@ def plot_wealth(df, date_range=None, by=CUMULATED_AMOUNT_CCY, top_items_count = 
     fig.update_layout(
         title="Total Wealth",
         xaxis_title="Date",
-        yaxis_title="Currency")
+        yaxis_title="Currency",
+        margin=dict(t=50))
     
     i = 0
     for annotation_date in collections.OrderedDict(sorted(annotations.items())):
@@ -456,15 +457,24 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
 
     return fig
 
-def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, nb_days: int = 365, show_count: int = 5, exclude: list = [], max_char: int = 12, include_tail_memos: bool = False):
+def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, date_range=None, nb_days: int = 365, show_count: int = 5, exclude: list = [], max_char: int = 12, include_tail_memos: bool = False):
     if by not in ['FullMasterType', 'FullSubType', 'FullType']:
         raise Exception(f"by must be in {['FullMasterType', 'FullSubType', 'FullType']}")
-    if key is None:
-        df = pd.pivot_table(df_exp[(df_exp.Date>df_exp.Date.max()-timedelta(nb_days)) & (df_exp['FullType'] != 'Intra-Account Transfert')], \
-                        index=['Date', by, label], values='AmountCcy', aggfunc='sum')
+    
+    if date_range is None:
+        df_exp_date = df_exp[(df_exp.Date>df_exp.Date.max()-timedelta(nb_days))]
     else:
-        df = pd.pivot_table(df_exp[(df_exp.Date>df_exp.Date.max()-timedelta(nb_days)) & (df_exp[by] == key) & (df_exp['FullType'] != 'Intra-Account Transfert')], \
-                            index=['Date', by, label], values='AmountCcy', aggfunc='sum')
+        if len(date_range) == 2:
+            df_exp_date = df_exp[(df_exp.Date > date_range[0]) & (df_exp.Date < date_range[1])]
+        else:
+            raise Exception(f'date_range is not set to a correct value ({date_range}). Expected None or String.')
+
+    if key is None:
+        df = pd.pivot_table(df_exp_date[(df_exp_date['FullType'] != 'Intra-Account Transfert')], \
+                        index=['Date', by, label], values=AMOUNT_CCY, aggfunc='sum')
+    else:
+        df = pd.pivot_table(df_exp_date[(df_exp_date[by] == key) & (df_exp_date['FullType'] != 'Intra-Account Transfert')], \
+                            index=['Date', by, label], values=AMOUNT_CCY, aggfunc='sum')
     df = pd.DataFrame(df.to_records())
 
     df['Year'] = [d.year for d in df['Date']]
@@ -474,21 +484,21 @@ def get_by(df_exp:pd.DataFrame, by: str, key: str, label: str, nb_days: int = 36
     if len(df) == 0:
         raise Exception(f"No records found for {key}.")
 
-    df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', label], values='AmountCcy', aggfunc='sum').to_records())
+    df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', label], values=AMOUNT_CCY, aggfunc='sum').to_records())
     if len(exclude) > 0:
         df = df[[m not in exclude for m in df[label]]]
-    top_memos = list([s for s in pd.pivot_table(df, index=[label], values='AmountCcy', aggfunc='sum')\
-                      .sort_values(by='AmountCcy').head(show_count).index])
+    top_memos = list([s for s in pd.pivot_table(df, index=[label], values=AMOUNT_CCY, aggfunc='sum')\
+                      .sort_values(by=AMOUNT_CCY).head(show_count).index])
     if include_tail_memos:
-        low_memos = list([s for s in pd.pivot_table(df, index=[label], values='AmountCcy', aggfunc='sum')\
-                        .sort_values(by='AmountCcy').tail(show_count).index])
+        low_memos = list([s for s in pd.pivot_table(df, index=[label], values=AMOUNT_CCY, aggfunc='sum')\
+                        .sort_values(by=AMOUNT_CCY).tail(show_count).index])
         top_memos = top_memos + low_memos
     
     df['Memo'] = [s[:max_char] if s in top_memos else 'Other' for s in df[label]]
 
-    df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', 'Memo'], values='AmountCcy', aggfunc='sum').to_records())\
-    .sort_values(by='AmountCcy')
-    df['AmountCcy'] = -1 * df['AmountCcy']
+    df = pd.DataFrame(pd.pivot_table(df, index=['Year', 'Month', 'Memo'], values=AMOUNT_CCY, aggfunc='sum').to_records())\
+    .sort_values(by=AMOUNT_CCY)
+    df[AMOUNT_CCY] = -1 * df[AMOUNT_CCY]
     return df
 
 def plot_spend_waterfall(df_trans):
@@ -508,3 +518,8 @@ def plot_spend_waterfall(df_trans):
     inflows = pd.pivot_table(df_waterfall,
                             index= 'FullType', values='Amount', aggfunc=sum)['Amount'].sort_values(ascending=False)
     return plot_waterfall(inflows, "Income/Spending Summary 2023")
+
+def plot_category_breakdown(df_exp:pd.DataFrame, by: str, key: str, label: str, date_range: list = None, nb_days: int = None, show_count: int = 5, exclude: list = [], max_char: int = 12, include_tail_memos: bool = False):
+    df_temp = get_by(df_exp, by, key, label, date_range, nb_days, show_count, exclude, max_char, include_tail_memos)
+    fig_category_brkdn = px.bar(df_temp, x="Month", y=AMOUNT_CCY, color="Memo", text="Memo")
+    fig_category_brkdn.update_layout(title=f"{key} Spending")
