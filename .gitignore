@@ -6,7 +6,7 @@ env
 notebooks/config
 notebooks/.ipynb_checkpoints
 bkanalysis/ui/assets
-bkanalysis/ui/__init__.py
 .venv
 tests/run.py
 .vscode
+bkanalysis.egg-info
