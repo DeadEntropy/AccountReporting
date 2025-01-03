@@ -20,7 +20,7 @@ def plot_waterfall(data: pd.Series, title: str):
         )
 
     fig.update_layout(
-            showlegend = True,
+            showlegend = False,
             margin=dict(t=50)
     )
 
