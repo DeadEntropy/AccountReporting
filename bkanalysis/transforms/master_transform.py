@@ -76,9 +76,7 @@ class Loader:
 
     def load_multi_thread(self, files):
         with ThreadPoolExecutor() as executor:
-            futures = {
-                executor.submit(self.load_internal, file): file for file in files
-            }
+            futures = {executor.submit(self.load_internal, file): file for file in files}
             results = []
             for future in as_completed(futures):
                 file = futures[future]
@@ -148,119 +146,57 @@ class Loader:
         # print(f'Loading {file}')
         if "Barclays" in self.config and barc.can_handle(file, self.config["Barclays"]):
             return barc.load(file, self.config["Barclays"])
-        elif "LloydsCurrent" in self.config and lloyds_curr.can_handle(
-            file, self.config["LloydsCurrent"]
-        ):
+        elif "LloydsCurrent" in self.config and lloyds_curr.can_handle(file, self.config["LloydsCurrent"]):
             return lloyds_curr.load(file, self.config["LloydsCurrent"])
-        elif "LloydsMortgage" in self.config and lloyds_mort.can_handle(
-            file, self.config["LloydsMortgage"]
-        ):
+        elif "LloydsMortgage" in self.config and lloyds_mort.can_handle(file, self.config["LloydsMortgage"]):
             return lloyds_mort.load(file, self.config["LloydsMortgage"])
         # elif 'Nutmeg' in self.config and nut_transform.can_handle(file, self.config['Nutmeg']):
         #    return nut_transform.load(file, self.config['Nutmeg'], self.market, ref_currency)
-        elif "Revolut" in self.config and rev_transform.can_handle(
-            file, self.config["Revolut"], ";"
-        ):
+        elif "Revolut" in self.config and rev_transform.can_handle(file, self.config["Revolut"], ";"):
             return rev_transform.load(file, self.config["Revolut"], ";")
-        elif "Revolut" in self.config and rev_transform.can_handle(
-            file, self.config["Revolut"], ","
-        ):
+        elif "Revolut" in self.config and rev_transform.can_handle(file, self.config["Revolut"], ","):
             return rev_transform.load(file, self.config["Revolut"], ",")
-        elif "Revolut2" in self.config and rev_transform_2.can_handle(
-            file, self.config["Revolut2"], ","
-        ):
+        elif "Revolut2" in self.config and rev_transform_2.can_handle(file, self.config["Revolut2"], ","):
             return rev_transform_2.load(file, self.config["Revolut2"], ",")
-        elif "Citi" in self.config and citi_transform.can_handle(
-            file, self.config["Citi"]
-        ):
+        elif "Citi" in self.config and citi_transform.can_handle(file, self.config["Citi"]):
             return citi_transform.load(file, self.config["Citi"])
         elif clone_transform.can_handle(file):
             return clone_transform.load(file)
-        elif "UbsPension" in self.config and ubs_pension_transform.can_handle(
-            file, self.config["UbsPension"]
-        ):
-            return ubs_pension_transform.load(
-                file, self.config["UbsPension"], self.market, ref_currency
-            )
-        elif "UbsUsPension" in self.config and ubs_us_pension_transform.can_handle(
-            file, self.config["UbsUsPension"]
-        ):
-            return ubs_us_pension_transform.load(
-                file, self.config["UbsUsPension"], None, ref_currency
-            )
-        elif "Vault" in self.config and vault_transform.can_handle(
-            file, self.config["Vault"]
-        ):
+        elif "UbsPension" in self.config and ubs_pension_transform.can_handle(file, self.config["UbsPension"]):
+            return ubs_pension_transform.load(file, self.config["UbsPension"], self.market, ref_currency)
+        elif "UbsUsPension" in self.config and ubs_us_pension_transform.can_handle(file, self.config["UbsUsPension"]):
+            return ubs_us_pension_transform.load(file, self.config["UbsUsPension"], None, ref_currency)
+        elif "Vault" in self.config and vault_transform.can_handle(file, self.config["Vault"]):
             return vault_transform.load(file, self.config["Vault"])
-        elif "CoinbasePro" in self.config and coinbase_pro_transform.can_handle(
-            file, self.config["CoinbasePro"]
-        ):
+        elif "CoinbasePro" in self.config and coinbase_pro_transform.can_handle(file, self.config["CoinbasePro"]):
             return coinbase_pro_transform.load(file, self.config["CoinbasePro"])
-        elif "Coinbase" in self.config and coinbase_transform.can_handle(
-            file, self.config["Coinbase"]
-        ):
+        elif "Coinbase" in self.config and coinbase_transform.can_handle(file, self.config["Coinbase"]):
             return coinbase_transform.load(file, self.config["Coinbase"])
-        elif "BnpStocks" in self.config and bnp_stock_transform.can_handle(
-            file, self.config["BnpStocks"]
-        ):
+        elif "BnpStocks" in self.config and bnp_stock_transform.can_handle(file, self.config["BnpStocks"]):
             return bnp_stock_transform.load(file, self.config["BnpStocks"])
-        elif "BnpCash" in self.config and bnp_cash_transform.can_handle(
-            file, self.config["BnpCash"]
-        ):
+        elif "BnpCash" in self.config and bnp_cash_transform.can_handle(file, self.config["BnpCash"]):
             return bnp_cash_transform.load(file, self.config["BnpCash"])
-        elif "Chase" in self.config and chase_transform.can_handle(
-            file, self.config["Chase"]
-        ):
+        elif "Chase" in self.config and chase_transform.can_handle(file, self.config["Chase"]):
             return chase_transform.load(file, self.config["Chase"])
-        elif "ChaseBusiness" in self.config and chasebusiness_transform.can_handle(
-            file, self.config["ChaseBusiness"]
-        ):
+        elif "ChaseBusiness" in self.config and chasebusiness_transform.can_handle(file, self.config["ChaseBusiness"]):
             return chasebusiness_transform.load(file, self.config["ChaseBusiness"])
-        elif "Fidelity" in self.config and fidelity_transform.can_handle(
-            file, self.config["Fidelity"]
-        ):
+        elif "Fidelity" in self.config and fidelity_transform.can_handle(file, self.config["Fidelity"]):
             return fidelity_transform.load(file, self.config["Fidelity"])
-        elif "Discover" in self.config and discover_transform.can_handle(
-            file, self.config["Discover"]
-        ):
+        elif "Discover" in self.config and discover_transform.can_handle(file, self.config["Discover"]):
             return discover_transform.load(file, self.config["Discover"])
-        elif "Marcus" in self.config and marcus_transform.can_handle(
-            file, self.config["Marcus"]
-        ):
+        elif "Marcus" in self.config and marcus_transform.can_handle(file, self.config["Marcus"]):
             return marcus_transform.load(file, self.config["Marcus"])
-        elif "DiscoverCredit" in self.config and discover_credit_transform.can_handle(
-            file, self.config["DiscoverCredit"]
-        ):
+        elif "DiscoverCredit" in self.config and discover_credit_transform.can_handle(file, self.config["DiscoverCredit"]):
             return discover_credit_transform.load(file, self.config["DiscoverCredit"])
-        elif "CapitalOne" in self.config and capital_one_transform.can_handle(
-            file, self.config["CapitalOne"]
-        ):
+        elif "CapitalOne" in self.config and capital_one_transform.can_handle(file, self.config["CapitalOne"]):
             return capital_one_transform.load(file, self.config["CapitalOne"])
-        elif "FirstRepublic" in self.config and first_republic_transform.can_handle(
-            file, self.config["FirstRepublic"]
-        ):
+        elif "FirstRepublic" in self.config and first_republic_transform.can_handle(file, self.config["FirstRepublic"]):
             return first_republic_transform.load(file, self.config["FirstRepublic"])
-        elif (
-            "FirstRepublicMortgage" in self.config
-            and first_republic_mtg_transform.can_handle(
-                file, self.config["FirstRepublicMortgage"]
-            )
-        ):
-            return first_republic_mtg_transform.load(
-                file, self.config["FirstRepublicMortgage"]
-            )
-        elif (
-            "NutmegInvestment" in self.config
-            and nutmeg_transaction_transform.can_handle(
-                file, self.config["NutmegInvestment"]
-            )
-        ):
-            return nutmeg_transaction_transform.load(
-                file, self.config["NutmegInvestment"]
-            )
-        elif "UbsWealthManagement" in self.config and ubs_wm_transform.can_handle(
-            file, self.config["UbsWealthManagement"]
-        ):
+        elif "FirstRepublicMortgage" in self.config and first_republic_mtg_transform.can_handle(file, self.config["FirstRepublicMortgage"]):
+            return first_republic_mtg_transform.load(file, self.config["FirstRepublicMortgage"])
+        elif "NutmegInvestment" in self.config and nutmeg_transaction_transform.can_handle(file, self.config["NutmegInvestment"]):
+            return nutmeg_transaction_transform.load(file, self.config["NutmegInvestment"])
+        elif "UbsWealthManagement" in self.config and ubs_wm_transform.can_handle(file, self.config["UbsWealthManagement"]):
             return ubs_wm_transform.load(file, self.config["UbsWealthManagement"])
         elif mortgage_script_transform.can_handle(file, None):
             return mortgage_script_transform.load(file, None)
@@ -293,9 +229,7 @@ class Loader:
         else:
             json_files = []
 
-        print(
-            f"Loading {len(csv_files)} CSV file(s), {len(xls_files)} XLS file(s), and {len(json_files)} JSON file(s)."
-        )
+        print(f"Loading {len(csv_files)} CSV file(s), {len(xls_files)} XLS file(s), and {len(json_files)} JSON file(s).")
         return csv_files + xls_files + json_files
 
     def load_all(self, include_xls=True, include_json=True):
@@ -319,11 +253,7 @@ class Loader:
             for df_temp in df_list:
                 df_temp["count"] = df_temp.groupby(sd.target_columns).cumcount()
             df = pd.concat(df_list)
-            df = (
-                df.drop_duplicates()
-                .drop(["count"], axis=1)
-                .sort_values(["Date", "Account"], ascending=False)
-            )
+            df = df.drop_duplicates().drop(["count"], axis=1).sort_values(["Date", "Account"], ascending=False)
         else:
             df = self.load_multi_thread(files)
         df.Date = pd.to_datetime(df.Date)

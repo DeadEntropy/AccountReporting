@@ -13,9 +13,9 @@ class TestProcess(unittest.TestCase):
 
         pr = process.Process(ch.get_config())
         df = pr.extend(df_raw)
-        self.assertTrue(len(df) > 0, 'empty DataFrame loaded')
-        self.assertEqual(df.drop('Week', axis=1).isnull().sum().sum(), 0, 'Loaded DataFrame contains NaN.')
+        self.assertTrue(len(df) > 0, "empty DataFrame loaded")
+        self.assertEqual(df.drop("Week", axis=1).isnull().sum().sum(), 0, "Loaded DataFrame contains NaN.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

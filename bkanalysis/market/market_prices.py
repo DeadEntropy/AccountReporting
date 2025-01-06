@@ -25,9 +25,7 @@ __crypto_staking_map = {"ETH2": "ETH"}
 def get_symbol(instr, currency):
     if instr is None:
         return None
-    elif (len(instr) == 3 or len(instr) == 4) and (
-        instr in __currencies or instr in __crypto
-    ):  # its a currency/crypto
+    elif (len(instr) == 3 or len(instr) == 4) and (instr in __currencies or instr in __crypto):  # its a currency/crypto
         if instr in __crypto:
             if instr in __crypto_staking_map:
                 return f"{__crypto_staking_map[instr]}-{currency}"
@@ -45,9 +43,7 @@ def get_spot_price(instr, currency):
         return None
     if instr == currency:
         return 1.0
-    elif (len(instr) == 3) and (
-        instr in __currencies or instr in __crypto
-    ):  # its a currency/crypto
+    elif (len(instr) == 3) and (instr in __currencies or instr in __crypto):  # its a currency/crypto
         if instr in __crypto:
             symbol = f"{instr}-{currency}"
         else:
@@ -107,21 +103,13 @@ def get_symbol_from_isin(isin):
     r = requests.get(__query_yahoo_url_search, params=params, headers=headers)
     sleep(0.05)
 
-    assert (
-        r.status_code == 200
-    ), f"Yahoo Request Failed for {isin}. Status code: {r.status_code}"
+    assert r.status_code == 200, f"Yahoo Request Failed for {isin}. Status code: {r.status_code}"
 
     data = r.json()
 
-    assert (
-        "quotes" in data
-    ), f"Yahoo request for {isin} didnt return a quotes. (status_code: {r.status_code})"
-    assert (
-        len(data["quotes"]) > 0
-    ), f"Yahoo request for {isin} didnt return a quotes. (status_code: {r.status_code})"
-    assert (
-        "symbol" in data["quotes"][0]
-    ), f"Yahoo request for {isin} didnt return a symbol. (status_code: {r.status_code})"
+    assert "quotes" in data, f"Yahoo request for {isin} didnt return a quotes. (status_code: {r.status_code})"
+    assert len(data["quotes"]) > 0, f"Yahoo request for {isin} didnt return a quotes. (status_code: {r.status_code})"
+    assert "symbol" in data["quotes"][0], f"Yahoo request for {isin} didnt return a symbol. (status_code: {r.status_code})"
 
     return data["quotes"][0]["symbol"]
 
@@ -155,11 +143,7 @@ __isin_map = {"FR0014000RC4": "FR0000120321"}
 def get_with_isin_map(isin):
     if isin == "CASH":
         return None
-    return (
-        get_symbol_from_isin(__isin_map[isin])
-        if isin in __isin_map
-        else get_symbol_from_isin(isin)
-    )
+    return get_symbol_from_isin(__isin_map[isin]) if isin in __isin_map else get_symbol_from_isin(isin)
 
 
 def __get_ticker(symbol):

@@ -8,7 +8,7 @@ class CacheDict:
 
         if os.path.exists(self.__path):
             try:
-                with open(self.__path, 'r') as json_file:
+                with open(self.__path, "r") as json_file:
                     self.__cache = json.load(json_file)
             except TypeError:
                 raise TypeError(f"Failed to deserialise jSon file '{self.__path}' {json_file}")
@@ -18,7 +18,7 @@ class CacheDict:
     def __update(self, key, value):
         self.__cache[key] = value
 
-        with open(self.__path, 'w') as outfile:
+        with open(self.__path, "w") as outfile:
             json.dump(self.__cache, outfile, indent=2)
 
     def get(self, key, func):

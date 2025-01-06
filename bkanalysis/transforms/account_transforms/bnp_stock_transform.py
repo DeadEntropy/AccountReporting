@@ -9,11 +9,11 @@ from bkanalysis.config import config_helper as ch
 
 
 def __remove_accents(s):
-    return ''.join(' ' if e == "'" else (e if (e.isalnum() or e == ' ') else 'e') for e in s)
+    return "".join(" " if e == "'" else (e if (e.isalnum() or e == " ") else "e") for e in s)
 
 
 def can_handle(path_in, config, *args):
-    if not path_in.endswith('csv'):
+    if not path_in.endswith("csv"):
         return False
 
     try:
@@ -21,45 +21,46 @@ def can_handle(path_in, config, *args):
     except Exception:
         return False
 
-    expected_columns = parse_list(config['expected_columns'], False)
+    expected_columns = parse_list(config["expected_columns"], False)
 
     return set(df.columns) == set(expected_columns)
 
 
 def load(path_in, config, *args):
     df = pd.read_csv(path_in)
-    expected_columns = parse_list(config['expected_columns'], False)
+    expected_columns = parse_list(config["expected_columns"], False)
 
-    assert set(df.columns) == set(expected_columns), \
-        f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (BNP Stock)'
+    assert set(df.columns) == set(
+        expected_columns
+    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (BNP Stock)'
 
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Date"], dayfirst=True)
-    df_out.Account = config['account_name']
+    df_out.Account = config["account_name"]
     df_out.Currency = df["ISIN"]
     df_out.Amount = df["Quantite"]
     df_out.Subcategory = df["Statut"]
-    df_out.Memo = [f"BUY: {l}" if q>0 else f"SALE: {l}" for (q, l) in zip(df["Quantite"], df["Libelle"])]
-    df_out['AccountType'] = config['account_type']
+    df_out.Memo = [f"BUY: {l}" if q > 0 else f"SALE: {l}" for (q, l) in zip(df["Quantite"], df["Libelle"])]
+    df_out["AccountType"] = config["account_type"]
 
     return df_out
 
 
 def load_save(config):
-    files = glob.glob(os.path.join(config['folder_in'], '*.csv'))
+    files = glob.glob(os.path.join(config["folder_in"], "*.csv"))
     print(f"found {len(files)} CSV files in {config['folder_in']}.")
     if len(files) == 0:
         return
 
     df_list = [load(f, config) for f in files]
     for df_temp in df_list:
-        df_temp['count'] = df_temp.groupby(sd.target_columns).cumcount()
+        df_temp["count"] = df_temp.groupby(sd.target_columns).cumcount()
     df = pd.concat(df_list)
-    df.drop_duplicates().drop(['count'], axis=1).sort_values('Date', ascending=False).to_csv(config['path_out'], index=False)
+    df.drop_duplicates().drop(["count"], axis=1).sort_values("Date", ascending=False).to_csv(config["path_out"], index=False)
 
 
 def load_save_default():
     config = configparser.ConfigParser()
     config.read(ch.source)
 
-    load_save(config['Coinbase'])
+    load_save(config["Coinbase"])

@@ -331,9 +331,6 @@ overgeneral-exceptions=builtins.BaseException,builtins.Exception
 # Expected format of line ending, e.g. empty (any line ending), LF or CRLF.
 expected-line-ending-format=
 
-# Regexp for a line that is allowed to be longer than the limit.
-ignore-long-lines=^\s*(# )?<?https?://\S+>?$
-
 # Number of spaces of indent required inside a hanging or continued line.
 indent-after-paren=4
 
@@ -342,7 +339,7 @@ indent-after-paren=4
 indent-string='    '
 
 # Maximum number of characters on a single line.
-max-line-length=180
+max-line-length=140
 
 # Maximum number of lines in a module.
 max-module-lines=1000

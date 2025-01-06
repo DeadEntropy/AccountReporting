@@ -25,13 +25,9 @@ class Process:
         except Exception:
             print(f"Could not find mapping file in: {ch.get_path(config, path, root)}.")
             try:
-                pd.DataFrame(columns=default_columns).to_csv(
-                    ch.get_path(config, path, root), index=False
-                )
+                pd.DataFrame(columns=default_columns).to_csv(ch.get_path(config, path, root), index=False)
             except Exception as e:
-                raise Exception(
-                    f"Couldnt access {os.path.abspath(ch.get_path(config, path))}"
-                ) from e
+                raise Exception(f"Couldnt access {os.path.abspath(ch.get_path(config, path))}") from e
             return pd.DataFrame(columns=default_columns)
 
     @staticmethod
@@ -90,15 +86,9 @@ class Process:
     def __del__(self):
         self.__save_to_csv(self.config["Mapping"], self.map_simple, "path_map")
         self.__save_to_csv(self.config["Mapping"], self.map_main, "path_map_type")
-        self.__save_to_csv(
-            self.config["Mapping"], self.map_full_type, "path_map_full_type"
-        )
-        self.__save_to_csv(
-            self.config["Mapping"], self.map_full_subtype, "path_map_full_subtype"
-        )
-        self.__save_to_csv(
-            self.config["Mapping"], self.map_master, "path_map_full_master_type"
-        )
+        self.__save_to_csv(self.config["Mapping"], self.map_full_type, "path_map_full_type")
+        self.__save_to_csv(self.config["Mapping"], self.map_full_subtype, "path_map_full_subtype")
+        self.__save_to_csv(self.config["Mapping"], self.map_master, "path_map_full_master_type")
 
     @staticmethod
     def _mapping(memo, mapping):
@@ -108,23 +98,15 @@ class Process:
             return get_missing_map(memo, mapping)
 
     def map_memo(self, memo_series):
-        self.map_simple["Memo Mapped"] = (
-            self.map_simple["Memo Mapped"].str.strip().str.upper()
-        )
-        self.map_simple["Memo Simple"] = (
-            self.map_simple["Memo Simple"].str.strip().str.upper()
-        )
+        self.map_simple["Memo Mapped"] = self.map_simple["Memo Mapped"].str.strip().str.upper()
+        self.map_simple["Memo Simple"] = self.map_simple["Memo Simple"].str.strip().str.upper()
 
-        mapping = pd.Series(
-            self.map_simple["Memo Mapped"].values, index=self.map_simple["Memo Simple"]
-        ).to_dict()
+        mapping = pd.Series(self.map_simple["Memo Mapped"].values, index=self.map_simple["Memo Simple"]).to_dict()
 
         memo_series_upper = memo_series.str.upper()
         memo_mapped = memo_series_upper.map(lambda x: Process._mapping(x, mapping))
 
-        self.map_simple = pd.DataFrame(
-            mapping.items(), columns=["Memo Simple", "Memo Mapped"]
-        )
+        self.map_simple = pd.DataFrame(mapping.items(), columns=["Memo Simple", "Memo Mapped"])
         return memo_mapped
 
     @staticmethod
@@ -147,37 +129,21 @@ class Process:
                 else:
                     return master_type, "N/A"
             except AttributeError as e:
-                raise AttributeError(
-                    f"failed on: {type} {master_type_mapping[type]}", e
-                ) from e
+                raise AttributeError(f"failed on: {type} {master_type_mapping[type]}", e) from e
         else:
             return "N/A", "N/A"
 
     def map_type(self, memo_series):
-        self.map_main["Memo Mapped"] = (
-            self.map_main["Memo Mapped"].fillna("").str.strip().str.upper()
-        )
+        self.map_main["Memo Mapped"] = self.map_main["Memo Mapped"].fillna("").str.strip().str.upper()
         self.map_main["Type"] = self.map_main["Type"].fillna("").str.strip().str.upper()
-        self.map_main["SubType"] = (
-            self.map_main["SubType"].fillna("").str.strip().str.upper()
-        )
+        self.map_main["SubType"] = self.map_main["SubType"].fillna("").str.strip().str.upper()
 
-        self.map_full_type["MasterType"] = (
-            self.map_full_type["MasterType"].fillna("").str.strip()
-        )
+        self.map_full_type["MasterType"] = self.map_full_type["MasterType"].fillna("").str.strip()
 
-        mapping_a = pd.Series(
-            self.map_main["Type"].values, index=self.map_main["Memo Mapped"]
-        ).to_dict()
-        mapping_b = pd.Series(
-            self.map_main["SubType"].values, index=self.map_main["Memo Mapped"]
-        ).to_dict()
-        type_mapping = pd.Series(
-            self.map_full_type["FullType"].values, index=self.map_full_type["Type"]
-        ).to_dict()
-        master_type_mapping = pd.Series(
-            self.map_full_type["MasterType"].values, index=self.map_full_type["Type"]
-        ).to_dict()
+        mapping_a = pd.Series(self.map_main["Type"].values, index=self.map_main["Memo Mapped"]).to_dict()
+        mapping_b = pd.Series(self.map_main["SubType"].values, index=self.map_main["Memo Mapped"]).to_dict()
+        type_mapping = pd.Series(self.map_full_type["FullType"].values, index=self.map_full_type["Type"]).to_dict()
+        master_type_mapping = pd.Series(self.map_full_type["MasterType"].values, index=self.map_full_type["Type"]).to_dict()
         subtype_mapping = pd.Series(
             self.map_full_subtype["FullSubType"].values,
             index=self.map_full_subtype["SubType"],
@@ -207,17 +173,11 @@ class Process:
                     subtype.append(mapping_b[memo].strip())
 
                     full_type.append(self.get_full_type(mapping_a[memo], type_mapping))
-                    full_subtype.append(
-                        self.get_full_type(mapping_b[memo], subtype_mapping)
-                    )
+                    full_subtype.append(self.get_full_type(mapping_b[memo], subtype_mapping))
                 except AttributeError as e:
-                    raise AttributeError(
-                        f"failed on: {memo} {mapping_a[memo]} {mapping_b[memo]}", e
-                    ) from e
+                    raise AttributeError(f"failed on: {memo} {mapping_a[memo]} {mapping_b[memo]}", e) from e
 
-                m, full_m = self.get_master_type(
-                    mapping_a[memo], master_type_mapping, full_master_type_mapping
-                )
+                m, full_m = self.get_master_type(mapping_a[memo], master_type_mapping, full_master_type_mapping)
                 master_type.append(m)
                 full_master_type.append(full_m)
             else:
@@ -225,40 +185,23 @@ class Process:
                 type.append(t)
                 subtype.append(st)
 
-                new_row = pd.DataFrame(
-                    [[memo, t, st]], columns=["Memo Mapped", "Type", "SubType"]
-                )
+                new_row = pd.DataFrame([[memo, t, st]], columns=["Memo Mapped", "Type", "SubType"])
                 self.map_main = pd.concat([self.map_main, new_row], ignore_index=True)
 
                 full_type.append(self.get_full_type(t, type_mapping))
                 full_subtype.append(self.get_full_type(st, subtype_mapping))
-                m, full_m = self.get_master_type(
-                    t, master_type_mapping, full_master_type_mapping
-                )
+                m, full_m = self.get_master_type(t, master_type_mapping, full_master_type_mapping)
                 master_type.append(m)
                 full_master_type.append(full_m)
 
         return type, full_type, subtype, full_subtype, master_type, full_master_type
 
     def apply_overrides(self, df):
-        self.mapping_override_df["Date"] = self.mapping_override_df["Date"].apply(
-            lambda x: x.strftime("%d-%b-%Y")
-        )
-        self.mapping_override_df["MemoMapped"] = (
-            self.mapping_override_df["MemoMapped"].fillna("").str.strip().str.upper()
-        )
-        self.mapping_override_df["Account"] = (
-            self.mapping_override_df["Account"].fillna("").str.strip().str.upper()
-        )
-        self.mapping_override_df["OverridesType"] = (
-            self.mapping_override_df["OverridesType"].fillna("").str.strip().str.upper()
-        )
-        self.mapping_override_df["OverrideSubType"] = (
-            self.mapping_override_df["OverrideSubType"]
-            .fillna("")
-            .str.strip()
-            .str.upper()
-        )
+        self.mapping_override_df["Date"] = self.mapping_override_df["Date"].apply(lambda x: x.strftime("%d-%b-%Y"))
+        self.mapping_override_df["MemoMapped"] = self.mapping_override_df["MemoMapped"].fillna("").str.strip().str.upper()
+        self.mapping_override_df["Account"] = self.mapping_override_df["Account"].fillna("").str.strip().str.upper()
+        self.mapping_override_df["OverridesType"] = self.mapping_override_df["OverridesType"].fillna("").str.strip().str.upper()
+        self.mapping_override_df["OverrideSubType"] = self.mapping_override_df["OverrideSubType"].fillna("").str.strip().str.upper()
 
         overrides_dict = {
             (row["Date"], row["Account"], row["MemoMapped"]): (
@@ -268,16 +211,12 @@ class Process:
             for _, row in self.mapping_override_df.iterrows()
         }
 
-        type_mapping = pd.Series(
-            self.map_full_type["FullType"].values, index=self.map_full_type["Type"]
-        ).to_dict()
+        type_mapping = pd.Series(self.map_full_type["FullType"].values, index=self.map_full_type["Type"]).to_dict()
         subtype_mapping = pd.Series(
             self.map_full_subtype["FullSubType"].values,
             index=self.map_full_subtype["SubType"],
         ).to_dict()
-        master_type_mapping = pd.Series(
-            self.map_full_type["MasterType"].values, index=self.map_full_type["Type"]
-        ).to_dict()
+        master_type_mapping = pd.Series(self.map_full_type["MasterType"].values, index=self.map_full_type["Type"]).to_dict()
         full_master_type_mapping = pd.Series(
             self.map_master["FullMasterType"].values,
             index=self.map_master["MasterType"],
@@ -299,23 +238,15 @@ class Process:
                     )
                 if overrides[1]:
                     row["SubType"] = overrides[1]
-                    row["FullSubType"] = self.get_full_type(
-                        overrides[1], subtype_mapping
-                    )
+                    row["FullSubType"] = self.get_full_type(overrides[1], subtype_mapping)
             return row
 
         df = df.apply(apply_override, axis=1)
         return df
 
-    def remove_offsetting(
-        self, df, iat_value_col=None, map_iat_fx=True, adjust_dates=False
-    ):
+    def remove_offsetting(self, df, iat_value_col=None, map_iat_fx=True, adjust_dates=False):
         iat = IatIdentification(self.config)
-        df_out = (
-            iat.map_iat(df, iat_value_col, adjust_dates=adjust_dates)
-            if iat_value_col is not None
-            else df_out
-        )
+        df_out = iat.map_iat(df, iat_value_col, adjust_dates=adjust_dates) if iat_value_col is not None else df_out
         df_out = iat.map_iat_fx(df_out) if map_iat_fx else df_out
 
         return df_out
@@ -332,25 +263,14 @@ class Process:
     @staticmethod
     def __clean_memo(s):
         if isinstance(s, str):
-            return Process._clean_amazon_memo(
-                re.sub("\*", "", re.sub(" +", " ", s.split(" ON ")[0]))
-                .replace(",", "")
-                .strip()
-            )
+            return Process._clean_amazon_memo(re.sub("\*", "", re.sub(" +", " ", s.split(" ON ")[0])).replace(",", "").strip())
         return s
 
     def extend(self, df, ignore_overrides=True):
-        expected_columns = [
-            n.strip()
-            for n in ast.literal_eval(self.config["Mapping"]["expected_columns"])
-        ]
-        assert set(df.columns) == set(
-            expected_columns
-        ), f"Columns do not match expectation. Expected: [{expected_columns}]"
+        expected_columns = [n.strip() for n in ast.literal_eval(self.config["Mapping"]["expected_columns"])]
+        assert set(df.columns) == set(expected_columns), f"Columns do not match expectation. Expected: [{expected_columns}]"
 
-        new_columns = [
-            n.strip() for n in ast.literal_eval(self.config["Mapping"]["new_columns"])
-        ]
+        new_columns = [n.strip() for n in ast.literal_eval(self.config["Mapping"]["new_columns"])]
         df_out = pd.DataFrame(columns=list(new_columns))
 
         df_out.Date = df.Date
@@ -372,9 +292,7 @@ class Process:
     def extend_types(self, df_out, only_full=True, ignore_overrides=True):
         df_out["YearToDate"] = df_out["Date"].apply(get_year_to_date)
 
-        type_, full_type, subtype, full_subtype, master_type, full_master_type = (
-            self.map_type(df_out["MemoMapped"])
-        )
+        type_, full_type, subtype, full_subtype, master_type, full_master_type = self.map_type(df_out["MemoMapped"])
 
         if not only_full:
             df_out["Type"] = type_
@@ -398,9 +316,7 @@ class Process:
         df.Amount = df.Amount.astype(float)
         df_out = self.extend(df, ignore_overrides)
         if remove_offsetting:
-            df_out = self.remove_offsetting(
-                df_out, iat_value_col="Amount", adjust_dates=True
-            )
+            df_out = self.remove_offsetting(df_out, iat_value_col="Amount", adjust_dates=True)
         return df_out
 
     def save(self, df):

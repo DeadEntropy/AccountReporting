@@ -1,0 +1,2 @@
+[tool.black]
+line-length = 140  # Adjust line length to your preferred value

@@ -16,17 +16,17 @@ class TestTax(unittest.TestCase):
         self.assertEqual(advanced_band.tax_to_pay(200000), 22500)
 
     def test_compute_uk_tax_return(self):
-        results, details = tax.compute_uk_tax_return(200000, 0.0, tax_year='2020', tax_bands=None)
+        results, details = tax.compute_uk_tax_return(200000, 0.0, tax_year="2020", tax_bands=None)
         self.assertEqual(results, 75000)
 
     def test_compute_uk_tax_return_2(self):
-        results, details = tax.compute_uk_tax_return(200000, 70000, tax_year='2020', tax_bands=None)
+        results, details = tax.compute_uk_tax_return(200000, 70000, tax_year="2020", tax_bands=None)
         self.assertEqual(results, 5000)
 
     def test_compute_uk_tax_return_3(self):
-        results, details = tax.compute_uk_tax_return(200000, 80000, tax_year='2020', tax_bands=None)
+        results, details = tax.compute_uk_tax_return(200000, 80000, tax_year="2020", tax_bands=None)
         self.assertEqual(results, -5000)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
