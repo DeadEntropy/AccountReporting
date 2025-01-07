@@ -10,6 +10,7 @@ from bkanalysis.config import config_helper
 from bkanalysis.market import market_loader
 from bkanalysis.process import process
 from bkanalysis.transforms import master_transform
+from bkanalysis.process.iat_identification import IatIdentification
 
 USE_GO = True
 
@@ -198,7 +199,7 @@ class DataServer:
         """returns the list of all accounts"""
         return self.data_manager.accounts
 
-    def get_values_by_asset(self, account: str = None):
+    def get_values_by_asset(self, date_range: list = None, account: str = None):
         """returns the data_manager.transactions with the market prices"""
         transaction_prices = {}
 
@@ -224,14 +225,23 @@ class DataServer:
             transaction_prices[asset] = transaction_price
 
         # Combine results for all assets
-        return pd.concat(transaction_prices.values(), ignore_index=True)
+        df_value = pd.concat(transaction_prices.values(), ignore_index=True)
+
+        if date_range is not None:
+            if len(date_range) != 2:
+                raise ValueError(f"date_range must be a list of two dates")
+            return df_value[(df_value.Date >= date_range[0]) & (df_value.Date <= date_range[1])]
+        return df_value
 
     def merge_transaction_asset(self, df_trans_asset, df_prices_asset):
         """merge the transaction and price dataframes, calculate value and capital gain"""
         date_range = DataServer.get_full_range(df_trans_asset, df_prices_asset)
 
         df_trans_asset_daily = pd.pivot_table(
-            df_trans_asset, index="Date", values=["Quantity", "MemoMapped"], aggfunc={"Quantity": ["sum", list], "MemoMapped": list}
+            df_trans_asset,
+            index="Date",
+            values=["Quantity", "MemoMapped", "Type", "SubType"],
+            aggfunc={"Quantity": ["sum", list], "MemoMapped": list, "Type": list},
         ).reindex(date_range)
         df_trans_asset_daily.columns = ["_".join(col).strip() if isinstance(col, tuple) else col for col in df_trans_asset_daily.columns]
         df_trans_asset_daily["Quantity_sum"] = df_trans_asset_daily["Quantity_sum"].fillna(0)
@@ -248,6 +258,7 @@ class DataServer:
 
         merged["Quantity_list"] = merged["Quantity_list"].apply(lambda d: d if isinstance(d, list) else [])
         merged["MemoMapped_list"] = merged["MemoMapped_list"].apply(lambda d: d if isinstance(d, list) else [])
+        merged["Type_list"] = merged["Type_list"].apply(lambda d: d if isinstance(d, list) else [])
 
         return merged
 
@@ -260,39 +271,31 @@ class DataServer:
     def consolidate_label(label):
         """Aggregate duplicate labels and sort by absolute value"""
         d = {}
-        for k, v in label:
+        for k, v, c in label:
             if k not in d:
-                d[k] = v
-            d[k] += v
-        return sorted(d.items(), key=lambda item: -abs(item[1]))
+                d[k] = v, c
+            else:
+                d[k] = (d[k][0] + v, c)
+        return sorted([(k, v[0], v[1]) for k, v in d.items()], key=lambda item: -abs(item[1]))
 
     @staticmethod
-    def prepare_label(l, max_labels: int = 20, max_char: int = 20):
-        """prepares the label for the hover"""
-        labels = DataServer.consolidate_label([(k, d[k]) for d in l for k in d])
-        if len(labels) < max_labels:
-            return "<br>".join([f"{v:>7,.0f}: {k[:max_char]}" for (k, v) in labels])
+    def aggregate_label(l):
+        """Aggregate a list of labels into a single label"""
+        return DataServer.consolidate_label([(k, d[k][0], d[k][1]) for d in l for k in d])
 
-        threshold = sorted([abs(v) for (k, v) in labels], reverse=True)[max_labels - 1]
-        largest_labels = [(k, v) for (k, v) in labels if abs(v) > threshold]
-        remainging_amount = sum([v for k, v in labels]) - sum([v for k, v in largest_labels])
-        largest_labels = sorted(
-            {**dict(largest_labels), **{"OTHER": remainging_amount}}.items(),
-            key=lambda item: -abs(item[1]),
-        )
-        return "<br>".join([f"{v:>7,.0f}: {k[:25]}" for (k, v) in largest_labels])
-
-    def get_values_timeseries(self, account: str = None) -> pd.DataFrame:
+    def get_values_timeseries(self, date_range: list = None, account: str = None) -> pd.DataFrame:
         """returns a timeseries of the values"""
-        df_asset = self.get_values_by_asset(account)
+        df_asset = self.get_values_by_asset(date_range, account)
 
         df_asset["TransactionValue_list"] = [
-            {m: q * p for m, q in zip(m_list, q_list)}
-            for m_list, q_list, p in zip(df_asset["MemoMapped_list"], df_asset["Quantity_list"], df_asset["AssetPriceInRefCurrency"])
+            {m: (q * p, t) for m, q, t in zip(m_list, q_list, t_list)}
+            for m_list, q_list, p, t_list in zip(
+                df_asset["MemoMapped_list"], df_asset["Quantity_list"], df_asset["AssetPriceInRefCurrency"], df_asset["Type_list"]
+            )
         ]
         df_values_timeseries = (
             df_asset.groupby("Date")
-            .agg({"Value": "sum", "TransactionValue_list": DataServer.prepare_label})
+            .agg({"Value": "sum", "TransactionValue_list": DataServer.aggregate_label})
             .rename(columns={"TransactionValue_list": "Label"})
         )
 
@@ -312,24 +315,85 @@ class DataFigure:
 
     def __init__(self, data_server: DataServer):
         self.data_server = data_server
+        self._iat_types = IatIdentification.iat_types + ["C", "S"]
 
-    def get_figure_timeseries(self, account: str = None) -> pd.DataFrame:
+    def prepare_timeseries_label(self, labels, max_labels: int = 20, max_char: int = 20):
+        """prepares the label for the hover"""
+        total_amt = sum([l[1] for l in labels])
+        total_label = f"<br><br>TOTAL: {total_amt:,.0f}" if total_amt != 0 else ""
+
+        if len(labels) < max_labels:
+            return "<br>".join([f"{v:>7,.0f}: {k[:max_char]}" for (k, v, t) in labels]) + total_label
+
+        threshold = sorted([abs(v) for (k, v, t) in labels], reverse=True)[max_labels - 1]
+        largest_labels = [(k, v) for (k, v, t) in labels if abs(v) > threshold]
+        remainging_amount = sum([v for k, v, t in labels]) - sum([v for k, v in largest_labels])
+        largest_labels = sorted(
+            {**dict(largest_labels), **{"OTHER": remainging_amount}}.items(),
+            key=lambda item: -abs(item[1]),
+        )
+        return "<br>".join([f"{v:>7,.0f}: {k[:25]}" for (k, v) in largest_labels]) + total_label
+
+    def get_timeseries_annotations(self, labels: pd.Series, annotation_count: int = 3) -> list:
+        """returns the annotations for the figure"""
+        result = [(index, *tup) for index, sublist in labels.items() for tup in sublist if tup[2] not in self._iat_types]
+        df_annotations = (
+            pd.DataFrame(result, columns=["Date", "MemoMapped", "TransactionValue", "Type"])
+            .sort_values(by="TransactionValue", ascending=True)
+            .iloc[:annotation_count]
+            .reset_index(drop=True)
+        )
+
+        df_annotations["Annotation"] = [
+            f"{memo[:20]}: {tv:,.0f}" for memo, tv in zip(df_annotations["MemoMapped"], df_annotations["TransactionValue"])
+        ]
+
+        return df_annotations.groupby("Date").agg({"Annotation": lambda x: "<br>".join(x)})
+
+    def get_figure_timeseries(self, date_range: list = None, account: str = None, annotation_count: int = 3) -> pd.DataFrame:
         """plots the timeseries of the account value"""
-        df_values_timeseries = self.data_server.get_values_timeseries(account)
-        if USE_GO:
-            fig = go.Figure(
-                data=go.Scatter(x=df_values_timeseries.index, y=df_values_timeseries["Value"], hovertext=df_values_timeseries["Label"])
-            )
+        df_values_timeseries = self.data_server.get_values_timeseries(date_range, account)
+        df_annotations = self.get_timeseries_annotations(df_values_timeseries["Label"], annotation_count=annotation_count)
 
-            fig.update_layout(
-                title="Total Wealth",
-                xaxis_title="Date",
-                yaxis_title="Currency",
-                margin=dict(t=50),
+        fig = go.Figure(
+            data=go.Scatter(
+                x=df_values_timeseries.index,
+                y=df_values_timeseries["Value"],
+                hovertext=df_values_timeseries["Label"].apply(self.prepare_timeseries_label),
+            ),
+        )
+
+        fig.update_layout(
+            title="Total Wealth",
+            xaxis_title="Date",
+            yaxis_title="Currency",
+            margin=dict(t=50),
+        )
+
+        i = 0
+        for annotation_date in df_annotations.index:
+            ann_text = df_annotations.loc[annotation_date]["Annotation"]
+            fig.add_annotation(
+                x=annotation_date,
+                y=df_values_timeseries.loc[annotation_date]["Value"],
+                xref="x",
+                yref="y",
+                text=ann_text,
+                showarrow=True,
+                font=dict(family="Courier New, monospace", size=12, color="#ffffff"),
+                align="center",
+                arrowhead=2,
+                arrowsize=1,
+                arrowwidth=2,
+                arrowcolor="#636363",
+                ax=20,
+                ay=(-100 if (i % 4) == 0 else 50 if (i % 3) == 0 else -50 if (i % 2) == 0 else 100),
+                bordercolor="#c7c7c7",
+                borderwidth=2,
+                borderpad=4,
+                bgcolor="#ff7f0e",
+                opacity=0.65,
             )
-        else:
-            fig = px.line(df_values_timeseries, x=df_values_timeseries.index, y=["Value"], hover_data=["Label"]).update_traces(
-                mode="lines+markers"
-            )
+            i = i + 1
 
         return fig
