@@ -3,6 +3,9 @@ from datetime import datetime
 
 import pandas as pd
 
+
+import plotly.express as px
+
 from bkanalysis.config import config_helper
 from bkanalysis.market import market_loader
 from bkanalysis.process import process
@@ -54,6 +57,11 @@ class DataManager:
         self.remove_offsetting = True
 
         self.transactions = None
+
+    @property
+    def accounts(self):
+        """returns the list of all accounts"""
+        return self.transactions.Account.unique()
 
     def _load_config(self, config=None):
         if config is None:
@@ -117,6 +125,7 @@ class DataMarket:
 
         df_prices = DataMarket.dataframe_from_nested_dict(market_prices)
         df_prices["Date"] = normalize_date_column(df_prices["Date"])
+        df_prices = df_prices[df_prices.Price != 0]
 
         df_fx = pd.concat(
             [df_prices[df_prices.AssetMapped.str.startswith(ccy)] for ccy in df_prices.Currency.unique() if ccy != self.ref_currency]
@@ -156,9 +165,7 @@ class DataMarket:
             .dropna()
         )
 
-        self._df_fx = df_fx
-        self.df = df
-        self.prices = df
+        self.prices = df.set_index(["AssetMapped", "Date"])
 
     @staticmethod
     def dataframe_from_nested_dict(data):
@@ -179,31 +186,37 @@ class DataMarket:
 class DataServer:
     """Class to prepare the data for the UI"""
 
-    def __init__(self, data_manager: DataManager, data_market: DataMarket, config=None):
+    def __init__(self, data_manager: DataManager, data_market: DataMarket):
         self.data_manager = data_manager
         self.data_market = data_market
-        self.config = config
+
+    @property
+    def accounts(self):
+        """returns the list of all accounts"""
+        return self.data_manager.accounts
 
     def get_values_by_asset(self, account: str = None):
         """returns the data_manager.transactions with the market prices"""
         transaction_prices = {}
 
-        asset_map = self.data_market.get_asset_map()
-
         if account is not None:
+            if account not in self.accounts:
+                raise KeyError(f"account {account} not found.")
             transactions = self.data_manager.transactions[self.data_manager.transactions.Account == account]
         else:
             transactions = self.data_manager.transactions
+
+        asset_map = self.data_market.get_asset_map()
 
         # Process each asset individually
         unique_assets = [asset_map[a] for a in transactions["Asset"].unique() if isinstance(a, str)]
         for asset in unique_assets:
             # Filter data for the current asset
             df_trans_asset = transactions[transactions["Asset"].map(asset_map) == asset]
-            df_prices_asset = self.data_market.prices[self.data_market.prices["AssetMapped"] == asset]
+            df_prices_asset = self.data_market.prices.xs(asset, level="AssetMapped")
 
-            # merge the transaction and pro
-            transaction_price = self.merge_transaction_asset(df_trans_asset, df_prices_asset)
+            # merge the transaction
+            transaction_price = self.merge_transaction_asset(df_trans_asset, df_prices_asset.reset_index())
             transaction_price["AssetMapped"] = asset
             transaction_prices[asset] = transaction_price
 
@@ -237,15 +250,33 @@ class DataServer:
 
     @staticmethod
     def get_full_range(df1, df2):
-        """return the full date range covering df1.Date and df2.Date"""
+        """return the full date range covering df1.Date and df2.Date, up to today"""
         try:
-            return pd.date_range(df1.Date.min(), max(df1.Date.max(), df2.Date.max()), name="Date")
+            return pd.date_range(df1.Date.min(), max(datetime.today().date(), df2.Date.max()), name="Date")
         except TypeError as type_error:
             raise TypeError("") from type_error
 
-    def get_values_timeseries(self, filters) -> pd.DataFrame:
+    @staticmethod
+    def prepare_label(l):
+        """prepares the label for the hover"""
+        label = [(k, d[k]) for d in l for k in d]
+        return "<br>".join([f"{k}: {v:,.0f}" for k, v in label])
+
+    def get_values_timeseries(self, account: str = None) -> pd.DataFrame:
         """returns a timeseries of the values"""
-        pass
+        df_asset = self.get_values_by_asset(account)
+
+        df_asset["TransactionValue_list"] = [
+            {m: q * p for m, q in zip(m_list, q_list)}
+            for m_list, q_list, p in zip(df_asset["MemoMapped_list"], df_asset["Quantity_list"], df_asset["AssetPriceInRefCurrency"])
+        ]
+        df_values_timeseries = (
+            df_asset.groupby("Date")
+            .agg({"Value": "sum", "TransactionValue_list": DataServer.prepare_label})
+            .rename(columns={"TransactionValue_list": "Label"})
+        )
+
+        return df_values_timeseries
 
     def get_values_by_types(self, filters) -> pd.DataFrame:
         """returns a breakdown by types"""
@@ -254,3 +285,17 @@ class DataServer:
     def get_values_by_month(self, filters):
         """returns a breakdown by month"""
         pass
+
+
+class DataFigure:
+    """Class to prepare the data for the UI"""
+
+    def __init__(self, data_server: DataServer):
+        self.data_server = data_server
+
+    def get_figure_timeseries(self, account: str = None) -> pd.DataFrame:
+        """plots the timeseries of the account value"""
+        df_values_timeseries = self.data_server.get_values_timeseries(account)
+        return px.line(df_values_timeseries, x=df_values_timeseries.index, y=["Value"], hover_data=["Label"]).update_traces(
+            mode="lines+markers"
+        )
