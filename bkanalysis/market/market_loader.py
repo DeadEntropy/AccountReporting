@@ -42,21 +42,31 @@ class MarketLoader:
             self.nutmeg_path = self.config["Nutmeg"]["path_activity"]
         self.source_default = SOURCE.YAHOO
 
-    def load(self, instruments, ref_currency: str, period: str):
+    def load(self, instruments, ref_currency: str, period: str | dict):
         # Get the symbols from the list of instruments
         logging.info(f"Getting Symbols ({len(instruments)})")
-        symbols = [(self.get_symbol(instr, ref_currency) if instr not in self.source_map.keys() else instr) for instr in instruments]
+        symbols = [
+            (instr, (self.get_symbol(instr, ref_currency)) if instr not in self.source_map.keys() else instr) for instr in instruments
+        ]
 
         # Get the additional currencies
         logging.info(f"Getting Additional Currencies ({len(symbols)})")
-        currencies_from_yahoo = list(set([self.get_currency(symbol) for symbol in symbols if symbol not in self.source_map.keys()]))
+        currencies_from_yahoo = list(set([self.get_currency(symbol) for _, symbol in symbols if symbol not in self.source_map.keys()]))
+        if isinstance(period, dict):
+            for c in currencies_from_yahoo:
+                if c not in period:
+                    period[c] = "max"
         symbols = list(
-            set([f"{ccy}{ref_currency}=X" for ccy in currencies_from_yahoo if ccy != ref_currency and ccy is not None] + symbols)
+            set([(ccy, f"{ccy}{ref_currency}=X") for ccy in currencies_from_yahoo if ccy != ref_currency and ccy is not None] + symbols)
         )
 
         # Get the time series
         logging.info("Getting Times Series of Mkt Data")
-        values = {symbol: self.get_history(symbol, period) for symbol in symbols if symbol is not None}
+        values = {
+            symbol: self.get_history(symbol, period[instr] if isinstance(period, dict) else period)
+            for instr, symbol in symbols
+            if symbol is not None
+        }
 
         logging.info("Done Loading all Mkt Data")
         return values
