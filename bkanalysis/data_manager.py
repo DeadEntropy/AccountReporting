@@ -3,13 +3,15 @@ from datetime import datetime
 
 import pandas as pd
 
-
 import plotly.express as px
+import plotly.graph_objects as go
 
 from bkanalysis.config import config_helper
 from bkanalysis.market import market_loader
 from bkanalysis.process import process
 from bkanalysis.transforms import master_transform
+
+USE_GO = True
 
 
 def normalize_date_column(date_column):
@@ -93,7 +95,8 @@ class DataManager:
             remove_offsetting=self.remove_offsetting,
         )
 
-    def get_assets(self) -> pd.DataFrame:
+    @property
+    def assets(self) -> dict:
         """returns a series of asset and their first transaction date"""
         return self.transactions.groupby("Asset").Date.min().to_dict()
 
@@ -119,7 +122,7 @@ class DataMarket:
         """loads market prices from sources specified in the config file"""
 
         loader = market_loader.MarketLoader(self.config)
-        assets = self.data_manager.get_assets()
+        assets = self.data_manager.assets
         period = {a: "10y" if (datetime.today().date() - assets[a]).days / 356 < 10 else "max" for a in assets}
         market_prices = loader.load(assets, self.ref_currency, period)
 
@@ -251,16 +254,33 @@ class DataServer:
     @staticmethod
     def get_full_range(df1, df2):
         """return the full date range covering df1.Date and df2.Date, up to today"""
-        try:
-            return pd.date_range(df1.Date.min(), max(datetime.today().date(), df2.Date.max()), name="Date")
-        except TypeError as type_error:
-            raise TypeError("") from type_error
+        return pd.date_range(df1.Date.min(), max(datetime.today().date(), df2.Date.max()), name="Date")
 
     @staticmethod
-    def prepare_label(l):
+    def consolidate_label(label):
+        """Aggregate duplicate labels and sort by absolute value"""
+        d = {}
+        for k, v in label:
+            if k not in d:
+                d[k] = v
+            d[k] += v
+        return sorted(d.items(), key=lambda item: -abs(item[1]))
+
+    @staticmethod
+    def prepare_label(l, max_labels: int = 20, max_char: int = 20):
         """prepares the label for the hover"""
-        label = [(k, d[k]) for d in l for k in d]
-        return "<br>".join([f"{k}: {v:,.0f}" for k, v in label])
+        labels = DataServer.consolidate_label([(k, d[k]) for d in l for k in d])
+        if len(labels) < max_labels:
+            return "<br>".join([f"{v:>7,.0f}: {k[:max_char]}" for (k, v) in labels])
+
+        threshold = sorted([abs(v) for (k, v) in labels], reverse=True)[max_labels - 1]
+        largest_labels = [(k, v) for (k, v) in labels if abs(v) > threshold]
+        remainging_amount = sum([v for k, v in labels]) - sum([v for k, v in largest_labels])
+        largest_labels = sorted(
+            {**dict(largest_labels), **{"OTHER": remainging_amount}}.items(),
+            key=lambda item: -abs(item[1]),
+        )
+        return "<br>".join([f"{v:>7,.0f}: {k[:25]}" for (k, v) in largest_labels])
 
     def get_values_timeseries(self, account: str = None) -> pd.DataFrame:
         """returns a timeseries of the values"""
@@ -282,7 +302,7 @@ class DataServer:
         """returns a breakdown by types"""
         pass
 
-    def get_values_by_month(self, filters):
+    def get_values_by_month(self, filters) -> pd.DataFrame:
         """returns a breakdown by month"""
         pass
 
@@ -296,6 +316,20 @@ class DataFigure:
     def get_figure_timeseries(self, account: str = None) -> pd.DataFrame:
         """plots the timeseries of the account value"""
         df_values_timeseries = self.data_server.get_values_timeseries(account)
-        return px.line(df_values_timeseries, x=df_values_timeseries.index, y=["Value"], hover_data=["Label"]).update_traces(
-            mode="lines+markers"
-        )
+        if USE_GO:
+            fig = go.Figure(
+                data=go.Scatter(x=df_values_timeseries.index, y=df_values_timeseries["Value"], hovertext=df_values_timeseries["Label"])
+            )
+
+            fig.update_layout(
+                title="Total Wealth",
+                xaxis_title="Date",
+                yaxis_title="Currency",
+                margin=dict(t=50),
+            )
+        else:
+            fig = px.line(df_values_timeseries, x=df_values_timeseries.index, y=["Value"], hover_data=["Label"]).update_traces(
+                mode="lines+markers"
+            )
+
+        return fig
