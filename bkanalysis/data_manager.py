@@ -26,7 +26,7 @@ def normalize_date_column(date_column):
         except (ValueError, TypeError) as exc:
             raise ValueError(f"Invalid date format: {value}") from exc
 
-    return date_column.map(convert_date)
+    return pd.to_datetime(date_column.map(convert_date))
 
 
 class DataManager:
@@ -66,6 +66,19 @@ class DataManager:
         """returns the list of all accounts"""
         return self.transactions.Account.unique()
 
+    @property
+    def assets(self) -> dict:
+        """returns a series of asset and their first transaction date"""
+        return self.transactions.groupby("Asset").Date.min().to_dict()
+
+    def to_disk(self, path: str) -> None:
+        """saves the transactions to disk"""
+        self.transactions.to_csv(path, index=False)
+
+    def load_pregenerated_data(self, path) -> None:
+        """loads the pregenerated data from disk"""
+        self.transactions = pd.read_csv(path, parse_dates=["Date"])
+
     def _load_config(self, config=None):
         if config is None:
             self.config = configparser.ConfigParser()
@@ -96,43 +109,74 @@ class DataManager:
             remove_offsetting=self.remove_offsetting,
         )
 
-    @property
-    def assets(self) -> dict:
-        """returns a series of asset and their first transaction date"""
-        return self.transactions.groupby("Asset").Date.min().to_dict()
-
 
 class DataMarket:
     """Class to handle the interaction of the data with the market prices"""
 
-    def __init__(self, data_manager: DataManager, ref_currency: str, config=None):
-        self.data_manager = data_manager
+    def __init__(self, ref_currency: str, config=None):
         self.config = config
         self.ref_currency = ref_currency
         self.prices = None
 
-    def get_asset_map(self) -> dict:
+    def to_disk(self, path: str) -> None:
+        """saves the transactions to disk"""
+        self.prices.to_csv(path, index=True)
+
+    def load_pregenerated_data(self, path) -> None:
+        """loads the pregenerated data from disk"""
+        self.prices = pd.read_csv(path, parse_dates=["Date"])
+        self.prices = self.prices.set_index(["AssetMapped", "Date"])
+
+    def get_asset_map(self, data_manager: DataManager) -> dict:
         """returns a map of the assets to their market symbol"""
         loader = market_loader.MarketLoader()
         return {
             instr: (loader.get_symbol(instr, "USD") if instr not in loader.source_map.keys() else instr)
-            for instr in self.data_manager.transactions.Asset.dropna().unique()
+            for instr in data_manager.transactions.Asset.dropna().unique()
         }
 
-    def load_prices(self) -> None:
+    def load_prices(self, data_manager: DataManager) -> None:
         """loads market prices from sources specified in the config file"""
 
         loader = market_loader.MarketLoader(self.config)
-        assets = self.data_manager.assets
-        period = {a: "10y" if (datetime.today().date() - assets[a]).days / 356 < 10 else "max" for a in assets}
+        assets = data_manager.assets
+        period = {a: "10y" if (datetime.today() - assets[a]).days / 356 < 10 else "max" for a in assets}
         market_prices = loader.load(assets, self.ref_currency, period)
 
         df_prices = DataMarket.dataframe_from_nested_dict(market_prices)
         df_prices["Date"] = normalize_date_column(df_prices["Date"])
         df_prices = df_prices[df_prices.Price != 0]
 
+        asset_map = self.get_asset_map(data_manager)
+        date_range = {
+            asset_map[k]: pd.date_range(
+                (
+                    start
+                    if start < df_prices[df_prices.AssetMapped == asset_map[k]].Date.max()
+                    else df_prices[df_prices.AssetMapped == asset_map[k]].Date.min()
+                ),
+                datetime.today(),
+                name="Date",
+            )
+            for k, start in data_manager.assets.items()
+        }
+
+        # Function to apply reindexing per group
+        def reindex_group(group, group_name):
+            if group_name not in date_range:
+                return group
+            return group.reset_index().set_index("Date").reindex(date_range[group_name]).ffill().bfill().reset_index()
+
+        df_prices = (
+            df_prices.groupby("AssetMapped")
+            .apply(lambda group: reindex_group(group, group.name))
+            .reset_index(drop=True)[["AssetMapped", "Date", "Currency", "Price"]]
+        )
+
+        df_prices = df_prices.dropna()
+
         df_fx = pd.concat(
-            [df_prices[df_prices.AssetMapped.str.startswith(ccy)] for ccy in df_prices.Currency.unique() if ccy != self.ref_currency]
+            [df_prices[df_prices.AssetMapped.str.endswith("=X")] for ccy in df_prices.Currency.unique() if ccy != self.ref_currency]
         )
         df_fx["Asset"] = df_fx["AssetMapped"].str.replace(f"{self.ref_currency}=X", "")  # TODO properly parse the asset to extract the ccy
         df_fx.rename(
@@ -141,7 +185,7 @@ class DataMarket:
             inplace=True,
         )
 
-        df_dummy = pd.DataFrame({"Date": pd.date_range(assets[self.ref_currency], datetime.today().date())})
+        df_dummy = pd.DataFrame({"Date": pd.date_range(assets[self.ref_currency], datetime.today())})
         df_dummy["Date"] = df_dummy["Date"].dt.date
         df_dummy["AssetMapped"] = f"{self.ref_currency}{self.ref_currency}=X"
         df_dummy["RefCurrency"] = self.ref_currency
@@ -187,6 +231,134 @@ class DataMarket:
         return pd.DataFrame(rows)
 
 
+class DataServer2:
+    """Class to prepare the data for the UI"""
+
+    def __init__(self, data_manager: DataManager, data_market: DataMarket):
+        self.data_manager = data_manager
+        self.data_market = data_market
+
+        self._reindexed_transactions = None
+        self._df_transaction_price = None
+
+        self.index_names = ["Account", "Asset", "Date", "MemoMapped"]
+        self.sum_names = ["Quantity"]
+
+    @property
+    def accounts(self):
+        """returns the list of all accounts"""
+        return self.data_manager.accounts
+
+    def reindex_transactions(self) -> None:
+        """Reindex the transactions DataFrame to include all dates for each Account and Asset."""
+        meta_data_names = [n for n in self.data_manager.transactions.columns if n not in self.sum_names and n not in self.index_names]
+        self.data_manager.transactions["Date"] = pd.to_datetime(self.data_manager.transactions["Date"])
+
+        # Step 1: Aggregate duplicates by summing Quantity, keeping other columns as-is
+        aggregation = {**{k: "sum" for k in self.sum_names}, **{k: "first" for k in meta_data_names}}
+        df = self.data_manager.transactions.groupby(self.index_names, as_index=False).agg(aggregation)
+
+        # Step 2: Initialize an empty list to store reindexed DataFrames
+        reindexed_dfs = []
+
+        # Step 3: Process each group (Account, Asset) separately
+        for (account, asset), group in df.groupby(["Account", "Asset"]):
+            # Determine the full date range for this group
+            date_range = pd.date_range(group["Date"].min(), datetime.today(), freq="D")
+
+            # Create a new DataFrame to reindex the group's data
+            date_memo_df = pd.DataFrame({"Date": date_range})
+
+            # Merge the full date range with the group to ensure all dates are included
+            expanded_group = pd.merge(date_memo_df, group, on="Date", how="left")
+
+            # Add back the Account and Asset columns
+            expanded_group["Account"] = account
+            expanded_group["Asset"] = asset
+
+            # Append the reindexed group to the list
+            reindexed_dfs.append(expanded_group)
+
+        # Step 4: Concatenate all reindexed DataFrames
+        df_reindexed = pd.concat(reindexed_dfs)
+
+        # Step 5: Reset the index if needed
+        df_reindexed = df_reindexed.reset_index(drop=True)
+
+        self._reindexed_transactions = df_reindexed.set_index(self.index_names[: self.index_names.index("Date") + 1])
+
+    def merge_transaction_price(self) -> None:
+        """Merge the reindexed transactions with the market prices."""
+        df_temp = self._reindexed_transactions.reset_index()
+        df_temp["AssetMapped"] = df_temp["Asset"].map(self.data_market.get_asset_map(self.data_manager))
+        df_temp["Date"] = normalize_date_column(df_temp["Date"])
+        df_temp = df_temp.set_index(["AssetMapped", "Date"])
+
+        df_prices = self.data_market.prices.reset_index().sort_values(by=["AssetMapped", "Date"], ascending=[True, False])
+
+        # df_prices_asset = df_prices_asset.groupby("AssetMapped").set_index("Date").reindex(date_range).ffill().bfill().reset_index()
+
+        df_prices["Date"] = normalize_date_column(df_prices["Date"])
+        df_prices = df_prices.set_index(["AssetMapped", "Date"])
+
+        self._df_transaction_price = pd.merge(df_temp, df_prices, left_index=True, right_index=True, how="left").sort_index()
+
+        self._df_transaction_price["AssetPriceInRefCurrency"] = self._df_transaction_price.groupby("AssetMapped")[
+            "AssetPriceInRefCurrency"
+        ].ffill()
+        self._df_transaction_price["AssetPriceDiffInRefCurrency"] = self._df_transaction_price.groupby("AssetMapped")[
+            "AssetPriceInRefCurrency"
+        ].diff()
+
+    def get_values_by_asset(self):
+        """returns the data_manager.transactions with the market prices"""
+        df = pd.pivot_table(
+            self._df_transaction_price,
+            index=["AssetMapped", "Date"],
+            values=["Quantity", "MemoMapped", "Type", "SubType", "AssetPriceInRefCurrency", "AssetPriceDiffInRefCurrency"],
+            aggfunc={
+                "Quantity": ["sum", list],
+                "MemoMapped": list,
+                "Type": list,
+                "SubType": list,
+                "AssetPriceInRefCurrency": "first",
+                "AssetPriceDiffInRefCurrency": "first",
+            },
+        ).sort_index(ascending=False)
+
+        df.columns = ["_".join(col).strip() if isinstance(col, tuple) else col for col in df.columns]
+
+        df["Quantity_cumsum"] = (
+            df.groupby("AssetMapped")["Quantity_sum"].apply(lambda x: x[::-1].cumsum()[::-1]).reset_index(level=0, drop=True)
+        )
+        df["Value"] = (
+            df.groupby("AssetMapped")
+            .apply(lambda group: group["Quantity_cumsum"] * group["AssetPriceInRefCurrency_first"])
+            .reset_index(level=0, drop=True)
+        )
+        df["CapitalGain"] = (
+            df.groupby("AssetMapped")
+            .apply(lambda group: group["Quantity_cumsum"] * group["AssetPriceDiffInRefCurrency_first"])
+            .reset_index(level=0, drop=True)
+        )
+
+        df["Quantity_list"] = df["Quantity_list"].apply(lambda d: d if isinstance(d, list) else [])
+        df["MemoMapped_list"] = df["MemoMapped_list"].apply(lambda d: d if isinstance(d, list) else [])
+        df["Type_list"] = df["Type_list"].apply(lambda d: d if isinstance(d, list) else [])
+        df["SubType_list"] = df["SubType_list"].apply(lambda d: d if isinstance(d, list) else [])
+
+        df = df.rename(
+            columns={
+                "AssetPriceDiffInRefCurrency_first": "AssetPriceChangeInRefCurrency",
+                "AssetPriceInRefCurrency_first": "AssetPriceInRefCurrency",
+            }
+        ).reset_index()
+        df.Date = pd.to_datetime(df.Date)
+        df = df.set_index(["AssetMapped", "Date"]).sort_index(ascending=[True, False])
+
+        return df
+
+
 class DataServer:
     """Class to prepare the data for the UI"""
 
@@ -210,7 +382,7 @@ class DataServer:
         else:
             transactions = self.data_manager.transactions
 
-        asset_map = self.data_market.get_asset_map()
+        asset_map = self.data_market.get_asset_map(self.data_manager)
 
         # Process each asset individually
         unique_assets = [asset_map[a] for a in transactions["Asset"].unique() if isinstance(a, str)]
@@ -241,7 +413,7 @@ class DataServer:
             df_trans_asset,
             index="Date",
             values=["Quantity", "MemoMapped", "Type", "SubType"],
-            aggfunc={"Quantity": ["sum", list], "MemoMapped": list, "Type": list},
+            aggfunc={"Quantity": ["sum", list], "MemoMapped": list, "Type": list, "SubType": list},
         ).reindex(date_range)
         df_trans_asset_daily.columns = ["_".join(col).strip() if isinstance(col, tuple) else col for col in df_trans_asset_daily.columns]
         df_trans_asset_daily["Quantity_sum"] = df_trans_asset_daily["Quantity_sum"].fillna(0)
@@ -259,45 +431,46 @@ class DataServer:
         merged["Quantity_list"] = merged["Quantity_list"].apply(lambda d: d if isinstance(d, list) else [])
         merged["MemoMapped_list"] = merged["MemoMapped_list"].apply(lambda d: d if isinstance(d, list) else [])
         merged["Type_list"] = merged["Type_list"].apply(lambda d: d if isinstance(d, list) else [])
+        merged["SubType_list"] = merged["SubType_list"].apply(lambda d: d if isinstance(d, list) else [])
 
         return merged
 
     @staticmethod
     def get_full_range(df1, df2):
         """return the full date range covering df1.Date and df2.Date, up to today"""
-        return pd.date_range(df1.Date.min(), max(datetime.today().date(), df2.Date.max()), name="Date")
+        return pd.date_range(df1.Date.min(), max(datetime.today(), df2.Date.max()), name="Date")
 
     @staticmethod
-    def consolidate_label(label):
-        """Aggregate duplicate labels and sort by absolute value"""
+    def consolidate_transactions(transactions):
+        """Aggregate duplicate transactions and sort by absolute value"""
         d = {}
-        for k, v, c in label:
+        for k, v, t, s in transactions:
             if k not in d:
-                d[k] = v, c
+                d[k] = v, t, s
             else:
-                d[k] = (d[k][0] + v, c)
-        return sorted([(k, v[0], v[1]) for k, v in d.items()], key=lambda item: -abs(item[1]))
+                d[k] = (d[k][0] + v, t, s)
+        return sorted([(k, v[0], v[1], v[2]) for k, v in d.items()], key=lambda item: -abs(item[1]))
 
     @staticmethod
-    def aggregate_label(l):
-        """Aggregate a list of labels into a single label"""
-        return DataServer.consolidate_label([(k, d[k][0], d[k][1]) for d in l for k in d])
+    def aggregate_transactions(l):
+        """Aggregate a list of transactions"""
+        return DataServer.consolidate_transactions([(k, d[k][0], d[k][1], d[k][2]) for d in l for k in d])
 
     def get_values_timeseries(self, date_range: list = None, account: str = None) -> pd.DataFrame:
         """returns a timeseries of the values"""
         df_asset = self.get_values_by_asset(date_range, account)
 
         df_asset["TransactionValue_list"] = [
-            {m: (q * p, t) for m, q, t in zip(m_list, q_list, t_list)}
-            for m_list, q_list, p, t_list in zip(
-                df_asset["MemoMapped_list"], df_asset["Quantity_list"], df_asset["AssetPriceInRefCurrency"], df_asset["Type_list"]
+            {m: (q * p, t, s) for m, q, t, s in zip(m_list, q_list, t_list, s_list)}
+            for m_list, q_list, p, t_list, s_list in zip(
+                df_asset["MemoMapped_list"],
+                df_asset["Quantity_list"],
+                df_asset["AssetPriceInRefCurrency"],
+                df_asset["Type_list"],
+                df_asset["SubType_list"],
             )
         ]
-        df_values_timeseries = (
-            df_asset.groupby("Date")
-            .agg({"Value": "sum", "TransactionValue_list": DataServer.aggregate_label})
-            .rename(columns={"TransactionValue_list": "Label"})
-        )
+        df_values_timeseries = df_asset.groupby("Date").agg({"Value": "sum", "TransactionValue_list": DataServer.aggregate_transactions})
 
         return df_values_timeseries
 
@@ -317,28 +490,28 @@ class DataFigure:
         self.data_server = data_server
         self._iat_types = IatIdentification.iat_types + ["C", "S"]
 
-    def prepare_timeseries_label(self, labels, max_labels: int = 20, max_char: int = 20):
+    def __prepare_timeseries_label(self, labels, max_labels: int = 20, max_char: int = 20):
         """prepares the label for the hover"""
         total_amt = sum([l[1] for l in labels])
         total_label = f"<br><br>TOTAL: {total_amt:,.0f}" if total_amt != 0 else ""
 
         if len(labels) < max_labels:
-            return "<br>".join([f"{v:>7,.0f}: {k[:max_char]}" for (k, v, t) in labels]) + total_label
+            return "<br>".join([f"{v:>7,.0f}: {k[:max_char]}" for (k, v, t, s) in labels]) + total_label
 
-        threshold = sorted([abs(v) for (k, v, t) in labels], reverse=True)[max_labels - 1]
-        largest_labels = [(k, v) for (k, v, t) in labels if abs(v) > threshold]
-        remainging_amount = sum([v for k, v, t in labels]) - sum([v for k, v in largest_labels])
+        threshold = sorted([abs(v) for (k, v, t, s) in labels], reverse=True)[max_labels - 1]
+        largest_labels = [(k, v) for (k, v, t, s) in labels if abs(v) > threshold]
+        remainging_amount = sum([v for k, v, t, s in labels]) - sum([v for k, v in largest_labels])
         largest_labels = sorted(
             {**dict(largest_labels), **{"OTHER": remainging_amount}}.items(),
             key=lambda item: -abs(item[1]),
         )
         return "<br>".join([f"{v:>7,.0f}: {k[:25]}" for (k, v) in largest_labels]) + total_label
 
-    def get_timeseries_annotations(self, labels: pd.Series, annotation_count: int = 3) -> list:
+    def __get_timeseries_annotations(self, labels: pd.Series, annotation_count: int = 3) -> list:
         """returns the annotations for the figure"""
         result = [(index, *tup) for index, sublist in labels.items() for tup in sublist if tup[2] not in self._iat_types]
         df_annotations = (
-            pd.DataFrame(result, columns=["Date", "MemoMapped", "TransactionValue", "Type"])
+            pd.DataFrame(result, columns=["Date", "MemoMapped", "TransactionValue", "Type", "SubType"])
             .sort_values(by="TransactionValue", ascending=True)
             .iloc[:annotation_count]
             .reset_index(drop=True)
@@ -350,16 +523,16 @@ class DataFigure:
 
         return df_annotations.groupby("Date").agg({"Annotation": lambda x: "<br>".join(x)})
 
-    def get_figure_timeseries(self, date_range: list = None, account: str = None, annotation_count: int = 3) -> pd.DataFrame:
+    def get_figure_timeseries(self, date_range: list = None, account: str = None, annotation_count: int = 3) -> go.Figure:
         """plots the timeseries of the account value"""
         df_values_timeseries = self.data_server.get_values_timeseries(date_range, account)
-        df_annotations = self.get_timeseries_annotations(df_values_timeseries["Label"], annotation_count=annotation_count)
+        df_annotations = self.__get_timeseries_annotations(df_values_timeseries["TransactionValue_list"], annotation_count=annotation_count)
 
         fig = go.Figure(
             data=go.Scatter(
                 x=df_values_timeseries.index,
                 y=df_values_timeseries["Value"],
-                hovertext=df_values_timeseries["Label"].apply(self.prepare_timeseries_label),
+                hovertext=df_values_timeseries["TransactionValue_list"].apply(self.__prepare_timeseries_label),
             ),
         )
 
@@ -397,3 +570,13 @@ class DataFigure:
             i = i + 1
 
         return fig
+
+    def get_total_wealth(self, date: datetime = None) -> float:
+        """returns the total wealth at the given date"""
+        df_values_timeseries = self.data_server.get_values_timeseries()
+        if date is None:
+            date = datetime.today()
+        return df_values_timeseries.loc[date]["Value"]
+
+    def get_figure_sunburst(self, date_range: list = None, account: str = None, annotation_count: int = 3) -> go.Figure:
+        pass
