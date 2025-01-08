@@ -2,8 +2,6 @@ import configparser
 from datetime import datetime
 
 import pandas as pd
-
-import plotly.express as px
 import plotly.graph_objects as go
 
 from bkanalysis.config import config_helper
@@ -208,10 +206,12 @@ class DataMarket:
                 ]
             )
             .drop_duplicates()
-            .sort_values(["AssetMapped", "Date"])
+            .sort_values(["AssetMapped", "Date"], ascending=[True, False])
             .reset_index(drop=True)
             .dropna()
         )
+
+        df["AssetPriceChangeInRefCurrency"] = df.groupby("AssetMapped")["AssetPriceInRefCurrency"].diff()
 
         self.prices = df.set_index(["AssetMapped", "Date"])
 
@@ -231,214 +231,70 @@ class DataMarket:
         return pd.DataFrame(rows)
 
 
-class DataServer2:
+class DataServer:
     """Class to prepare the data for the UI"""
+
+    __agg_func = {
+        "Quantity": ["sum", list],
+        "MemoMapped": list,
+        "Type": list,
+        "SubType": list,
+        "AssetPriceInRefCurrency": "first",
+        "AssetPriceChangeInRefCurrency": "first",
+    }
 
     def __init__(self, data_manager: DataManager, data_market: DataMarket):
         self.data_manager = data_manager
         self.data_market = data_market
 
-        self._reindexed_transactions = None
+        self._df_grouped_transactions = None
         self._df_transaction_price = None
 
         self.index_names = ["Account", "Asset", "Date", "MemoMapped"]
         self.sum_names = ["Quantity"]
 
-    @property
-    def accounts(self):
-        """returns the list of all accounts"""
-        return self.data_manager.accounts
-
-    def reindex_transactions(self) -> None:
-        """Reindex the transactions DataFrame to include all dates for each Account and Asset."""
-        meta_data_names = [n for n in self.data_manager.transactions.columns if n not in self.sum_names and n not in self.index_names]
-        self.data_manager.transactions["Date"] = pd.to_datetime(self.data_manager.transactions["Date"])
-
-        # Step 1: Aggregate duplicates by summing Quantity, keeping other columns as-is
-        aggregation = {**{k: "sum" for k in self.sum_names}, **{k: "first" for k in meta_data_names}}
-        df = self.data_manager.transactions.groupby(self.index_names, as_index=False).agg(aggregation)
-
-        # Step 2: Initialize an empty list to store reindexed DataFrames
-        reindexed_dfs = []
-
-        # Step 3: Process each group (Account, Asset) separately
-        for (account, asset), group in df.groupby(["Account", "Asset"]):
-            # Determine the full date range for this group
-            date_range = pd.date_range(group["Date"].min(), datetime.today(), freq="D")
-
-            # Create a new DataFrame to reindex the group's data
-            date_memo_df = pd.DataFrame({"Date": date_range})
-
-            # Merge the full date range with the group to ensure all dates are included
-            expanded_group = pd.merge(date_memo_df, group, on="Date", how="left")
-
-            # Add back the Account and Asset columns
-            expanded_group["Account"] = account
-            expanded_group["Asset"] = asset
-
-            # Append the reindexed group to the list
-            reindexed_dfs.append(expanded_group)
-
-        # Step 4: Concatenate all reindexed DataFrames
-        df_reindexed = pd.concat(reindexed_dfs)
-
-        # Step 5: Reset the index if needed
-        df_reindexed = df_reindexed.reset_index(drop=True)
-
-        self._reindexed_transactions = df_reindexed.set_index(self.index_names[: self.index_names.index("Date") + 1])
-
-    def merge_transaction_price(self) -> None:
-        """Merge the reindexed transactions with the market prices."""
-        df_temp = self._reindexed_transactions.reset_index()
-        df_temp["AssetMapped"] = df_temp["Asset"].map(self.data_market.get_asset_map(self.data_manager))
-        df_temp["Date"] = normalize_date_column(df_temp["Date"])
-        df_temp = df_temp.set_index(["AssetMapped", "Date"])
-
-        df_prices = self.data_market.prices.reset_index().sort_values(by=["AssetMapped", "Date"], ascending=[True, False])
-
-        # df_prices_asset = df_prices_asset.groupby("AssetMapped").set_index("Date").reindex(date_range).ffill().bfill().reset_index()
-
-        df_prices["Date"] = normalize_date_column(df_prices["Date"])
-        df_prices = df_prices.set_index(["AssetMapped", "Date"])
-
-        self._df_transaction_price = pd.merge(df_temp, df_prices, left_index=True, right_index=True, how="left").sort_index()
-
-        self._df_transaction_price["AssetPriceInRefCurrency"] = self._df_transaction_price.groupby("AssetMapped")[
-            "AssetPriceInRefCurrency"
-        ].ffill()
-        self._df_transaction_price["AssetPriceDiffInRefCurrency"] = self._df_transaction_price.groupby("AssetMapped")[
-            "AssetPriceInRefCurrency"
-        ].diff()
-
-    def get_values_by_asset(self):
-        """returns the data_manager.transactions with the market prices"""
-        df = pd.pivot_table(
-            self._df_transaction_price,
-            index=["AssetMapped", "Date"],
-            values=["Quantity", "MemoMapped", "Type", "SubType", "AssetPriceInRefCurrency", "AssetPriceDiffInRefCurrency"],
-            aggfunc={
-                "Quantity": ["sum", list],
-                "MemoMapped": list,
-                "Type": list,
-                "SubType": list,
-                "AssetPriceInRefCurrency": "first",
-                "AssetPriceDiffInRefCurrency": "first",
-            },
-        ).sort_index(ascending=False)
-
-        df.columns = ["_".join(col).strip() if isinstance(col, tuple) else col for col in df.columns]
-
-        df["Quantity_cumsum"] = (
-            df.groupby("AssetMapped")["Quantity_sum"].apply(lambda x: x[::-1].cumsum()[::-1]).reset_index(level=0, drop=True)
+    def group_transaction(self):
+        """group the transaction by ["Account", "AssetMapped", "Date"]"""
+        df_grouped_transactions = self.data_manager.transactions.groupby(["Account", "Asset", "Date"]).agg(
+            {k: DataServer.__agg_func[k] for k in DataServer.__agg_func if k in self.data_manager.transactions.columns}
         )
-        df["Value"] = (
-            df.groupby("AssetMapped")
-            .apply(lambda group: group["Quantity_cumsum"] * group["AssetPriceInRefCurrency_first"])
-            .reset_index(level=0, drop=True)
-        )
-        df["CapitalGain"] = (
-            df.groupby("AssetMapped")
-            .apply(lambda group: group["Quantity_cumsum"] * group["AssetPriceDiffInRefCurrency_first"])
-            .reset_index(level=0, drop=True)
-        )
+        df_grouped_transactions.columns = [
+            "_".join(col).strip() if isinstance(col, tuple) else col for col in df_grouped_transactions.columns
+        ]
+        df_grouped_transactions = df_grouped_transactions.reset_index()
+        df_grouped_transactions["AssetMapped"] = df_grouped_transactions["Asset"].map(self.data_market.get_asset_map(self.data_manager))
+        df_grouped_transactions = df_grouped_transactions.set_index(["Account", "AssetMapped", "Date"]).drop(columns="Asset")
+        self._df_grouped_transactions = df_grouped_transactions
 
-        df["Quantity_list"] = df["Quantity_list"].apply(lambda d: d if isinstance(d, list) else [])
-        df["MemoMapped_list"] = df["MemoMapped_list"].apply(lambda d: d if isinstance(d, list) else [])
-        df["Type_list"] = df["Type_list"].apply(lambda d: d if isinstance(d, list) else [])
-        df["SubType_list"] = df["SubType_list"].apply(lambda d: d if isinstance(d, list) else [])
-
-        df = df.rename(
-            columns={
-                "AssetPriceDiffInRefCurrency_first": "AssetPriceChangeInRefCurrency",
-                "AssetPriceInRefCurrency_first": "AssetPriceInRefCurrency",
-            }
-        ).reset_index()
-        df.Date = pd.to_datetime(df.Date)
-        df = df.set_index(["AssetMapped", "Date"]).sort_index(ascending=[True, False])
-
-        return df
-
-
-class DataServer:
-    """Class to prepare the data for the UI"""
-
-    def __init__(self, data_manager: DataManager, data_market: DataMarket):
-        self.data_manager = data_manager
-        self.data_market = data_market
-
-    @property
-    def accounts(self):
-        """returns the list of all accounts"""
-        return self.data_manager.accounts
-
-    def get_values_by_asset(self, date_range: list = None, account: str = None):
-        """returns the data_manager.transactions with the market prices"""
-        transaction_prices = {}
+    def get_values_by_asset(self, date_range: list = None, account: str | list = None):
+        """Retrieve asset values and related financial metrics within a specified date range and/or for a specific account."""
 
         if account is not None:
-            if account not in self.accounts:
-                raise KeyError(f"account {account} not found.")
-            transactions = self.data_manager.transactions[self.data_manager.transactions.Account == account]
+            if isinstance(account, str):
+                account = [account]
+            df = self._df_grouped_transactions.loc[account].groupby(["AssetMapped", "Date"]).agg("sum")
+            prices = self.data_market.prices.loc[df.reset_index().AssetMapped.unique()].reset_index()
+            prices = prices[prices.Date > df.reset_index().Date.min()].set_index(["AssetMapped", "Date"])
         else:
-            transactions = self.data_manager.transactions
+            df = self._df_grouped_transactions
+            df = df.groupby(["AssetMapped", "Date"]).agg("sum")
+            prices = self.data_market.prices
 
-        asset_map = self.data_market.get_asset_map(self.data_manager)
+        df_prices = pd.merge(df, prices, left_index=True, right_index=True, how="outer").fillna({"Quantity_sum": 0})
+        df_prices["Quantity_cumsum"] = df_prices.groupby(["AssetMapped"])["Quantity_sum"].cumsum()
+        df_prices["Value"] = df_prices["Quantity_cumsum"] * df_prices["AssetPriceInRefCurrency"]
+        df_prices["CapitalGain"] = df_prices["Quantity_cumsum"] * df_prices["AssetPriceChangeInRefCurrency"]
 
-        # Process each asset individually
-        unique_assets = [asset_map[a] for a in transactions["Asset"].unique() if isinstance(a, str)]
-        for asset in unique_assets:
-            # Filter data for the current asset
-            df_trans_asset = transactions[transactions["Asset"].map(asset_map) == asset]
-            df_prices_asset = self.data_market.prices.xs(asset, level="AssetMapped")
-
-            # merge the transaction
-            transaction_price = self.merge_transaction_asset(df_trans_asset, df_prices_asset.reset_index())
-            transaction_price["AssetMapped"] = asset
-            transaction_prices[asset] = transaction_price
-
-        # Combine results for all assets
-        df_value = pd.concat(transaction_prices.values(), ignore_index=True)
+        df_prices["Quantity_list"] = df_prices["Quantity_list"].apply(lambda d: d if isinstance(d, list) else [])
+        df_prices["MemoMapped_list"] = df_prices["MemoMapped_list"].apply(lambda d: d if isinstance(d, list) else [])
+        df_prices["Type_list"] = df_prices["Type_list"].apply(lambda d: d if isinstance(d, list) else [])
+        df_prices["SubType_list"] = df_prices["SubType_list"].apply(lambda d: d if isinstance(d, list) else [])
 
         if date_range is not None:
             if len(date_range) != 2:
-                raise ValueError(f"date_range must be a list of two dates")
-            return df_value[(df_value.Date >= date_range[0]) & (df_value.Date <= date_range[1])]
-        return df_value
-
-    def merge_transaction_asset(self, df_trans_asset, df_prices_asset):
-        """merge the transaction and price dataframes, calculate value and capital gain"""
-        date_range = DataServer.get_full_range(df_trans_asset, df_prices_asset)
-
-        df_trans_asset_daily = pd.pivot_table(
-            df_trans_asset,
-            index="Date",
-            values=["Quantity", "MemoMapped", "Type", "SubType"],
-            aggfunc={"Quantity": ["sum", list], "MemoMapped": list, "Type": list, "SubType": list},
-        ).reindex(date_range)
-        df_trans_asset_daily.columns = ["_".join(col).strip() if isinstance(col, tuple) else col for col in df_trans_asset_daily.columns]
-        df_trans_asset_daily["Quantity_sum"] = df_trans_asset_daily["Quantity_sum"].fillna(0)
-        df_prices_asset = df_prices_asset.set_index("Date").reindex(date_range).ffill().bfill().reset_index()
-
-        merged = pd.merge(
-            df_trans_asset_daily.reset_index(), df_prices_asset[["Date", "AssetPriceInRefCurrency"]], on=["Date"], how="left"
-        ).sort_values("Date", ascending=False)
-
-        merged["AssetPriceChangeInRefCurrency"] = -merged["AssetPriceInRefCurrency"].diff().fillna(0.0)
-        merged["Quantity_cumsum"] = merged["Quantity_sum"][::-1].cumsum()[::-1]
-        merged["Value"] = merged["Quantity_cumsum"] * merged["AssetPriceInRefCurrency"]
-        merged["CapitalGain"] = merged["Quantity_cumsum"] * merged["AssetPriceChangeInRefCurrency"]
-
-        merged["Quantity_list"] = merged["Quantity_list"].apply(lambda d: d if isinstance(d, list) else [])
-        merged["MemoMapped_list"] = merged["MemoMapped_list"].apply(lambda d: d if isinstance(d, list) else [])
-        merged["Type_list"] = merged["Type_list"].apply(lambda d: d if isinstance(d, list) else [])
-        merged["SubType_list"] = merged["SubType_list"].apply(lambda d: d if isinstance(d, list) else [])
-
-        return merged
-
-    @staticmethod
-    def get_full_range(df1, df2):
-        """return the full date range covering df1.Date and df2.Date, up to today"""
-        return pd.date_range(df1.Date.min(), max(datetime.today(), df2.Date.max()), name="Date")
+                raise ValueError("date_range must be a list of two dates")
+            return df_prices[(df_prices.Date >= date_range[0]) & (df_prices.Date <= date_range[1])]
+        return df_prices
 
     @staticmethod
     def consolidate_transactions(transactions):
@@ -456,7 +312,7 @@ class DataServer:
         """Aggregate a list of transactions"""
         return DataServer.consolidate_transactions([(k, d[k][0], d[k][1], d[k][2]) for d in l for k in d])
 
-    def get_values_timeseries(self, date_range: list = None, account: str = None) -> pd.DataFrame:
+    def get_values_timeseries(self, date_range: list = None, account: str | list = None) -> pd.DataFrame:
         """returns a timeseries of the values"""
         df_asset = self.get_values_by_asset(date_range, account)
 
@@ -496,7 +352,10 @@ class DataFigure:
         total_label = f"<br><br>TOTAL: {total_amt:,.0f}" if total_amt != 0 else ""
 
         if len(labels) < max_labels:
-            return "<br>".join([f"{v:>7,.0f}: {k[:max_char]}" for (k, v, t, s) in labels]) + total_label
+            try:
+                return "<br>".join([f"{v:>7,.0f}: {k[:max_char] if isinstance(k,str) else ''}" for (k, v, t, s) in labels]) + total_label
+            except TypeError:
+                return ""
 
         threshold = sorted([abs(v) for (k, v, t, s) in labels], reverse=True)[max_labels - 1]
         largest_labels = [(k, v) for (k, v, t, s) in labels if abs(v) > threshold]
@@ -523,7 +382,7 @@ class DataFigure:
 
         return df_annotations.groupby("Date").agg({"Annotation": lambda x: "<br>".join(x)})
 
-    def get_figure_timeseries(self, date_range: list = None, account: str = None, annotation_count: int = 3) -> go.Figure:
+    def get_figure_timeseries(self, date_range: list = None, account: str | list = None, annotation_count: int = 3) -> go.Figure:
         """plots the timeseries of the account value"""
         df_values_timeseries = self.data_server.get_values_timeseries(date_range, account)
         df_annotations = self.__get_timeseries_annotations(df_values_timeseries["TransactionValue_list"], annotation_count=annotation_count)
