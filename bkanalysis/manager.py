@@ -109,7 +109,7 @@ class DataManager:
         )
 
 
-class DataMarket:
+class MarketManager:
     """Class to handle the interaction of the data with the market prices"""
 
     def __init__(self, ref_currency: str, config=None):
@@ -142,7 +142,7 @@ class DataMarket:
         period = {a: "10y" if (datetime.today() - assets[a]).days / 356 < 10 else "max" for a in assets}
         market_prices = loader.load(assets, self.ref_currency, period)
 
-        df_prices = DataMarket.dataframe_from_nested_dict(market_prices)
+        df_prices = MarketManager.dataframe_from_nested_dict(market_prices)
         df_prices["Date"] = normalize_date_column(df_prices["Date"])
         df_prices = df_prices[df_prices.Price != 0]
 
@@ -232,7 +232,7 @@ class DataMarket:
         return pd.DataFrame(rows)
 
 
-class DataServer:
+class TransformationManager:
     """Class to prepare the data for the UI"""
 
     __agg_func = {
@@ -244,9 +244,9 @@ class DataServer:
         "AssetPriceChangeInRefCurrency": "first",
     }
 
-    def __init__(self, data_manager: DataManager, data_market: DataMarket):
+    def __init__(self, data_manager: DataManager, market_manager: MarketManager):
         self.data_manager = data_manager
-        self.data_market = data_market
+        self.market_manager = market_manager
 
         self._df_grouped_transactions = None
         self._df_transaction_price = None
@@ -257,13 +257,17 @@ class DataServer:
     def group_transaction(self):
         """group the transaction by ["Account", "AssetMapped", "Date"]"""
         df_grouped_transactions = self.data_manager.transactions.groupby(["Account", "Asset", "Date"]).agg(
-            {k: DataServer.__agg_func[k] for k in DataServer.__agg_func if k in self.data_manager.transactions.columns}
+            {
+                k: TransformationManager.__agg_func[k]
+                for k in TransformationManager.__agg_func
+                if k in self.data_manager.transactions.columns
+            }
         )
         df_grouped_transactions.columns = [
             "_".join(col).strip() if isinstance(col, tuple) else col for col in df_grouped_transactions.columns
         ]
         df_grouped_transactions = df_grouped_transactions.reset_index()
-        df_grouped_transactions["AssetMapped"] = df_grouped_transactions["Asset"].map(self.data_market.get_asset_map(self.data_manager))
+        df_grouped_transactions["AssetMapped"] = df_grouped_transactions["Asset"].map(self.market_manager.get_asset_map(self.data_manager))
         df_grouped_transactions = df_grouped_transactions.set_index(["Account", "AssetMapped", "Date"]).drop(columns="Asset")
         self._df_grouped_transactions = df_grouped_transactions
 
@@ -274,12 +278,12 @@ class DataServer:
             if isinstance(account, str):
                 account = [account]
             df = self._df_grouped_transactions.loc[account].groupby(["AssetMapped", "Date"]).agg("sum")
-            prices = self.data_market.prices.loc[df.reset_index().AssetMapped.unique()].reset_index()
+            prices = self.market_manager.prices.loc[df.reset_index().AssetMapped.unique()].reset_index()
             prices = prices[prices.Date > df.reset_index().Date.min()].set_index(["AssetMapped", "Date"])
         else:
             df = self._df_grouped_transactions
             df = df.groupby(["AssetMapped", "Date"]).agg("sum")
-            prices = self.data_market.prices
+            prices = self.market_manager.prices
 
         df_prices = pd.merge(df, prices, left_index=True, right_index=True, how="outer").fillna({"Quantity_sum": 0})
         df_prices["Quantity_cumsum"] = df_prices.groupby(["AssetMapped"])["Quantity_sum"].cumsum()
@@ -313,7 +317,7 @@ class DataServer:
     @staticmethod
     def aggregate_transactions(l):
         """Aggregate a list of transactions"""
-        return DataServer.consolidate_transactions([(k, d[k][0], d[k][1], d[k][2]) for d in l for k in d])
+        return TransformationManager.consolidate_transactions([(k, d[k][0], d[k][1], d[k][2]) for d in l for k in d])
 
     def get_values_timeseries(self, date_range: list = None, account: str | list = None) -> pd.DataFrame:
         """returns a timeseries of the values"""
@@ -329,7 +333,9 @@ class DataServer:
                 df_asset["SubType_list"],
             )
         ]
-        df_values_timeseries = df_asset.groupby("Date").agg({"Value": "sum", "TransactionValue_list": DataServer.aggregate_transactions})
+        df_values_timeseries = df_asset.groupby("Date").agg(
+            {"Value": "sum", "TransactionValue_list": TransformationManager.aggregate_transactions}
+        )
 
         return df_values_timeseries
 
@@ -367,13 +373,13 @@ class DataServer:
         pass
 
 
-class DataFigure:
+class FigureManager:
     """Class to prepare the data for the UI"""
 
     __DATE_FORMAT = "%Y-%m-%d"
 
-    def __init__(self, data_server: DataServer):
-        self.data_server = data_server
+    def __init__(self, transformation_manager: TransformationManager):
+        self.transformation_manager = transformation_manager
         self._iat_types = IatIdentification.iat_types + ["C", "S"]
 
     def __prepare_timeseries_label(self, labels, max_labels: int = 20, max_char: int = 20):
@@ -414,7 +420,7 @@ class DataFigure:
 
     def get_figure_timeseries(self, date_range: list = None, account: str | list = None, annotation_count: int = 3) -> go.Figure:
         """plots the timeseries of the account value"""
-        df_values_timeseries = self.data_server.get_values_timeseries(date_range, account)
+        df_values_timeseries = self.transformation_manager.get_values_timeseries(date_range, account)
         df_annotations = self.__get_timeseries_annotations(df_values_timeseries["TransactionValue_list"], annotation_count=annotation_count)
 
         fig = go.Figure(
@@ -462,7 +468,7 @@ class DataFigure:
 
     def get_total_wealth(self, date: datetime = None) -> float:
         """returns the total wealth at the given date"""
-        df_values_timeseries = self.data_server.get_values_timeseries()
+        df_values_timeseries = self.transformation_manager.get_values_timeseries()
         if date is None:
             date = datetime.today()
         return df_values_timeseries.loc[date]["Value"]
@@ -472,15 +478,15 @@ class DataFigure:
         """returns the title of the sunburst chart"""
         if dates is not None:
             return (
-                f"Spending Breakdown for {min(dates).strftime(DataFigure.__DATE_FORMAT)} to "
-                f"{max(dates).strftime(DataFigure.__DATE_FORMAT)}"
+                f"Spending Breakdown for {min(dates).strftime(FigureManager.__DATE_FORMAT)} to "
+                f"{max(dates).strftime(FigureManager.__DATE_FORMAT)}"
                 f" (Total Spend: {amounts.sum():,.0f})"
             )
         return f" (Total Spend: {amounts.sum():,.0f})"
 
     def get_figure_sunburst(self, date_range: list = None, account: str = None) -> go.Figure:
         """plots a sunburst of the account transactions"""
-        df_expenses = self.data_server.get_flow_values(date_range, account, how="out", include_iat=False).reset_index(drop=True)
+        df_expenses = self.transformation_manager.get_flow_values(date_range, account, how="out", include_iat=False).reset_index(drop=True)
         df_expenses["Value"] = (-1) * df_expenses["Value"]
         title = self.__get_title_sunburst(date_range, df_expenses["Value"])
         return px.sunburst(df_expenses, path=["Type", "SubType", "MemoMapped"], values="Value", title=title)
@@ -489,7 +495,7 @@ class DataFigure:
         self, category, label, show_count: int = 5, date_range: list = None, account: str = None, how: str = "out", include_iat=False
     ):
         """plots a bar chat showing the monthly spending by category"""
-        df_expenses = self.data_server.get_flow_values(date_range, account, how=how, include_iat=include_iat)
+        df_expenses = self.transformation_manager.get_flow_values(date_range, account, how=how, include_iat=include_iat)
         df_expenses["Value"] = (-1) * df_expenses["Value"]
         key = list(category.keys())[0]
         df_expenses = df_expenses[df_expenses[key] == category[key]].reset_index()[["Date", label, "Value"]]
@@ -510,7 +516,7 @@ class DataFigure:
 
     def get_figure_waterfall(self, date_range: list = None, account: str = None, how: str = "both", include_iat=False):
         """plots a waterfall chat showing the spending/incomes by category"""
-        df_expenses = self.data_server.get_flow_values(date_range, account, how=how, include_iat=include_iat)
+        df_expenses = self.transformation_manager.get_flow_values(date_range, account, how=how, include_iat=include_iat)
         df_spendings = df_expenses.reset_index(drop=True).groupby("Type")["Value"].sum().sort_values(ascending=False)
 
         fig = go.Figure(
