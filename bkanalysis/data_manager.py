@@ -3,6 +3,7 @@ from datetime import datetime
 
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 
 from bkanalysis.config import config_helper
 from bkanalysis.market import market_loader
@@ -293,7 +294,9 @@ class DataServer:
         if date_range is not None:
             if len(date_range) != 2:
                 raise ValueError("date_range must be a list of two dates")
-            return df_prices[(df_prices.Date >= date_range[0]) & (df_prices.Date <= date_range[1])]
+            df_prices = df_prices.reset_index()
+            df_prices = df_prices[(df_prices.Date >= date_range[0]) & (df_prices.Date <= date_range[1])]
+            return df_prices.set_index(["AssetMapped", "Date"])
         return df_prices
 
     @staticmethod
@@ -330,9 +333,25 @@ class DataServer:
 
         return df_values_timeseries
 
-    def get_values_by_types(self, filters) -> pd.DataFrame:
-        """returns a breakdown by types"""
-        pass
+    def get_expenses(self, date_range=None, account: str = None):
+        """get the expenses by Type/Subtype/MemoMapped for the given date_range and account"""
+        df_values_timeseries = self.get_values_by_asset(date_range=date_range, account=account)
+
+        df_values_timeseries["Value_list"] = [
+            [q * p for q in q_list]
+            for p, q_list in zip(df_values_timeseries["AssetPriceInRefCurrency"], df_values_timeseries["Quantity_list"])
+        ]
+        columns_list = ["MemoMapped_list", "Type_list", "SubType_list", "Value_list"]
+        df_values_exploded = df_values_timeseries.explode(columns_list)[columns_list].dropna(subset="Value_list")
+        df_values_exploded.columns = [c.replace("_list", "") for c in df_values_exploded.columns]
+        df_values_exploded["SubType"] = df_values_exploded["SubType"].fillna(" ")
+        df_values_exploded["MemoMapped"] = df_values_exploded["MemoMapped"].fillna(" ")
+        df_values_exploded["Type"] = df_values_exploded["Type"].fillna(" ")
+
+        df_expenses = df_values_exploded[(df_values_exploded["Value"] < 0) & (df_values_exploded["Type"] != "IAT")].copy()
+        df_expenses["Value"] = (-1) * df_expenses["Value"]
+
+        return df_expenses
 
     def get_values_by_month(self, filters) -> pd.DataFrame:
         """returns a breakdown by month"""
@@ -341,6 +360,8 @@ class DataServer:
 
 class DataFigure:
     """Class to prepare the data for the UI"""
+
+    __DATE_FORMAT = "%Y-%m-%d"
 
     def __init__(self, data_server: DataServer):
         self.data_server = data_server
@@ -437,5 +458,40 @@ class DataFigure:
             date = datetime.today()
         return df_values_timeseries.loc[date]["Value"]
 
-    def get_figure_sunburst(self, date_range: list = None, account: str = None, annotation_count: int = 3) -> go.Figure:
-        pass
+    @staticmethod
+    def __get_title_sunburst(dates, amounts):
+        """returns the title of the sunburst chart"""
+        if dates is not None:
+            return (
+                f"Spending Breakdown for {min(dates).strftime(DataFigure.__DATE_FORMAT)} to "
+                f"{max(dates).strftime(DataFigure.__DATE_FORMAT)}"
+                f" (Total Spend: {amounts.sum():,.0f})"
+            )
+        return f" (Total Spend: {amounts.sum():,.0f})"
+
+    def get_figure_sunburst(self, date_range: list = None, account: str = None) -> go.Figure:
+        """plots a sunburst of the account transactions"""
+        df_expenses = self.data_server.get_expenses(date_range, account).reset_index(drop=True)
+        title = self.__get_title_sunburst(date_range, df_expenses["Value"])
+        return px.sunburst(df_expenses, path=["Type", "SubType", "MemoMapped"], values="Value", title=title)
+
+    def get_figure_bar(self, category, label, show_count: int = 5, date_range: list = None, account: str = None):
+        """plots a bar chat showing the monthly spending by category"""
+        df_expenses = self.data_server.get_expenses(date_range, account)
+
+        key = list(category.keys())[0]
+        df_expenses = df_expenses[df_expenses[key] == category[key]].reset_index()[["Date", label, "Value"]]
+
+        df_expenses["Date"] = pd.to_datetime(df_expenses["Date"])
+        df_expenses = df_expenses.groupby([df_expenses["Date"].dt.to_period("M"), label])["Value"].sum().reset_index()
+        df_expenses = df_expenses.rename(columns={"Date": "Month"})
+        df_expenses["Month"] = df_expenses["Month"].astype(str)
+
+        category_totals = df_expenses.groupby(label)["Value"].sum().astype(float)
+        top_categories = category_totals.nlargest(show_count).index
+        df_expenses[label] = df_expenses[label].apply(lambda x: x if x in top_categories else "Others")
+        df_expenses_aggregated = df_expenses.groupby(["Month", label], as_index=False)["Value"].sum()
+
+        return px.bar(
+            df_expenses_aggregated, x="Month", y="Value", color="MemoMapped", text="MemoMapped", title=f"{category[key]} Spending"
+        )
