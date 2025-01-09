@@ -11,8 +11,6 @@ from bkanalysis.process import process
 from bkanalysis.transforms import master_transform
 from bkanalysis.process.iat_identification import IatIdentification
 
-USE_GO = True
-
 
 def normalize_date_column(date_column):
     """Normalizes the date column to a consistent date format."""
@@ -470,7 +468,7 @@ class FigureManager:
         """returns the total wealth at the given date"""
         df_values_timeseries = self.transformation_manager.get_values_timeseries()
         if date is None:
-            date = datetime.today()
+            return df_values_timeseries.iloc[-1]["Value"]
         return df_values_timeseries.loc[date]["Value"]
 
     @staticmethod
