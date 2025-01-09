@@ -333,7 +333,7 @@ class DataServer:
 
         return df_values_timeseries
 
-    def get_expenses(self, date_range=None, account: str = None):
+    def get_flow_values(self, date_range=None, account: str = None, how: str = "both", include_iat: bool = False):
         """get the expenses by Type/Subtype/MemoMapped for the given date_range and account"""
         df_values_timeseries = self.get_values_by_asset(date_range=date_range, account=account)
 
@@ -348,10 +348,19 @@ class DataServer:
         df_values_exploded["MemoMapped"] = df_values_exploded["MemoMapped"].fillna(" ")
         df_values_exploded["Type"] = df_values_exploded["Type"].fillna(" ")
 
-        df_expenses = df_values_exploded[(df_values_exploded["Value"] < 0) & (df_values_exploded["Type"] != "IAT")].copy()
-        df_expenses["Value"] = (-1) * df_expenses["Value"]
+        if not include_iat:
+            df_flow_values = df_values_exploded[df_values_exploded["Type"] != "IAT"]
+        else:
+            df_flow_values = df_values_exploded
 
-        return df_expenses
+        if how.lower() == "both":
+            return df_flow_values
+        elif how.lower() == "in":
+            return df_flow_values[df_flow_values["Value"] > 0]
+        elif how.lower() == "out":
+            return df_flow_values[df_flow_values["Value"] < 0]
+
+        raise ValueError(f"Invalid 'how=' must be 'both', 'in', or 'out' but was {how}.")
 
     def get_values_by_month(self, filters) -> pd.DataFrame:
         """returns a breakdown by month"""
@@ -471,14 +480,17 @@ class DataFigure:
 
     def get_figure_sunburst(self, date_range: list = None, account: str = None) -> go.Figure:
         """plots a sunburst of the account transactions"""
-        df_expenses = self.data_server.get_expenses(date_range, account).reset_index(drop=True)
+        df_expenses = self.data_server.get_flow_values(date_range, account, how="out", include_iat=False).reset_index(drop=True)
+        df_expenses["Value"] = (-1) * df_expenses["Value"]
         title = self.__get_title_sunburst(date_range, df_expenses["Value"])
         return px.sunburst(df_expenses, path=["Type", "SubType", "MemoMapped"], values="Value", title=title)
 
-    def get_figure_bar(self, category, label, show_count: int = 5, date_range: list = None, account: str = None):
+    def get_figure_bar(
+        self, category, label, show_count: int = 5, date_range: list = None, account: str = None, how: str = "out", include_iat=False
+    ):
         """plots a bar chat showing the monthly spending by category"""
-        df_expenses = self.data_server.get_expenses(date_range, account)
-
+        df_expenses = self.data_server.get_flow_values(date_range, account, how=how, include_iat=include_iat)
+        df_expenses["Value"] = (-1) * df_expenses["Value"]
         key = list(category.keys())[0]
         df_expenses = df_expenses[df_expenses[key] == category[key]].reset_index()[["Date", label, "Value"]]
 
@@ -495,3 +507,26 @@ class DataFigure:
         return px.bar(
             df_expenses_aggregated, x="Month", y="Value", color="MemoMapped", text="MemoMapped", title=f"{category[key]} Spending"
         )
+
+    def get_figure_waterfall(self, date_range: list = None, account: str = None, how: str = "both", include_iat=False):
+        """plots a waterfall chat showing the spending/incomes by category"""
+        df_expenses = self.data_server.get_flow_values(date_range, account, how=how, include_iat=include_iat)
+        df_spendings = df_expenses.reset_index(drop=True).groupby("Type")["Value"].sum().sort_values(ascending=False)
+
+        fig = go.Figure(
+            go.Waterfall(
+                name="20",
+                orientation="v",
+                measure=["relative" for b in df_spendings] + ["total"],
+                x=list(df_spendings.index) + ["savings"],
+                textposition="outside",
+                text=list(df_spendings.index) + ["Savings"],
+                y=list(df_spendings.values) + [-df_spendings.values.sum()],
+                connector={"line": {"color": "rgb(63, 63, 63)"}},
+            )
+        )
+
+        title = f"Income/Spending Summary {date_range[1].year}" if date_range is not None else f"Income/Spending Summary"
+        fig.update_layout(showlegend=False, margin=dict(t=50), title=title)
+
+        return fig
