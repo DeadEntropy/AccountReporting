@@ -10,6 +10,7 @@ from bkanalysis.market import market_loader
 from bkanalysis.process import process
 from bkanalysis.transforms import master_transform
 from bkanalysis.process.iat_identification import IatIdentification
+from bkanalysis.salary import Salary
 
 
 def normalize_date_column(date_column):
@@ -104,6 +105,48 @@ class DataManager:
             df_raw,
             ignore_overrides=self.ignore_overrides,
             remove_offsetting=self.remove_offsetting,
+        )
+
+    @property
+    def map_account_type(self):
+        """returns a mapping between Account and AccountType"""
+        return (
+            self.transactions[["Account", "AccountType"]]
+            .drop_duplicates()
+            .sort_values("Account")
+            .set_index("Account")
+            .AccountType.fillna(" ")
+        )
+
+    @property
+    def map_type(self):
+        """returns a mapping between Type and FullType"""
+        return {
+            **self.transactions[["Type", "FullType"]].drop_duplicates().sort_values("Type").set_index("Type").FullType.fillna(" "),
+            **{" ": " "},
+        }
+
+    @property
+    def map_subtype(self):
+        """returns a mapping between SubType and FullSubType"""
+        return {
+            **self.transactions[["SubType", "FullSubType"]]
+            .drop_duplicates()
+            .sort_values("SubType")
+            .set_index("SubType")
+            .FullSubType.fillna(" "),
+            **{" ": " "},
+        }
+
+    @property
+    def map_mastertype(self):
+        """returns a mapping between MasterType and FullMasterType"""
+        return (
+            self.transactions[["MasterType", "FullMasterType"]]
+            .drop_duplicates()
+            .sort_values("MasterType")
+            .set_index("MasterType")
+            .FullMasterType.fillna(" ")
         )
 
 
@@ -210,7 +253,7 @@ class MarketManager:
             .dropna()
         )
 
-        df["AssetPriceChangeInRefCurrency"] = df.groupby("AssetMapped")["AssetPriceInRefCurrency"].diff()
+        df["AssetPriceChangeInRefCurrency"] = -df.groupby("AssetMapped")["AssetPriceInRefCurrency"].diff()
 
         self.prices = df.set_index(["AssetMapped", "Date"])
 
@@ -247,7 +290,6 @@ class TransformationManager:
         self.market_manager = market_manager
 
         self._df_grouped_transactions = None
-        self._df_transaction_price = None
 
         self.index_names = ["Account", "Asset", "Date", "MemoMapped"]
         self.sum_names = ["Quantity"]
@@ -268,6 +310,48 @@ class TransformationManager:
         df_grouped_transactions["AssetMapped"] = df_grouped_transactions["Asset"].map(self.market_manager.get_asset_map(self.data_manager))
         df_grouped_transactions = df_grouped_transactions.set_index(["Account", "AssetMapped", "Date"]).drop(columns="Asset")
         self._df_grouped_transactions = df_grouped_transactions
+
+    def get_all_categories(self, date_range, threshold=1000):
+        """Returns the complete list of categories based on FullMasterType, FullType and FullSubType"""
+        df = self.data_manager.transactions[
+            (self.data_manager.transactions.Date >= date_range[0]) & (self.data_manager.transactions.Date <= date_range[1])
+        ]
+        df = df[(df.FullMasterType != "Intra-Account Transfers")]
+
+        df_fmt = pd.pivot_table(
+            df,
+            index="FullMasterType",
+            values=["Quantity", "FullType"],
+            aggfunc={"Quantity": "sum", "FullType": lambda x: len(x.unique())},
+        ).sort_values("Quantity")
+        df_fmt["Quantity"] = df_fmt["Quantity"].apply(abs)
+        df_fmt = df_fmt[(df_fmt.Quantity > threshold) & (df_fmt.FullType > 1)].sort_values("Quantity", ascending=False)
+        df_fmt = pd.DataFrame(df_fmt.to_records()).rename({"FullMasterType": "index", "Quantity": "size", "FullType": "count"}, axis=1)
+        df_fmt["index"] = [f"MasterType: {k}" for k in df_fmt["index"]]
+
+        df_ft = pd.pivot_table(
+            df,
+            index="FullType",
+            values=["Quantity", "FullSubType"],
+            aggfunc={"Quantity": "sum", "FullSubType": lambda x: len(x.unique())},
+        ).sort_values("Quantity")
+        df_ft["Quantity"] = df_ft["Quantity"].apply(abs)
+        df_ft = df_ft[(df_ft.Quantity > threshold) & (df_ft.FullSubType > 1)].sort_values("Quantity", ascending=False)
+        df_ft = pd.DataFrame(df_ft.to_records()).rename({"FullType": "index", "Quantity": "size", "FullSubType": "count"}, axis=1)
+        df_ft["index"] = [f"Type: {k}" for k in df_ft["index"]]
+
+        df_st = pd.pivot_table(
+            df,
+            index="FullSubType",
+            values=["Quantity", "MemoMapped"],
+            aggfunc={"Quantity": "sum", "MemoMapped": lambda x: len(x.unique())},
+        ).sort_values("Quantity")
+        df_st["Quantity"] = df_st["Quantity"].apply(abs)
+        df_st = df_st[(df_st.Quantity > threshold) & (df_st.MemoMapped > 1)].sort_values("Quantity", ascending=False)
+        df_st = pd.DataFrame(df_st.to_records()).rename({"FullSubType": "index", "Quantity": "size", "MemoMapped": "count"}, axis=1)
+        df_st["index"] = [f"SubType: {k}" for k in df_st["index"]]
+
+        return pd.concat([df_fmt, df_ft, df_st])["index"]
 
     def get_values_by_asset(self, date_range: list = None, account: str | list = None):
         """Retrieve asset values and related financial metrics within a specified date range and/or for a specific account."""
@@ -337,7 +421,23 @@ class TransformationManager:
 
         return df_values_timeseries
 
-    def get_flow_values(self, date_range=None, account: str = None, how: str = "both", include_iat: bool = False):
+    # @cached(mem_cache_get_flow_values)
+    # @log_args_with_inspect
+    def get_flow_values(
+        self,
+        date_start=None,
+        date_end=None,
+        account: str = None,
+        how: str = "both",
+        include_iat: bool = False,
+        include_full_types: bool = True,
+    ):
+        if date_end is None and date_start is None:
+            date_range = None
+        elif date_start is None or date_end is None:
+            raise ValueError("date_start and date_end must both have values or both be None.")
+        else:
+            date_range = [date_start, date_end]
         """get the expenses by Type/Subtype/MemoMapped for the given date_range and account"""
         df_values_timeseries = self.get_values_by_asset(date_range=date_range, account=account)
 
@@ -346,16 +446,20 @@ class TransformationManager:
             for p, q_list in zip(df_values_timeseries["AssetPriceInRefCurrency"], df_values_timeseries["Quantity_list"])
         ]
         columns_list = ["MemoMapped_list", "Type_list", "SubType_list", "Value_list"]
-        df_values_exploded = df_values_timeseries.explode(columns_list)[columns_list].dropna(subset="Value_list")
+        df_values_exploded = df_values_timeseries.explode(columns_list)[columns_list].dropna(subset="Value_list").copy()
         df_values_exploded.columns = [c.replace("_list", "") for c in df_values_exploded.columns]
         df_values_exploded["SubType"] = df_values_exploded["SubType"].fillna(" ")
         df_values_exploded["MemoMapped"] = df_values_exploded["MemoMapped"].fillna(" ")
         df_values_exploded["Type"] = df_values_exploded["Type"].fillna(" ")
 
         if not include_iat:
-            df_flow_values = df_values_exploded[df_values_exploded["Type"] != "IAT"]
+            df_flow_values = df_values_exploded[df_values_exploded["Type"] != "IAT"].copy()
         else:
             df_flow_values = df_values_exploded
+
+        if include_full_types:
+            df_flow_values["FullType"] = df_flow_values.Type.map(self.data_manager.map_type)
+            df_flow_values["FullSubType"] = df_flow_values.SubType.map(self.data_manager.map_subtype)
 
         if how.lower() == "both":
             return df_flow_values
@@ -366,9 +470,39 @@ class TransformationManager:
 
         raise ValueError(f"Invalid 'how=' must be 'both', 'in', or 'out' but was {how}.")
 
-    def get_values_by_month(self, filters) -> pd.DataFrame:
-        """returns a breakdown by month"""
-        pass
+    def __get_price_on_date(self, date: str, threshold: float = 100) -> pd.DataFrame:
+        q_t = self._df_grouped_transactions.reset_index()
+        q_t = q_t[q_t.Date <= date]
+        q_t = q_t.groupby(["Account", "AssetMapped"]).agg({"Quantity_sum": "sum"})
+
+        prices = self.market_manager.prices.xs(date, level="Date")
+
+        v_t = pd.merge(q_t.reset_index(), prices.reset_index(), on="AssetMapped", how="left")
+        v_t["Price"] = v_t["Quantity_sum"] * v_t["AssetPriceInRefCurrency"]
+
+        df_account = pd.pivot_table(v_t, index="Account", values="Price", aggfunc="sum").sort_values("Price", ascending=False)
+
+        return df_account[df_account.Price.apply(abs) > threshold]
+
+    def get_price_comparison_on_dates(self, date1: str, date2: str, by_account_type=True) -> pd.DataFrame:
+        """returns a DataFrame comparing the account type on 2 dates"""
+        df1 = self.__get_price_on_date(date1)
+        df2 = self.__get_price_on_date(date2)
+        df = pd.concat([df1, df2], axis=1).fillna(0.0)
+        df.columns = [date1, date2]
+
+        if by_account_type:
+            df["AccountType"] = [self.data_manager.map_account_type.loc[x] for x in df.index]
+            df = (
+                pd.pivot_table(df.reset_index(), index="AccountType", values=[date1, date2], aggfunc="sum")
+                .sort_values(date1, ascending=False)
+                .reset_index()
+            )
+            df.columns = ["AccountType"] + [f"{d.date():%b-%y}" for d in df.columns[1:]]
+        else:
+            df.columns = ["Account"] + [f"{d.date():%b-%y}" for d in df.columns[1:]]
+
+        return df
 
 
 class FigureManager:
@@ -484,16 +618,19 @@ class FigureManager:
 
     def get_figure_sunburst(self, date_range: list = None, account: str = None) -> go.Figure:
         """plots a sunburst of the account transactions"""
-        df_expenses = self.transformation_manager.get_flow_values(date_range, account, how="out", include_iat=False).reset_index(drop=True)
+        df_expenses = self.transformation_manager.get_flow_values(
+            date_range[0], date_range[1], account, how="out", include_iat=False
+        ).reset_index(drop=True)
         df_expenses["Value"] = (-1) * df_expenses["Value"]
+
         title = self.__get_title_sunburst(date_range, df_expenses["Value"])
-        return px.sunburst(df_expenses, path=["Type", "SubType", "MemoMapped"], values="Value", title=title)
+        return px.sunburst(df_expenses, path=["FullType", "FullSubType", "MemoMapped"], values="Value", title=title)
 
     def get_figure_bar(
         self, category, label, show_count: int = 5, date_range: list = None, account: str = None, how: str = "out", include_iat=False
     ):
         """plots a bar chat showing the monthly spending by category"""
-        df_expenses = self.transformation_manager.get_flow_values(date_range, account, how=how, include_iat=include_iat)
+        df_expenses = self.transformation_manager.get_flow_values(date_range[0], date_range[1], account, how=how, include_iat=include_iat)
         df_expenses["Value"] = (-1) * df_expenses["Value"]
         key = list(category.keys())[0]
         df_expenses = df_expenses[df_expenses[key] == category[key]].reset_index()[["Date", label, "Value"]]
@@ -512,25 +649,74 @@ class FigureManager:
             df_expenses_aggregated, x="Month", y="Value", color="MemoMapped", text="MemoMapped", title=f"{category[key]} Spending"
         )
 
-    def get_figure_waterfall(self, date_range: list = None, account: str = None, how: str = "both", include_iat=False):
+    def get_category_breakdown(
+        self, category, label, row_limit: int = 5, date_range: list = None, account: str = None, how: str = "out", include_iat=False
+    ):
+        """Return the top categories based on the provided filter"""
+        key = list(category.keys())[0]
+        df_expenses = self.transformation_manager.get_flow_values(date_range[0], date_range[1], account, how=how, include_iat=include_iat)
+        df_expenses = df_expenses[df_expenses[key] == category[key]].reset_index()[["Date", label, "Value"]]
+
+        return (
+            pd.DataFrame(pd.pivot_table(df_expenses, index=label, values="Value", aggfunc="sum").to_records())
+            .sort_values("Value")
+            .reset_index(drop=True)[:row_limit]
+        )
+
+    def get_figure_waterfall(
+        self,
+        date_range: list = None,
+        account: str = None,
+        how: str = "both",
+        include_iat=False,
+        salary_override: Salary = None,
+        include_capital_gain: bool = True,
+    ):
         """plots a waterfall chat showing the spending/incomes by category"""
-        df_expenses = self.transformation_manager.get_flow_values(date_range, account, how=how, include_iat=include_iat)
-        df_spendings = df_expenses.reset_index(drop=True).groupby("Type")["Value"].sum().sort_values(ascending=False)
+        df_expenses = self.transformation_manager.get_flow_values(
+            date_range[0], date_range[1], account, how=how, include_iat=include_iat, include_full_types=True
+        )
+        categorised_flows = df_expenses.reset_index(drop=True).groupby("FullType")["Value"].sum().sort_values(ascending=False)
+
+        if salary_override is not None:
+            categorised_flows = categorised_flows.drop("Salary", axis=0)
+            for p in salary_override.payrolls:
+                categorised_flows.loc[p] = salary_override.actual_salaries[p]
+            categorised_flows.loc["Salary Carried Over"] = salary_override.total_received_salary_from_previous_year
+
+        threshold = 2000
+        small_flows = (
+            categorised_flows[
+                (categorised_flows > -threshold) & (categorised_flows < threshold) & (categorised_flows.index != "Others")
+            ].sum()
+            + categorised_flows.loc["Others"]
+        )
+        categorised_flows = categorised_flows[
+            (categorised_flows < -threshold) | (categorised_flows > threshold) | (categorised_flows.index == "Others")
+        ]
+        categorised_flows.loc["Others"] = small_flows
+
+        if include_capital_gain:
+            categorised_flows["Capital Gain"] = self.transformation_manager.get_values_by_asset(date_range=date_range, account=account)[
+                "CapitalGain"
+            ].sum()
+
+        categorised_flows = categorised_flows.sort_values(ascending=False)
 
         fig = go.Figure(
             go.Waterfall(
                 name="20",
                 orientation="v",
-                measure=["relative" for b in df_spendings] + ["total"],
-                x=list(df_spendings.index) + ["savings"],
+                measure=["relative" for b in categorised_flows] + ["total"],
+                x=list(categorised_flows.index) + ["savings"],
                 textposition="outside",
-                text=list(df_spendings.index) + ["Savings"],
-                y=list(df_spendings.values) + [-df_spendings.values.sum()],
+                text=list(categorised_flows.index) + ["Savings"],
+                y=list(categorised_flows.values) + [-categorised_flows.values.sum()],
                 connector={"line": {"color": "rgb(63, 63, 63)"}},
             )
         )
 
-        title = f"Income/Spending Summary {date_range[1].year}" if date_range is not None else f"Income/Spending Summary"
+        title = f"Income/Spending Summary {date_range[1].year}" if date_range is not None else "Income/Spending Summary"
         fig.update_layout(showlegend=False, margin=dict(t=50), title=title)
 
         return fig
