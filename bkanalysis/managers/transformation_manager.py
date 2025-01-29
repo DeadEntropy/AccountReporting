@@ -84,7 +84,7 @@ class TransformationManager:
         df_st = pd.DataFrame(df_st.to_records()).rename({"FullSubType": "index", "Quantity": "size", "MemoMapped": "count"}, axis=1)
         df_st["index"] = [f"SubType: {k}" for k in df_st["index"]]
 
-        return pd.concat([df_fmt, df_ft, df_st])["index"]
+        return pd.concat([df_ft, df_st])["index"]
 
     def get_values_by_asset(self, date_range: list = None, account: str | list = None):
         """Retrieve asset values and related financial metrics within a specified date range and/or for a specific account."""

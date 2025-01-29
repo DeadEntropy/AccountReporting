@@ -121,10 +121,10 @@ class FigureManager:
             )
         return f" (Total Spend: {amounts.sum():,.0f})"
 
-    def get_figure_sunburst(self, date_range: list = None, account: str = None) -> go.Figure:
+    def get_figure_sunburst(self, date_range: list = None, account: str = None, include_iat=False) -> go.Figure:
         """plots a sunburst of the account transactions"""
         df_expenses = self.transformation_manager.get_flow_values(
-            date_range[0], date_range[1], account, how="out", include_iat=False
+            date_range[0], date_range[1], account, how="out", include_iat=include_iat
         ).reset_index(drop=True)
         df_expenses["Value"] = (-1) * df_expenses["Value"]
 
@@ -138,7 +138,28 @@ class FigureManager:
         df_expenses = self.transformation_manager.get_flow_values(date_range[0], date_range[1], account, how=how, include_iat=include_iat)
         df_expenses["Value"] = (-1) * df_expenses["Value"]
         key = list(category.keys())[0]
+
+        if key not in df_expenses.columns:
+            return px.bar(
+                pd.DataFrame(columns=["Month", "MemoMapped", "Value"]),
+                x="Month",
+                y="Value",
+                color="MemoMapped",
+                text="MemoMapped",
+                title=f"{category[key]} Spending",
+            )
+
         df_expenses = df_expenses[df_expenses[key] == category[key]].reset_index()[["Date", label, "Value"]]
+
+        if len(df_expenses) == 0:
+            return px.bar(
+                pd.DataFrame(columns=["Month", "MemoMapped", "Value"]),
+                x="Month",
+                y="Value",
+                color="MemoMapped",
+                text="MemoMapped",
+                title=f"{category[key]} Spending",
+            )
 
         df_expenses["Date"] = pd.to_datetime(df_expenses["Date"])
         df_expenses = df_expenses.groupby([df_expenses["Date"].dt.to_period("M"), label])["Value"].sum().reset_index()
@@ -146,7 +167,22 @@ class FigureManager:
         df_expenses["Month"] = df_expenses["Month"].astype(str)
 
         category_totals = df_expenses.groupby(label)["Value"].sum().astype(float)
-        top_categories = category_totals.nlargest(show_count).index
+
+        if show_count is None:
+            COVERAGE = 0.8
+            # Calculate total sum of all categories
+            total_sum = category_totals.sum()
+
+            # Calculate cumulative sum and find the index for top categories that represent more than 80% of the total
+            category_totals_sorted = category_totals.sort_values(ascending=False)
+            cumulative_sum = category_totals_sorted.cumsum()
+            top_n = cumulative_sum[cumulative_sum <= total_sum * COVERAGE].index[-1]
+
+            # Get the top categories
+            top_categories = category_totals_sorted.loc[:top_n].index
+        else:
+            top_categories = category_totals.nlargest(show_count).index
+
         df_expenses[label] = df_expenses[label].apply(lambda x: x if x in top_categories else "Others")
         df_expenses_aggregated = df_expenses.groupby(["Month", label], as_index=False)["Value"].sum()
 
@@ -160,7 +196,14 @@ class FigureManager:
         """Return the top categories based on the provided filter"""
         key = list(category.keys())[0]
         df_expenses = self.transformation_manager.get_flow_values(date_range[0], date_range[1], account, how=how, include_iat=include_iat)
+
+        if key not in df_expenses.columns:
+            return pd.DataFrame(columns=["MemoMapped", "Value"])
+
         df_expenses = df_expenses[df_expenses[key] == category[key]].reset_index()[["Date", label, "Value"]]
+
+        if len(df_expenses) == 0:
+            return pd.DataFrame(columns=["MemoMapped", "Value"])
 
         return (
             pd.DataFrame(pd.pivot_table(df_expenses, index=label, values="Value", aggfunc="sum").to_records())
