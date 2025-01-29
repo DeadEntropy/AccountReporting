@@ -176,7 +176,12 @@ class FigureManager:
             # Calculate cumulative sum and find the index for top categories that represent more than 80% of the total
             category_totals_sorted = category_totals.sort_values(ascending=False)
             cumulative_sum = category_totals_sorted.cumsum()
-            top_n = cumulative_sum[cumulative_sum <= total_sum * COVERAGE].index[-1]
+
+            cum_coverage = cumulative_sum[cumulative_sum <= total_sum * COVERAGE]
+            if len(cum_coverage) > 10:
+                top_n = cum_coverage.index[9]
+            else:
+                top_n = cum_coverage.index[-1]
 
             # Get the top categories
             top_categories = category_totals_sorted.loc[:top_n].index
