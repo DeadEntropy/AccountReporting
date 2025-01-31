@@ -128,8 +128,17 @@ class FigureManager:
         ).reset_index(drop=True)
         df_expenses["Value"] = (-1) * df_expenses["Value"]
 
+        df_expenses["formatted_value"] = df_expenses["Value"].apply(lambda x: f"${x:,.0f}" if x < 10000 else f"${x/1000:,.0f}K")
+
         title = self.__get_title_sunburst(date_range, df_expenses["Value"])
-        return px.sunburst(df_expenses, path=["FullType", "FullSubType", "MemoMapped"], values="Value", title=title)
+        fig = px.sunburst(df_expenses, path=["FullType", "FullSubType", "MemoMapped"], values="Value", title=title)
+
+        # Add custom hovertemplate
+        fig.update_traces(
+            hovertemplate="<b>%{label}</b><br>Value: %{value:$,.0f}",
+        )
+
+        return fig
 
     def get_figure_bar(
         self, category, label, show_count: int = 5, date_range: list = None, account: str = None, how: str = "out", include_iat=False
@@ -191,9 +200,14 @@ class FigureManager:
         df_expenses[label] = df_expenses[label].apply(lambda x: x if x in top_categories else "Others")
         df_expenses_aggregated = df_expenses.groupby(["Month", label], as_index=False)["Value"].sum()
 
-        return px.bar(
-            df_expenses_aggregated, x="Month", y="Value", color="MemoMapped", text="MemoMapped", title=f"{category[key]} Spending"
+        fig = px.bar(df_expenses_aggregated, x="Month", y="Value", color="MemoMapped", text="MemoMapped", title=f"{category[key]} Spending")
+
+        # Add custom hovertemplate
+        fig.update_traces(
+            hovertemplate="<b>%{text}</b><br>Value: %{value:$,.0f}",
         )
+
+        return fig
 
     def get_category_breakdown(
         self, category, label, row_limit: int = 5, date_range: list = None, account: str = None, how: str = "out", include_iat=False
@@ -255,6 +269,10 @@ class FigureManager:
             ].sum()
 
         categorised_flows = categorised_flows.sort_values(ascending=False)
+        incremental_values = [
+            f"{x / 1000:,.0f}K" if abs(x) > 1000 else f"{x:,.0f}"
+            for x in list(categorised_flows.values) + [-categorised_flows.values.sum()]
+        ]
 
         fig = go.Figure(
             go.Waterfall(
@@ -266,6 +284,8 @@ class FigureManager:
                 text=list(categorised_flows.index) + ["Savings"],
                 y=list(categorised_flows.values) + [-categorised_flows.values.sum()],
                 connector={"line": {"color": "rgb(63, 63, 63)"}},
+                customdata=incremental_values,
+                hovertemplate="Category: %{x}<br>Value: %{customdata}<extra></extra>",
             )
         )
 
