@@ -141,7 +141,15 @@ class FigureManager:
         return fig
 
     def get_figure_bar(
-        self, category, label, show_count: int = 5, date_range: list = None, account: str = None, how: str = "out", include_iat=False
+        self,
+        category,
+        label,
+        show_count: int = 5,
+        date_range: list = None,
+        account: str = None,
+        how: str = "out",
+        include_iat=False,
+        return_bar: bool = True,
     ):
         """plots a bar chat showing the monthly spending by category"""
         df_expenses = self.transformation_manager.get_flow_values(date_range[0], date_range[1], account, how=how, include_iat=include_iat)
@@ -177,8 +185,99 @@ class FigureManager:
 
         category_totals = df_expenses.groupby(label)["Value"].sum().astype(float)
 
+        top_categories = self.get_top_categories(category_totals, show_count)
+
+        df_expenses[label] = df_expenses[label].apply(lambda x: x if x in top_categories else "Others")
+        df_expenses_aggregated = df_expenses.groupby(["Month", label], as_index=False)["Value"].sum()
+
+        if return_bar:
+            fig = px.bar(
+                df_expenses_aggregated, x="Month", y="Value", color="MemoMapped", text="MemoMapped", title=f"{category[key]} Spending"
+            )
+
+            # Add custom hovertemplate
+            fig.update_traces(
+                hovertemplate="<b>%{text}</b><br>Value: %{value:$,.0f}",
+            )
+
+            return fig
+        else:
+            # Aggregate expenses by Month and Category
+            df_expenses_aggregated = df_expenses.groupby(["Month", label], as_index=False)["Value"].sum()
+
+            # Compute total sum per category and sort columns by total value (descending)
+            category_totals = df_expenses_aggregated.groupby("MemoMapped")["Value"].sum()
+            sorted_categories = category_totals.sort_values(ascending=False).index.tolist()
+
+            # Compute stacked totals with sorted order
+            stacked_totals = df_expenses_aggregated.pivot(index="Month", columns="MemoMapped", values="Value").fillna(0)
+            stacked_totals = stacked_totals[sorted_categories]  # Enforce largest-to-smallest order
+            stacked_totals = stacked_totals.cumsum(axis=1)  # Compute cumulative stacked values
+
+            # Reorder df_expenses_aggregated to match sorted order
+            df_expenses_aggregated["MemoMapped"] = pd.Categorical(
+                df_expenses_aggregated["MemoMapped"], categories=sorted_categories, ordered=True
+            )
+
+            # Create stacked line chart
+            fig = px.line(
+                df_expenses_aggregated,
+                x="Month",
+                y="Value",
+                color="MemoMapped",
+                title=f"{category[key]} Spending",
+                line_group="MemoMapped",
+                category_orders={"MemoMapped": sorted_categories},  # Enforce order in the plot
+                text="MemoMapped",
+            )
+
+            # Enable stacking
+            fig.update_traces(
+                mode="lines+markers",
+                stackgroup="one",
+                hovertemplate="<b>%{text}: %{y:$,.0f}<extra></extra>",
+            )
+
+            # Adjust label positioning
+            for memo in sorted_categories:  # Iterate in sorted order
+                df_memo = df_expenses_aggregated[df_expenses_aggregated["MemoMapped"] == memo]
+
+                # Find the month where this category has the maximum value
+                max_idx = df_memo["Value"].idxmax()
+                max_month = df_memo.loc[max_idx, "Month"]
+
+                # Get the stacked value at that month
+                stacked_value = stacked_totals.loc[max_month, memo]
+                y_shift = -0.025 * stacked_value
+
+                # Find the corresponding color from the figure traces
+                trace_color = None
+                for trace in fig.data:
+                    if trace.name == memo:
+                        trace_color = trace.line.color
+                        break  # Stop searching once we find it
+
+                fig.add_annotation(
+                    x=max_month,  # Shift right
+                    y=stacked_value + y_shift,  # Shift below
+                    text=memo,
+                    showarrow=False,
+                    font=dict(size=12, color="black"),
+                    xanchor="center",
+                    yanchor="top",  # Ensures label is always below the point,
+                    bgcolor="rgba(0,0,0,0)",  # Set background color to match line
+                    bordercolor=trace_color,  # Set border color to match
+                    borderwidth=2,
+                    borderpad=1,  # Add some padding for rounded effect
+                )
+
+            return fig
+
+    @staticmethod
+    def get_top_categories(category_totals, show_count: int = 5, target_coverage: float = 0.8, max_count: int = 10):
+        """get the top categories, if show_count is not None, returns the N to categories where N = show_count.
+        otherwise, calcualte N such that the N categories represent cover target_coverage percent of the total"""
         if show_count is None:
-            COVERAGE = 0.8
             # Calculate total sum of all categories
             total_sum = category_totals.sum()
 
@@ -186,9 +285,9 @@ class FigureManager:
             category_totals_sorted = category_totals.sort_values(ascending=False)
             cumulative_sum = category_totals_sorted.cumsum()
 
-            cum_coverage = cumulative_sum[cumulative_sum <= total_sum * COVERAGE]
-            if len(cum_coverage) > 10:
-                top_n = cum_coverage.index[9]
+            cum_coverage = cumulative_sum[cumulative_sum <= total_sum * target_coverage]
+            if len(cum_coverage) > max_count:
+                top_n = cum_coverage.index[max_count - 1]
             else:
                 top_n = cum_coverage.index[-1]
 
@@ -196,18 +295,7 @@ class FigureManager:
             top_categories = category_totals_sorted.loc[:top_n].index
         else:
             top_categories = category_totals.nlargest(show_count).index
-
-        df_expenses[label] = df_expenses[label].apply(lambda x: x if x in top_categories else "Others")
-        df_expenses_aggregated = df_expenses.groupby(["Month", label], as_index=False)["Value"].sum()
-
-        fig = px.bar(df_expenses_aggregated, x="Month", y="Value", color="MemoMapped", text="MemoMapped", title=f"{category[key]} Spending")
-
-        # Add custom hovertemplate
-        fig.update_traces(
-            hovertemplate="<b>%{text}</b><br>Value: %{value:$,.0f}",
-        )
-
-        return fig
+        return top_categories
 
     def get_category_breakdown(
         self, category, label, row_limit: int = 5, date_range: list = None, account: str = None, how: str = "out", include_iat=False
