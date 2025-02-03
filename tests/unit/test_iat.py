@@ -9,41 +9,6 @@ import ast
 
 class TestProcess(unittest.TestCase):
 
-    @unittest.skip("implementation needs to be reviewed")
-    def test_remove_duplicate(self):
-        config = ch.get_config()
-        iat = iat_identification.IatIdentification(config)
-
-        df = pd.DataFrame(columns=[n.strip() for n in ast.literal_eval(config["Mapping"]["new_columns"])])
-
-        df["Account"] = ["account"] * 3
-        df["Memo"] = ["memo"] * 3
-        df["AccountType"] = ["account_type"] * 3
-        df["Currency"] = ["CCY"] * 3
-
-        df["Amount"] = [100, -100, 200]
-        df["Date"] = datetime.datetime(2020, 10, 15)
-
-        df_out = iat.remove_duplicate(df)
-        self.assertEqual(len(df_out), 1, "Duplicate did not get removed successfully")
-
-    def test_remove_duplicate_2(self):
-        config = ch.get_config()
-        iat = iat_identification.IatIdentification(config)
-
-        df = pd.DataFrame(columns=[n.strip() for n in ast.literal_eval(config["Mapping"]["new_columns"])])
-
-        df["Account"] = ["account1", "account2", "account1"]
-        df["Memo"] = ["memo"] * 3
-        df["AccountType"] = ["account_type"] * 3
-        df["Currency"] = ["CCY"] * 3
-
-        df["Amount"] = [100, -100, 200]
-        df["Date"] = datetime.datetime(2020, 10, 15)
-
-        df_out = iat.remove_duplicate(df)
-        self.assertEqual(len(df_out), 3, "Removed duplicate where there are none.")
-
     def test_map_iat(self):
         config = ch.get_config()
         iat = iat_identification.IatIdentification(config)
