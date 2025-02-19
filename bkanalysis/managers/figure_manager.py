@@ -9,6 +9,7 @@ from bkanalysis.process.iat_identification import IatIdentification
 from bkanalysis.salary import Salary
 
 from bkanalysis.managers.transformation_manager import TransformationManager
+from bkanalysis.managers.manager_helper import is_ccy
 
 
 class FigureManager:
@@ -416,15 +417,17 @@ class FigureManager:
 
         return fig
 
-    def get_capital_gain_brkdn(self, date_range, target_coverage: float = 0.95, default_asset: str = "VTI"):
+    def get_capital_gain_brkdn(self, date_range, target_coverage: float = 0.95):
         """Get a Breakdown of the Capital Gain"""
         df = self.transformation_manager.get_values_by_asset(date_range)
-
         df_capital_gain = df.groupby("AssetMapped").agg(
             {"CapitalGain": "sum", "AssetPriceInRefCurrency": ["first", "last"], "Value": "first"}
         )
-        df_capital_gain.columns = [" ".join(col).strip() for col in df_capital_gain.columns.values]
-        df_capital_gain = df_capital_gain.rename(
+
+        df_cap_excl_ccy = df_capital_gain[[not is_ccy(idx) for idx in df_capital_gain.index]]
+
+        df_cap_excl_ccy.columns = [" ".join(col).strip() for col in df_cap_excl_ccy.columns.values]
+        df_cap_excl_ccy = df_cap_excl_ccy.rename(
             columns={
                 "CapitalGain sum": "CapitalGain",
                 "AssetPriceInRefCurrency first": "StartPrice",
@@ -433,15 +436,27 @@ class FigureManager:
             }
         )
 
-        df_capital_gain["AbsCapitalGain"] = df_capital_gain["CapitalGain"].abs()
-        df_capital_gain = df_capital_gain.sort_values(by="AbsCapitalGain", ascending=False)
-        df_capital_gain = df_capital_gain.reset_index()
+        df_cap_excl_ccy["AbsCapitalGain"] = df_cap_excl_ccy["CapitalGain"].abs()
+        df_cap_excl_ccy = df_cap_excl_ccy.sort_values(by="AbsCapitalGain", ascending=False)
+        df_cap_excl_ccy = df_cap_excl_ccy.reset_index()
 
-        cumulative_sum = df_capital_gain["AbsCapitalGain"].cumsum()
-        total_sum = df_capital_gain["AbsCapitalGain"].sum()
+        cumulative_sum = df_cap_excl_ccy["AbsCapitalGain"].cumsum()
+        total_sum = df_cap_excl_ccy["AbsCapitalGain"].sum()
         cum_coverage = cumulative_sum[cumulative_sum <= total_sum * target_coverage]
 
-        df_capital_gain["Return"] = (df_capital_gain["EndPrice"] - df_capital_gain["StartPrice"]) / df_capital_gain["StartPrice"]
+        df_cap_excl_ccy["Return"] = (df_cap_excl_ccy["EndPrice"] - df_cap_excl_ccy["StartPrice"]) / df_cap_excl_ccy["StartPrice"]
 
-        df_out = df_capital_gain.iloc[: cum_coverage.index[-1]].set_index("AssetMapped")[["StartValue", "CapitalGain", "Return"]]
-        return df_out, self.get_asset_plot(df, df_out.index[0])
+        df_out = df_cap_excl_ccy.iloc[: cum_coverage.index[-1]].set_index("AssetMapped")[["StartValue", "CapitalGain", "Return"]]
+        df_total = pd.DataFrame(
+            columns=["AssetMapped", "StartValue", "CapitalGain", "Return"],
+            data=[
+                [
+                    "Total",
+                    df_cap_excl_ccy.StartValue.sum(),
+                    df_cap_excl_ccy.CapitalGain.sum(),
+                    df_cap_excl_ccy.CapitalGain.sum() / df_cap_excl_ccy.StartValue.sum(),
+                ]
+            ],
+        ).set_index("AssetMapped")
+
+        return pd.concat([df_out, df_total]), self.get_asset_plot(df, df_out.index[0])

@@ -15,3 +15,12 @@ def normalize_date_column(date_column):
             raise ValueError(f"Invalid date format: {value}") from exc
 
     return pd.to_datetime(date_column.map(convert_date))
+
+
+def is_ccy(asset):
+    """check is an asset in a currency in the yahoo nomenclature i.e. 'GBPUSD=X'"""
+    if len(asset) != 8:
+        return False
+    if asset.upper().endswith("=X"):
+        return True
+    return False
