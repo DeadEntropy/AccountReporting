@@ -385,7 +385,11 @@ class FigureManager:
 
     def get_asset_plot(self, df, asset):
         """plot asset information: Quantity, Unit Price, Total Value"""
+
         fig = make_subplots(rows=1, cols=2, specs=[[{"secondary_y": True}, {"secondary_y": True}]], horizontal_spacing=0.15)
+
+        if asset not in df.index:
+            return fig
 
         fig.append_trace(go.Scatter(x=df.loc[asset].index, y=df.loc[asset].Quantity_cumsum, name="Asset Quantity"), row=1, col=1)
 
@@ -416,13 +420,16 @@ class FigureManager:
         """Get a Breakdown of the Capital Gain"""
         df = self.transformation_manager.get_values_by_asset(date_range)
 
-        df_capital_gain = df.groupby("AssetMapped").agg({"CapitalGain": "sum", "AssetPriceInRefCurrency": ["first", "last"]})
+        df_capital_gain = df.groupby("AssetMapped").agg(
+            {"CapitalGain": "sum", "AssetPriceInRefCurrency": ["first", "last"], "Value": "first"}
+        )
         df_capital_gain.columns = [" ".join(col).strip() for col in df_capital_gain.columns.values]
         df_capital_gain = df_capital_gain.rename(
             columns={
                 "CapitalGain sum": "CapitalGain",
-                "AssetPriceInRefCurrency first": "StartValue",
-                "AssetPriceInRefCurrency last": "EndValue",
+                "AssetPriceInRefCurrency first": "StartPrice",
+                "AssetPriceInRefCurrency last": "EndPrice",
+                "Value first": "StartValue",
             }
         )
 
@@ -434,7 +441,7 @@ class FigureManager:
         total_sum = df_capital_gain["AbsCapitalGain"].sum()
         cum_coverage = cumulative_sum[cumulative_sum <= total_sum * target_coverage]
 
-        df_capital_gain["Return"] = (df_capital_gain["EndValue"] - df_capital_gain["StartValue"]) / df_capital_gain["StartValue"]
+        df_capital_gain["Return"] = (df_capital_gain["EndPrice"] - df_capital_gain["StartPrice"]) / df_capital_gain["StartPrice"]
 
         df_out = df_capital_gain.iloc[: cum_coverage.index[-1]].set_index("AssetMapped")[["StartValue", "CapitalGain", "Return"]]
-        return df_out, self.get_asset_plot(df, default_asset)
+        return df_out, self.get_asset_plot(df, df_out.index[0])
