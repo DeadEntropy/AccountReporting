@@ -2,6 +2,7 @@
 *.iml
 *.ipynb
 *.ini
+*.csv
 env
 notebooks/config
 notebooks/.ipynb_checkpoints

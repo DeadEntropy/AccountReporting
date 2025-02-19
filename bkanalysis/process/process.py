@@ -256,6 +256,8 @@ class Process:
         if isinstance(s, str):
             if "AMZN MKTP" in s.upper():
                 return "AMAZON"
+            if "AMAZON MKTPL" in s.upper():
+                return "AMAZON"
             if "AMAZON.COM" in s.upper():
                 return "AMAZON"
         return s
