@@ -92,26 +92,8 @@ def get_spot_prices(instr_list, currency):
     return fx_spots
 
 
-from time import sleep
-
-
 def get_symbol_from_isin(isin):
-    params = {"q": isin, "quotesCount": 1, "newsCount": 0}
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
-    }
-    r = requests.get(__query_yahoo_url_search, params=params, headers=headers)
-    sleep(0.05)
-
-    assert r.status_code == 200, f"Yahoo Request Failed for {isin}. Status code: {r.status_code}"
-
-    data = r.json()
-
-    assert "quotes" in data, f"Yahoo request for {isin} didnt return a quotes. (status_code: {r.status_code})"
-    assert len(data["quotes"]) > 0, f"Yahoo request for {isin} didnt return a quotes. (status_code: {r.status_code})"
-    assert "symbol" in data["quotes"][0], f"Yahoo request for {isin} didnt return a symbol. (status_code: {r.status_code})"
-
-    return data["quotes"][0]["symbol"]
+    return __get_ticker(isin).info["symbol"]
 
 
 def __get_time_series_in_currency(symbol, currency, period):

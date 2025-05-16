@@ -209,6 +209,9 @@ class TransformationManager:
         q_t = q_t[q_t.Date <= date]
         q_t = q_t.groupby(["Account", "AssetMapped"]).agg({"Quantity_sum": "sum"})
 
+        if date > self.market_manager.prices.index.levels[1].max():
+            date = self.market_manager.prices.index.levels[1].max()
+
         prices = self.market_manager.prices.xs(date, level="Date")
 
         v_t = pd.merge(q_t.reset_index(), prices.reset_index(), on="AssetMapped", how="left")

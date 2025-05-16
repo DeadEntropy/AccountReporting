@@ -123,17 +123,20 @@ class FigureManager:
             )
         return f" (Total Spend: {amounts.sum():,.0f})"
 
-    def get_figure_sunburst(self, date_range: list = None, account: str = None, include_iat=False) -> go.Figure:
+    def get_figure_sunburst(self, date_range: list = None, account: str = None, include_iat=False, how="out") -> go.Figure:
         """plots a sunburst of the account transactions"""
         df_expenses = self.transformation_manager.get_flow_values(
-            date_range[0], date_range[1], account, how="out", include_iat=include_iat
+            date_range[0], date_range[1], account, how=how, include_iat=include_iat
         ).reset_index(drop=True)
         df_expenses["Value"] = (-1) * df_expenses["Value"]
 
+        path = ["FullType", "FullSubType", "MemoMapped"]
+        df_expenses = pd.pivot_table(df_expenses, values="Value", index=path, aggfunc="sum").reset_index()
+        df_expenses = df_expenses[df_expenses.Value > 0]
         df_expenses["formatted_value"] = df_expenses["Value"].apply(lambda x: f"${x:,.0f}" if x < 10000 else f"${x/1000:,.0f}K")
 
         title = self.__get_title_sunburst(date_range, df_expenses["Value"])
-        fig = px.sunburst(df_expenses, path=["FullType", "FullSubType", "MemoMapped"], values="Value", title=title)
+        fig = px.sunburst(df_expenses, path=path, values="Value", title=title)
 
         # Add custom hovertemplate
         fig.update_traces(
@@ -459,4 +462,6 @@ class FigureManager:
             ],
         ).set_index("AssetMapped")
 
+        if len(df_out.index) == 0:
+            return df_total, None
         return pd.concat([df_out, df_total]), self.get_asset_plot(df, df_out.index[0])
