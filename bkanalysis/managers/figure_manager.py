@@ -163,11 +163,11 @@ class FigureManager:
 
         if key not in df_expenses.columns:
             return px.bar(
-                pd.DataFrame(columns=["Month", "MemoMapped", "Value"]),
+                pd.DataFrame(columns=["Month", label, "Value"]),
                 x="Month",
                 y="Value",
-                color="MemoMapped",
-                text="MemoMapped",
+                color=label,
+                text=label,
                 title=f"{category[key]} Spending",
             )
 
@@ -175,11 +175,11 @@ class FigureManager:
 
         if len(df_expenses) == 0:
             return px.bar(
-                pd.DataFrame(columns=["Month", "MemoMapped", "Value"]),
+                pd.DataFrame(columns=["Month", label, "Value"]),
                 x="Month",
                 y="Value",
-                color="MemoMapped",
-                text="MemoMapped",
+                color=label,
+                text=label,
                 title=f"{category[key]} Spending",
             )
 
@@ -196,9 +196,7 @@ class FigureManager:
         df_expenses_aggregated = df_expenses.groupby(["Month", label], as_index=False)["Value"].sum()
 
         if return_bar:
-            fig = px.bar(
-                df_expenses_aggregated, x="Month", y="Value", color="MemoMapped", text="MemoMapped", title=f"{category[key]} Spending"
-            )
+            fig = px.bar(df_expenses_aggregated, x="Month", y="Value", color=label, text=label, title=f"{category[key]} Spending")
 
             # Add custom hovertemplate
             fig.update_traces(
@@ -211,29 +209,27 @@ class FigureManager:
             df_expenses_aggregated = df_expenses.groupby(["Month", label], as_index=False)["Value"].sum()
 
             # Compute total sum per category and sort columns by total value (descending)
-            category_totals = df_expenses_aggregated.groupby("MemoMapped")["Value"].sum()
+            category_totals = df_expenses_aggregated.groupby(label)["Value"].sum()
             sorted_categories = category_totals.sort_values(ascending=False).index.tolist()
 
             # Compute stacked totals with sorted order
-            stacked_totals = df_expenses_aggregated.pivot(index="Month", columns="MemoMapped", values="Value").fillna(0)
+            stacked_totals = df_expenses_aggregated.pivot(index="Month", columns=label, values="Value").fillna(0)
             stacked_totals = stacked_totals[sorted_categories]  # Enforce largest-to-smallest order
             stacked_totals = stacked_totals.cumsum(axis=1)  # Compute cumulative stacked values
 
             # Reorder df_expenses_aggregated to match sorted order
-            df_expenses_aggregated["MemoMapped"] = pd.Categorical(
-                df_expenses_aggregated["MemoMapped"], categories=sorted_categories, ordered=True
-            )
+            df_expenses_aggregated[label] = pd.Categorical(df_expenses_aggregated[label], categories=sorted_categories, ordered=True)
 
             # Create stacked line chart
             fig = px.line(
                 df_expenses_aggregated,
                 x="Month",
                 y="Value",
-                color="MemoMapped",
+                color=label,
                 title=f"{category[key]} Spending",
                 line_group="MemoMapped",
-                category_orders={"MemoMapped": sorted_categories},  # Enforce order in the plot
-                text="MemoMapped",
+                category_orders={label: sorted_categories},  # Enforce order in the plot
+                text=label,
             )
 
             # Enable stacking
@@ -245,7 +241,7 @@ class FigureManager:
 
             # Adjust label positioning
             for memo in sorted_categories:  # Iterate in sorted order
-                df_memo = df_expenses_aggregated[df_expenses_aggregated["MemoMapped"] == memo]
+                df_memo = df_expenses_aggregated[df_expenses_aggregated[label] == memo]
 
                 # Find the month where this category has the maximum value
                 max_idx = df_memo["Value"].idxmax()
