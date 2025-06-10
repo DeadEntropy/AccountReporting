@@ -15,20 +15,30 @@ class MarketManager:
         self.config = config
         self.ref_currency = ref_currency
         self.prices = None
+        self.asset_map = None
 
     def to_disk(self, path: str) -> None:
         """saves the transactions to disk"""
         self.prices.to_csv(path, index=True)
+        pd.Series(self.asset_map, name="AssetMap").to_csv(f"{path.replace('.csv', '_asset_map.csv')}")
 
     def load_pregenerated_data(self, path) -> None:
         """loads the pregenerated data from disk"""
         self.prices = pd.read_csv(path, parse_dates=["Date"])
         self.prices = self.prices.set_index(["AssetMapped", "Date"])
+        self.asset_map = pd.read_csv(f"{path.replace('.csv', '_asset_map.csv')}", index_col=0)["AssetMap"].to_dict()
 
     def get_asset_map(self, data_manager: DataManager) -> dict:
         """returns a map of the assets to their market symbol"""
+        if self.asset_map is None:
+            self.load_asset_map(data_manager)
+
+        return self.asset_map
+
+    def load_asset_map(self, data_manager: DataManager) -> None:
+        """returns a map of the assets to their market symbol"""
         loader = market_loader.MarketLoader()
-        return {
+        self.asset_map = {
             instr: (loader.get_symbol(instr, "USD") if instr not in loader.source_map.keys() else instr)
             for instr in data_manager.transactions.Asset.dropna().unique()
         }

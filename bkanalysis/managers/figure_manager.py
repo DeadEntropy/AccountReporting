@@ -461,3 +461,48 @@ class FigureManager:
         if len(df_out.index) == 0:
             return df_total, None
         return pd.concat([df_out, df_total]), self.get_asset_plot(df, df_out.index[0])
+
+    @staticmethod
+    def get_gradient_steps():
+        """Generates a gradient color scale from red to amber to green for the gauge"""
+        steps = []
+        for i in range(60):
+            if i <= 20:
+                # Red (255, 0, 0) → Amber (255, 165, 0)
+                t = i / 20
+                r = 255
+                g = int(165 * t)
+                b = 0
+            else:
+                # Amber (255,165,0) → Green (0,128,0)
+                t = (i - 20) / 40
+                r = int(255 * (1 - t))
+                g = int(165 + (128 - 165) * t)
+                b = 0
+            color = f"rgb({r},{g},{b})"
+            steps.append({"range": [i, i + 1], "color": color})
+        return steps
+
+    def get_saving_rate_gauge(self, current_saving_rate: float, previous_saving_rate: float) -> go.Figure:
+        """Generates a gauge figure for the saving rate"""
+        fig = go.Figure(
+            go.Indicator(
+                mode="gauge+number+delta",
+                value=current_saving_rate,
+                delta={
+                    "reference": previous_saving_rate,
+                },
+                number={"suffix": "%"},
+                title={"text": "Saving Rate"},
+                gauge={
+                    "axis": {"range": [0, 60]},
+                    "bar": {"color": "black", "thickness": 0.35},
+                    "steps": FigureManager.get_gradient_steps(),
+                    "threshold": {"line": {"color": "red", "width": 6}, "thickness": 0.75, "value": current_saving_rate},
+                },
+            )
+        )
+
+        fig.update_layout(height=400, margin=dict(t=50, b=5, l=0, r=0))
+
+        return fig
