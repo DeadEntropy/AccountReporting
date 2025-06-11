@@ -11,6 +11,9 @@ from bkanalysis.salary import Salary
 from bkanalysis.managers.transformation_manager import TransformationManager
 from bkanalysis.managers.manager_helper import is_ccy
 
+from plotly.colors import sample_colorscale
+import numpy as np
+
 
 class FigureManager:
     """Class to prepare the data for the UI"""
@@ -416,7 +419,7 @@ class FigureManager:
 
         return fig
 
-    def get_capital_gain_brkdn(self, date_range, target_coverage: float = 0.95):
+    def get_capital_gain_brkdn(self, date_range, target_coverage: float = 0.95, row_idx_to_plot: int = None):
         """Get a Breakdown of the Capital Gain"""
         df = self.transformation_manager.get_values_by_asset(date_range)
         df_capital_gain = df.groupby("AssetMapped").agg(
@@ -460,6 +463,8 @@ class FigureManager:
 
         if len(df_out.index) == 0:
             return df_total, None
+        if row_idx_to_plot is not None and row_idx_to_plot < len(df_out.index):
+            return pd.concat([df_out, df_total]), self.get_asset_plot(df, df_out.index[row_idx_to_plot])
         return pd.concat([df_out, df_total]), self.get_asset_plot(df, df_out.index[0])
 
     @staticmethod
@@ -483,7 +488,26 @@ class FigureManager:
             steps.append({"range": [i, i + 1], "color": color})
         return steps
 
-    def get_saving_rate_gauge(self, current_saving_rate: float, previous_saving_rate: float) -> go.Figure:
+    def get_saving_ratio(self, year=2025, month=None, include_capital=False, include_bonus=False):
+        transactions = self.transformation_manager.data_manager.transactions.copy(deep=True)
+        transactions = transactions[["Date", "Quantity", "FullType", "FullSubType", "FullMasterType"]]
+        transactions = transactions[transactions.Date.dt.year == year]
+        if month is not None:
+            transactions = transactions[transactions.Date.dt.month == month]
+        df_income = transactions[transactions.FullMasterType.isin(["Income"])]
+        transactions = transactions[~transactions.FullMasterType.isin(["Income", "Intra-Account Transfers", "Ex. Income"])]
+
+        expenses = transactions.Quantity.sum()
+
+        if not include_capital:
+            df_income = df_income[(df_income.FullType == "Salary")]
+        if not include_bonus:
+            df_income = df_income[(df_income.FullSubType != "UBS Bonus")]
+
+        income = df_income.Quantity.sum()
+        return (income + expenses) / income
+
+    def get_saving_rate_gauge(self, current_saving_rate: float, previous_saving_rate: float, title: str) -> go.Figure:
         """Generates a gauge figure for the saving rate"""
         fig = go.Figure(
             go.Indicator(
@@ -493,7 +517,7 @@ class FigureManager:
                     "reference": previous_saving_rate,
                 },
                 number={"suffix": "%"},
-                title={"text": "Saving Rate"},
+                title={"text": title},
                 gauge={
                     "axis": {"range": [0, 60]},
                     "bar": {"color": "black", "thickness": 0.35},
@@ -504,5 +528,101 @@ class FigureManager:
         )
 
         fig.update_layout(height=400, margin=dict(t=50, b=5, l=0, r=0))
+
+        return fig
+
+    def get_income_vs_expenses(self, date_range: list = None, exclude_bonus: bool = True, exclude_iat: bool = True) -> go.Figure:
+        """Generates a bar chart comparing income vs expenses"""
+        transactions = self.transformation_manager.data_manager.transactions.copy(deep=True)
+        transactions = transactions[["Date", "Quantity", "FullType", "FullSubType", "FullMasterType"]]
+        transactions = transactions[(transactions.Date >= date_range[0]) & (transactions.Date <= date_range[1])]
+
+        if exclude_iat:
+            transactions = transactions[~transactions.FullMasterType.isin(["Intra-Account Transfers"])]
+        if exclude_bonus:
+            transactions = transactions[~transactions.FullSubType.isin(["UBS Bonus"])]
+
+        # transactions["Month"] = transactions["Date"].dt.to_period("M")
+        df = transactions.copy()
+        df["Month"] = df["Date"].dt.strftime("%Y-%m")
+        df = df.sort_values("Month")
+
+        # 1) Build a sorted list of your month labels
+        months = sorted(df["Month"].unique())  # e.g. ["2024-01","2024-02",…]
+        pos = {m: i for i, m in enumerate(months)}  # map each month to 0,1,2,…
+
+        # 2) Aggregate incomes & expenses by FullType
+        inc = df[df.FullMasterType == "Income"].groupby(["Month", "FullSubType"], observed=True, as_index=False).Quantity.sum()
+        exp = (
+            df[df.FullMasterType.isin(["Living Costs", "Recreation"])]
+            .groupby(["Month", "FullType", "FullSubType"], observed=True, as_index=False)
+            .Quantity.sum()
+            .assign(Quantity=lambda d: d.Quantity.abs())
+        )
+
+        inc_rebucket_list = ["Dividend", "Interest Earnings"]
+        inc_rebucket_map = {k: k if k not in inc_rebucket_list else "Others" for k in inc.FullSubType.unique()}
+        inc["FullSubType"] = inc["FullSubType"].replace(inc_rebucket_map)
+
+        inc_totals = inc.groupby("FullSubType")["Quantity"].sum().sort_values(ascending=False)
+        inc_types = inc_totals.index.tolist()
+
+        exp_rebucket_list = ["ATM", "Gifts", "Work Bill"]
+        exp_rebucket_map = {k: k if k not in exp_rebucket_list else "Others" for k in exp.FullType.unique()}
+        exp["FullType"] = exp["FullType"].replace(exp_rebucket_map)
+
+        exp_totals = exp.groupby("FullType")["Quantity"].sum().sort_values(ascending=False)
+        exp_types = exp_totals.index.tolist()
+
+        # 5) Generate wide-ranging palettes via interpolation
+        n_inc, n_exp = len(inc_types), len(exp_types)
+        x = np.linspace(0.2, 0.8, n_inc)
+        cool_colors = sample_colorscale("PuBuGn", list(x))[::-1]
+        x = np.linspace(0.0, 0.8, n_exp)
+        warm_colors = sample_colorscale("YlOrRd", list(x))[::-1]
+
+        # 3) Plot: shift incomes to the left, expenses to the right
+        bar_width = 0.35
+        group_spacing = 0.4
+
+        fig = go.Figure()
+
+        # stacked income bars (left of each month)
+        for i, ftype in enumerate(inc_types):
+            grp = inc[inc.FullSubType == ftype]
+            fig.add_trace(
+                go.Bar(
+                    x=[pos[m] - group_spacing / 2 for m in grp["Month"]],
+                    y=grp["Quantity"],
+                    name=ftype,
+                    marker_color=cool_colors[i % len(cool_colors)],
+                    width=bar_width,
+                    customdata=[ftype] * len(grp),
+                    hovertemplate="%{customdata}<extra></extra>",
+                )
+            )
+
+        # — stacked expense bars (warm colors, right) —
+        for i, ftype in enumerate(exp_types):
+            grp = exp[exp.FullType == ftype]
+            fig.add_trace(
+                go.Bar(
+                    x=[pos[m] + group_spacing / 2 for m in grp["Month"]],
+                    y=grp["Quantity"],
+                    name=ftype,
+                    marker_color=warm_colors[i % len(warm_colors)],
+                    width=bar_width,
+                    customdata=[ftype] * len(grp),
+                    hovertemplate="%{customdata}<extra></extra>",
+                )
+            )
+
+        fig.update_layout(
+            barmode="stack",
+            title="Monthly Income versus Expenses by Type",
+            xaxis=dict(tickmode="array", tickvals=list(pos.values()), ticktext=months, title="Month"),
+            yaxis=dict(title="Amount"),
+            margin=dict(t=50, b=5, l=0, r=0),
+        )
 
         return fig
