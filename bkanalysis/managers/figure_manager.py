@@ -589,7 +589,7 @@ class FigureManager:
 
         # stacked income bars (left of each month)
         for i, ftype in enumerate(inc_types):
-            grp = inc[inc.FullSubType == ftype]
+            grp = pd.DataFrame(pd.pivot_table(inc[inc.FullSubType == ftype], index=['Month', 'FullSubType'], values='Quantity', aggfunc='sum').to_records())
             fig.add_trace(
                 go.Bar(
                     x=[pos[m] - group_spacing / 2 for m in grp["Month"]],
@@ -597,14 +597,14 @@ class FigureManager:
                     name=ftype,
                     marker_color=cool_colors[i % len(cool_colors)],
                     width=bar_width,
-                    customdata=[ftype] * len(grp),
+                    customdata=[f"{ft}: ${q:,.0f}" for (ft, q) in zip(grp.FullSubType, grp.Quantity)],
                     hovertemplate="%{customdata}<extra></extra>",
                 )
             )
 
         # — stacked expense bars (warm colors, right) —
         for i, ftype in enumerate(exp_types):
-            grp = exp[exp.FullType == ftype]
+            grp = pd.DataFrame(pd.pivot_table(exp[exp.FullType == ftype], index=['Month', 'FullType'], values='Quantity', aggfunc='sum').to_records())
             fig.add_trace(
                 go.Bar(
                     x=[pos[m] + group_spacing / 2 for m in grp["Month"]],
@@ -612,7 +612,7 @@ class FigureManager:
                     name=ftype,
                     marker_color=warm_colors[i % len(warm_colors)],
                     width=bar_width,
-                    customdata=[ftype] * len(grp),
+                    customdata=[f"{ft}: ${q:,.0f}" for (ft, q) in zip(grp.FullType, grp.Quantity)],
                     hovertemplate="%{customdata}<extra></extra>",
                 )
             )
