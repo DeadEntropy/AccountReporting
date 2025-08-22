@@ -137,12 +137,23 @@ class TransformationManager:
         """Aggregate a list of transactions"""
         return TransformationManager.consolidate_transactions([(k, d[k][0], d[k][1], d[k][2]) for d in l for k in d])
 
+    @staticmethod
+    def to_agg_dict(m_list, q_list, p, t_list, s_list):
+        output = {}
+        for m, q, t, s in zip(m_list, q_list, t_list, s_list):
+            if m not in output:
+                output[m] = (q * p, t, s)
+            else:
+                output[m] = (output[m][0]  + q * p, t, s)
+                
+        return output
+
     def get_values_timeseries(self, date_range: list = None, account: str | list = None) -> pd.DataFrame:
         """returns a timeseries of the values"""
         df_asset = self.get_values_by_asset(date_range, account)
 
         df_asset["TransactionValue_list"] = [
-            {m: (q * p, t, s) for m, q, t, s in zip(m_list, q_list, t_list, s_list)}
+            TransformationManager.to_agg_dict(m_list, q_list, p, t_list, s_list)
             for m_list, q_list, p, t_list, s_list in zip(
                 df_asset["MemoMapped_list"],
                 df_asset["Quantity_list"],
