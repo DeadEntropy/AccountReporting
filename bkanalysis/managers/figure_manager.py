@@ -495,7 +495,7 @@ class FigureManager:
         if month is not None:
             transactions = transactions[transactions.Date.dt.month == month]
         df_income = transactions[transactions.FullMasterType.isin(["Income"])]
-        transactions = transactions[~transactions.FullMasterType.isin(["Income", "Intra-Account Transfers", "Ex. Income"])]
+        transactions = transactions[~transactions.FullMasterType.isin(["Income", "Intra-Account Transfers", "Ex. Income", "Tax"])]
 
         expenses = transactions.Quantity.sum()
 
