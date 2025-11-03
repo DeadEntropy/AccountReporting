@@ -406,15 +406,15 @@ class FigureManager:
             title=f"{asset} Investment Evolution",
             margin=dict(t=50, b=20, r=0, l=0, pad=4),
             yaxis=dict(
-                title=dict(text="Quantity"),
+                title=dict(text="Asset Quantity"),
             ),
             yaxis2=dict(
-                title=dict(text="Unit Price (USD)"),
+                title=dict(text="Asset Unit Price (USD)"),
             ),
             yaxis3=dict(
-                title=dict(text="Price (USD)"),
+                title=dict(text="Total Value (USD)"),
             ),
-            legend={"xanchor": "right", "x": 1.08},
+            showlegend=False
         )
 
         return fig
