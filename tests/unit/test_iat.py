@@ -1,18 +1,19 @@
-from bkanalysis.transforms import master_transform
-from bkanalysis.process import iat_identification
-import tests.unit.config_helper as ch
-import unittest
-import pandas as pd
-import datetime
+"""Tests for inter-account transfer identification."""
 import ast
+import datetime
+
+import pandas as pd
+import pytest
+
+from bkanalysis.process import iat_identification
 
 
-class TestProcess(unittest.TestCase):
+class TestProcess:
+    """Tests for transaction processing."""
 
-    def test_map_iat(self):
-        config = ch.get_config()
-        iat = iat_identification.IatIdentification(config)
-
+    def test_map_iat(self, config, iat_identifier):
+        """Verify inter-account transfers are correctly identified and matched."""
+        # Create a test dataframe with required columns
         df = pd.DataFrame(columns=[n.strip() for n in ast.literal_eval(config["Mapping"]["new_columns"])])
 
         df["Account"] = ["account1", "account2", "account1"]
@@ -21,16 +22,11 @@ class TestProcess(unittest.TestCase):
         df["Currency"] = ["CCY"] * 3
         df["Type"] = ["IAT"] * 3
         df["FullType"] = ["Intra-Account Transfert"] * 3
-
         df["Amount"] = [100, -100, 200]
         df["Date"] = datetime.datetime(2020, 10, 15)
-
         df.fillna("", inplace=True)
 
-        df_out = iat.map_iat(df)
-        self.assertEqual(df_out.FacingAccount[0], "account2", "Intra-Account Transfer not correctly identified.")
-        self.assertEqual(df_out.FacingAccount[1], "account1", "Intra-Account Transfer not correctly identified.")
-
-
-if __name__ == "__main__":
-    unittest.main()
+        # Process and verify matching
+        df_out = iat_identifier.map_iat(df)
+        assert df_out.FacingAccount[0] == "account2", "Intra-Account Transfer not correctly identified."
+        assert df_out.FacingAccount[1] == "account1", "Intra-Account Transfer not correctly identified."
