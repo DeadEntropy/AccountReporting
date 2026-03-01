@@ -17,18 +17,12 @@ from unittest.mock import Mock, MagicMock, patch
 
 from bkanalysis.ui import ui
 
-# Note: Module-level private functions (__function_name) are stored in module.__dict__
-# We access them by looking up the actual name used in the module
-try:
-    _sum_to_dict = ui.__dict__['__sum_to_dict']
-    _try_get = ui.__dict__['__try_get']
-    _get_plot_data = ui.__dict__['__get_plot_data']  
-    _interpolate = ui.__dict__['__interpolate']
-    _running_capital_gains = ui.__dict__['__running_capital_gains']
-except KeyError as e:
-    print(f"Could not find private functions: {e}")
-    # List available functions for debugging
-    print("Available items in ui module:", [k for k in ui.__dict__.keys() if not k.startswith('_')])
+# Access remaining private helpers used in tests
+# __try_get has been removed; use built-in dict.get instead
+_sum_to_dict = ui.__dict__.get('__sum_to_dict')
+_get_plot_data = ui.__dict__.get('__get_plot_data')
+_interpolate = ui.__dict__.get('__interpolate')
+_running_capital_gains = ui.__dict__.get('__running_capital_gains')
 
 
 # ============================================================================
@@ -174,39 +168,8 @@ class TestAggregateMemos:
         assert "Refund" in result
 
 
-class TestTryGet:
-    """Test __try_get() helper function."""
+# removed __try_get tests; use dict.get directly instead
 
-    def test_try_get_key_exists(self):
-        """Test __try_get returns value when key exists."""
-        d = {"key1": "value1", "key2": "value2"}
-        result = _try_get(d, "key1")
-        assert result == "value1"
-
-    def test_try_get_key_missing_with_default(self):
-        """Test __try_get returns default when key missing."""
-        d = {"key1": "value1"}
-        result = _try_get(d, "missing", [0, 0, 0])
-        assert result == [0, 0, 0]
-
-    def test_try_get_key_missing_without_default_raises(self):
-        """Test __try_get raises exception when key missing and no default."""
-        d = {"key1": "value1"}
-        with pytest.raises(Exception, match="Key missing is not in dictionary"):
-            _try_get(d, "missing")
-
-    def test_try_get_with_none_default(self):
-        """Test __try_get raises when key missing and default is None."""
-        d = {"key1": "value1"}
-        # None as default means no default - should raise
-        with pytest.raises(Exception, match="Key missing is not in dictionary"):
-            _try_get(d, "missing", None)
-
-    def test_try_get_dict_value(self):
-        """Test __try_get returns dict value."""
-        d = {"accounts": {"acc1": 100, "acc2": 200}}
-        result = _try_get(d, "accounts")
-        assert result == {"acc1": 100, "acc2": 200}
 
 
 # ============================================================================

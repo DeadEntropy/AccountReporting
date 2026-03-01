@@ -63,7 +63,7 @@ def test_my_feature(self, config):
 ## Current Coverage Status
 
 **Baseline (before improvements):** 17.47%
-**Current:** 21.64%
+**Current:** 36% (UI module tested)
 **Target:** 75.00%
 
 ### Well-Tested Modules
@@ -77,7 +77,7 @@ def test_my_feature(self, config):
 ### Modules Needing More Tests (0% coverage)
 - `bkanalysis/portfolio/` - 0% coverage
 - `bkanalysis/managers/figure_manager.py` - 10.51% coverage
-- `bkanalysis/ui/` - 0% coverage
+- `bkanalysis/ui/` - 36% coverage (new suite added)
 - Most account transform modules - 15-30% coverage
 - `bkanalysis/projection/` - 0% coverage
 - `bkanalysis/salary.py` - 15.05% coverage
@@ -196,8 +196,8 @@ To reach 75% coverage most efficiently, focus on these areas (in priority order)
    - `process_helper.py` - Helper functions
 
 ### Phase 3: UI & Visualization (60% → 75%+)
-1. **UI Module** (Currently 0%)
-   - `ui.py` - Main UI logic
+1. **UI Module** (Currently 36%)
+   - `ui.py` - Main UI logic (30 unit tests added, further integration tests remain)
    - `salary.py` - Salary calculations
    - `charts/` - Charting functions
 

@@ -412,13 +412,8 @@ def plot_wealth_yearly(df, by=CUMULATED_AMOUNT_CCY_EXCL_CAPITAL, first_year=2016
     fig.show()
 
 
-# TODO: replace this with standard python call
-def __try_get(d, k, default=None):
-    if k in d:
-        return d[k]
-    elif not (default is None):
-        return default
-    raise Exception(f"Key {k} is not in dictionary.")
+# NOTE: __try_get removed – use dict.get directly with default and handle KeyError if needed
+
 
 
 def project(df, nb_years=11, projection_data={}):
@@ -437,9 +432,9 @@ def project(df, nb_years=11, projection_data={}):
         .reset_index()
     )
 
-    projection["Return"] = [__try_get(projection_data, acc, [0, 0, 0])[0] for acc in projection.Account]
-    projection["Volatility"] = [__try_get(projection_data, acc, [0, 0, 0])[1] for acc in projection.Account]
-    projection["Contribution"] = [__try_get(projection_data, acc, [0, 0, 0])[2] for acc in projection.Account]
+    projection["Return"] = [projection_data.get(acc, [0, 0, 0])[0] for acc in projection.Account]
+    projection["Volatility"] = [projection_data.get(acc, [0, 0, 0])[1] for acc in projection.Account]
+    projection["Contribution"] = [projection_data.get(acc, [0, 0, 0])[2] for acc in projection.Account]
 
     r = range(0, nb_years)
     (w, w_low, w_up, w_low_ex, w_up_ex) = pj.project_full(projection, r, CUMULATED_AMOUNT_CCY)
@@ -528,9 +523,9 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
         .sort_values(CUMULATED_AMOUNT_CCY, ascending=False)
         .reset_index()
     )
-    projection_1["Return"] = [__try_get(projection_data_1, acc, [0, 0, 0])[0] for acc in projection_1.Account]
-    projection_1["Volatility"] = [__try_get(projection_data_1, acc, [0, 0, 0])[1] for acc in projection_1.Account]
-    projection_1["Contribution"] = [__try_get(projection_data_1, acc, [0, 0, 0])[2] for acc in projection_1.Account]
+    projection_1["Return"] = [projection_data_1.get(acc, [0, 0, 0])[0] for acc in projection_1.Account]
+    projection_1["Volatility"] = [projection_data_1.get(acc, [0, 0, 0])[1] for acc in projection_1.Account]
+    projection_1["Contribution"] = [projection_data_1.get(acc, [0, 0, 0])[2] for acc in projection_1.Account]
 
     projection_2 = (
         pd.pivot_table(
@@ -542,9 +537,9 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
         .sort_values(CUMULATED_AMOUNT_CCY, ascending=False)
         .reset_index()
     )
-    projection_2["Return"] = [__try_get(projection_data_2, acc, [0, 0, 0])[0] for acc in projection_2.Account]
-    projection_2["Volatility"] = [__try_get(projection_data_2, acc, [0, 0, 0])[1] for acc in projection_2.Account]
-    projection_2["Contribution"] = [__try_get(projection_data_2, acc, [0, 0, 0])[2] for acc in projection_2.Account]
+    projection_2["Return"] = [projection_data_2.get(acc, [0, 0, 0])[0] for acc in projection_2.Account]
+    projection_2["Volatility"] = [projection_data_2.get(acc, [0, 0, 0])[1] for acc in projection_2.Account]
+    projection_2["Contribution"] = [projection_data_2.get(acc, [0, 0, 0])[2] for acc in projection_2.Account]
 
     r = range(0, nb_years)
     (w1, w1_low, w1_up, w1_low_ex, w1_up_ex) = pj.project_full(projection_1, r, CUMULATED_AMOUNT_CCY)
