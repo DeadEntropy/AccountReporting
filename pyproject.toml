@@ -1,2 +1,40 @@
 [tool.black]
 line-length = 140  # Adjust line length to your preferred value
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --strict-markers"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["bkanalysis"]
+omit = [
+    "*/__init__.py",
+    "*/setup.py",
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+skip_covered = false
+precision = 2
+fail_under = 75
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "class.*\\(Protocol\\):",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
