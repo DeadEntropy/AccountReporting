@@ -11,3 +11,4 @@ bkanalysis/ui/assets
 tests/run.py
 .vscode
 bkanalysis.egg-info
+.coverage
