@@ -412,6 +412,7 @@ def plot_wealth_yearly(df, by=CUMULATED_AMOUNT_CCY_EXCL_CAPITAL, first_year=2016
     fig.show()
 
 
+# TODO: replace this with standard python call
 def __try_get(d, k, default=None):
     if k in d:
         return d[k]
