@@ -41,24 +41,3 @@ def load(path_in, config, market: Market, ref_currency: str):
         )
 
     return df_out
-
-
-def load_save(config):
-    files = glob.glob(os.path.join(config["folder_in"], "*.csv"))
-    print(f"found {len(files)} CSV files.")
-    if len(files) == 0:
-        return
-
-    df_list = [load(f, config["account_name"]) for f in files]
-    for df_temp in df_list:
-        df_temp["count"] = df_temp.groupby(sd.target_columns).cumcount()
-    df = pd.concat(df_list)
-    df.drop_duplicates().drop(["count"], axis=1).sort_values("Date", ascending=False).to_csv(config["path_out"], index=False)
-
-
-def load_save_default():
-    config = configparser.ConfigParser()
-    if len(config.read(ch.source)) != 1:
-        raise OSError(f"no config found in {ch.source}")
-
-    load_save(config)

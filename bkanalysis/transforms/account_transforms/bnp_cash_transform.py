@@ -40,23 +40,3 @@ def load(path_in, config, *args):
     df_out["AccountType"] = config["account_type"]
 
     return df_out
-
-
-def load_save(config):
-    files = glob.glob(os.path.join(config["folder_in"], "*.csv"))
-    print(f"found {len(files)} CSV files in {config['folder_in']}.")
-    if len(files) == 0:
-        return
-
-    df_list = [load(f, config) for f in files]
-    for df_temp in df_list:
-        df_temp["count"] = df_temp.groupby(sd.target_columns).cumcount()
-    df = pd.concat(df_list)
-    df.drop_duplicates().drop(["count"], axis=1).sort_values("Date", ascending=False).to_csv(config["path_out"], index=False)
-
-
-def load_save_default():
-    config = configparser.ConfigParser()
-    config.read(ch.source)
-
-    load_save(config["Coinbase"])
