@@ -63,7 +63,7 @@ def test_my_feature(self, config):
 ## Current Coverage Status
 
 **Baseline (before improvements):** 17.47%
-**Current:** 36% (UI module tested)
+**Current:** 32.43% (Phase 1 expansion: 3 new account transforms)
 **Target:** 75.00%
 
 ### Well-Tested Modules
@@ -73,6 +73,9 @@ def test_my_feature(self, config):
 - ✅ `bkanalysis/managers/data_manager.py` - 80.70% coverage (newly added tests)
 - ✅ `bkanalysis/managers/market_manager.py` - 35.62% coverage (newly added tests)
 - ✅ `bkanalysis/managers/transformation_manager.py` - 18.13% coverage (newly added tests)
+- ✅ `bkanalysis/transforms/account_transforms/fidelity_transform.py` - 100% coverage (NEW)
+- ✅ `bkanalysis/transforms/account_transforms/first_republic_transform.py` - 100% coverage (NEW)
+- ✅ `bkanalysis/transforms/account_transforms/chasebusiness_transform.py` - 94.12% coverage (NEW)
 
 ### Modules Needing More Tests (0% coverage)
 - `bkanalysis/portfolio/` - 0% coverage
@@ -126,51 +129,22 @@ class TestMyClass:
 
 ### Mocking Example
 
-```python
-from unittest.mock import Mock, patch
+Avoid using Mocking as much as possible. Only use Mocking to mock calls to yfinance
 
-def test_with_mock(self):
-    """Test using mocks for external dependencies."""
-    
-    # Create a mock object
-    mock_loader = Mock()
-    mock_loader.load.return_value = {"asset": "price"}
-    
-    # Use patch decorator
-    with patch('bkanalysis.module.SomeClass', mock_loader):
-        result = some_function()
-        assert result is not None
-        mock_loader.load.assert_called_once()
-```
-
-### Testing Pandas DataFrames
-
-```python
-import pandas as pd
-
-def test_dataframe_operation(self):
-    """Test operations on DataFrames."""
-    df = pd.DataFrame({
-        'Date': pd.date_range('2023-01-01', periods=3),
-        'Amount': [100, 200, 150],
-        'Account': ['Acc1', 'Acc2', 'Acc1']
-    })
-    
-    # Test grouping
-    grouped = df.groupby('Account')['Amount'].sum()
-    assert grouped['Acc1'] == 250
-    assert grouped['Acc2'] == 200
-```
 
 ## Priority Areas for Coverage Improvement
 
 To reach 75% coverage most efficiently, focus on these areas (in priority order):
 
-### Phase 1: High-Impact (Current: 21.64% → ~40%)
+### Phase 1: High-Impact (Current: 21.64% → 32.43%, Target: ~40%)
 1. **Account Transforms** (31 classes, highest volume)
    - Lowest hanging fruit: Well-structured, similar patterns
    - Add basic initialization and transformation tests for each
-   - Example: `tests/unit/test_account_transforms.py`
+   - **Completed (3 transforms with 100%+ coverage):**
+     - `fidelity_transform` - handles security transactions with cash account duplication
+     - `first_republic_transform` - debit/credit aggregation with memo postprocessing
+     - `chasebusiness_transform` - filename parsing and account name extraction
+   - **Remaining (~28 transforms)** - Continue with similar pattern
 
 2. **Manager Classes** (Already started - continue)
    - `transformation_manager.py` - Additional methods

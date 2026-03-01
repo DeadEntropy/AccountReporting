@@ -412,10 +412,6 @@ def plot_wealth_yearly(df, by=CUMULATED_AMOUNT_CCY_EXCL_CAPITAL, first_year=2016
     fig.show()
 
 
-# NOTE: __try_get removed – use dict.get directly with default and handle KeyError if needed
-
-
-
 def project(df, nb_years=11, projection_data={}):
     assert CUMULATED_AMOUNT_CCY in df.columns, f'Expect "{CUMULATED_AMOUNT_CCY}" to be in the columns.'
     assert DATE in df.columns, f'Expect "{DATE}" to be in the columns.'
