@@ -298,6 +298,29 @@ class TestMarketManager:
         assert mm.asset_map is not None
         assert mm.asset_map['USD'] == 'USD'
 
+    @patch('bkanalysis.managers.market_manager.market_loader.MarketLoader')
+    def test_load_prices_with_ref_currency_only(self, mock_loader_cls, config):
+        """load_prices must work when every price is already in the reference currency
+        (used to raise 'No objects to concatenate' while building the FX frame)."""
+        from datetime import timedelta
+        from bkanalysis.market.price import Price
+
+        mm = market_manager.MarketManager(ref_currency='USD', config=config)
+        mm.asset_map = {'USD': 'USDUSD=X'}
+
+        dm = Mock()
+        dm.assets = {'USD': datetime(2023, 1, 1)}
+
+        mock_loader_cls.return_value.load.return_value = {
+            'USDUSD=X': {datetime(2023, 1, 1) + timedelta(days=i): Price(1.0, 'USD') for i in range(5)}
+        }
+
+        mm.load_prices(dm)
+
+        assert mm.prices is not None
+        assert len(mm.prices) > 0
+        assert (mm.prices['AssetPriceInRefCurrency'] == 1.0).all()
+
 
 class TestTransformationManager:
     """Tests for TransformationManager class."""

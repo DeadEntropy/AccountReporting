@@ -75,17 +75,14 @@ class MarketManager:
                 return group
             return group.reset_index().set_index("Date").reindex(date_range[group_name]).ffill().bfill().reset_index()
 
-        df_prices = (
-            df_prices.groupby("AssetMapped")
-            .apply(lambda group: reindex_group(group, group.name))
-            .reset_index(drop=True)[["AssetMapped", "Date", "Currency", "Price"]]
-        )
+        df_prices = pd.concat(
+            [reindex_group(group, name).assign(AssetMapped=name) for name, group in df_prices.groupby("AssetMapped")],
+            ignore_index=True,
+        )[["AssetMapped", "Date", "Currency", "Price"]]
 
         df_prices = df_prices.dropna()
 
-        df_fx = pd.concat(
-            [df_prices[df_prices.AssetMapped.str.endswith("=X")] for ccy in df_prices.Currency.unique() if ccy != self.ref_currency]
-        )
+        df_fx = df_prices[df_prices.AssetMapped.str.endswith("=X")].copy()
         df_fx["Asset"] = df_fx["AssetMapped"].str.replace(f"{self.ref_currency}=X", "")  # TODO properly parse the asset to extract the ccy
         df_fx.rename(
             {"Currency": "RefCurrency", "Asset": "Currency", "Price": "Fx"},

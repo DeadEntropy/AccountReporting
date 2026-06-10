@@ -207,7 +207,7 @@ class Loader:
 
     @staticmethod
     def get_files(folder_lake, root=None, include_xls=True, include_json=True):
-        print(f"Loading files from {os.path.abspath(folder_lake)}.")
+        print(f"Loading files from {os.path.abspath(folder_lake)}")
         if root is None:
             csv_files = glob.glob(os.path.join(folder_lake, "*.csv"))
         else:

@@ -338,7 +338,7 @@ class FigureManager:
         categorised_flows = df_expenses.reset_index(drop=True).groupby("FullType")["Value"].sum().sort_values(ascending=False)
 
         if salary_override is not None:
-            categorised_flows = categorised_flows.drop("Salary", axis=0)
+            categorised_flows = categorised_flows.drop("Salary", axis=0, errors="ignore")
             for p in salary_override.payrolls:
                 categorised_flows.loc[p] = salary_override.actual_salaries[p]
             categorised_flows.loc["Salary Carried Over"] = salary_override.total_received_salary_from_previous_year
@@ -348,7 +348,7 @@ class FigureManager:
             categorised_flows[
                 (categorised_flows > -threshold) & (categorised_flows < threshold) & (categorised_flows.index != "Others")
             ].sum()
-            + categorised_flows.loc["Others"]
+            + categorised_flows.get("Others", 0.0)
         )
         categorised_flows = categorised_flows[
             (categorised_flows < -threshold) | (categorised_flows > threshold) | (categorised_flows.index == "Others")
@@ -505,6 +505,9 @@ class FigureManager:
             df_income = df_income[(df_income.FullSubType != "UBS Bonus")]
 
         income = df_income.Quantity.sum()
+        if income == 0:
+            # no income in the period: the saving ratio is undefined
+            return float("nan")
         return (income + expenses) / income
 
     def get_saving_rate_gauge(self, current_saving_rate: float, previous_saving_rate: float, title: str) -> go.Figure:

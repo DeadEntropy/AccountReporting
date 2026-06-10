@@ -84,8 +84,15 @@ class Salary:
         }
         self.total_received_salary = sum(self.total_received_salaries.values())
 
+        try:
+            prev_year_row = self.monthly_salaries.loc[prev_year_end]
+        except KeyError:
+            # no salary received in December of the previous year: nothing was carried over
+            prev_year_row = None
+
         self.total_received_salaries_from_previous_year = {
-            payroll: -self.monthly_salaries.loc[prev_year_end][f"OUT_SLRY_{payroll}"] for payroll in self.salaries_info.keys()
+            payroll: (-prev_year_row[f"OUT_SLRY_{payroll}"] if prev_year_row is not None else 0.0)
+            for payroll in self.salaries_info.keys()
         }
         self.total_received_salaries_from_previous_year[Salary.OTHER_PAYROLLS] = 0.0
         self.total_received_salary_from_previous_year = sum(self.total_received_salaries_from_previous_year.values())
@@ -167,9 +174,15 @@ class SalaryLegacy:
         self.total_received_salaries = {p: self.monthly_salaries.loc[f"{year}":f"{year}-12"][p].sum() for p in self.payrolls}
         self.total_received_salary = sum([self.total_received_salaries[p] for p in self.payrolls])
 
+        try:
+            prev_year_row = self.monthly_salaries.loc[prev_year_end]
+        except KeyError:
+            # no salary received in December of the previous year: nothing was carried over
+            prev_year_row = None
+
         self.total_received_salaries_from_previous_year = {
-            base_payrolls_1: -self.monthly_salaries.loc[prev_year_end].OUT_SLRY_1,
-            base_payrolls_2: -self.monthly_salaries.loc[prev_year_end].OUT_SLRY_2,
+            base_payrolls_1: -prev_year_row.OUT_SLRY_1 if prev_year_row is not None else 0.0,
+            base_payrolls_2: -prev_year_row.OUT_SLRY_2 if prev_year_row is not None else 0.0,
             SalaryLegacy.OTHER_PAYROLLS: 0.0,
         }
         self.total_received_salary_from_previous_year = sum([self.total_received_salaries_from_previous_year[p] for p in self.payrolls])
