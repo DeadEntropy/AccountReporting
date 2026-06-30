@@ -4,7 +4,7 @@ numpy>=1.23.5
 pandas>=1.5.2
 plotly>=5.11.0
 Requests>=2.31.0
-yfinance>=0.2.26
+yfinance>=1.5.1
 nbformat>=4.2.0
 mortgage
 yahooquery

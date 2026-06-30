@@ -27,7 +27,7 @@ def can_handle(path_in, config, sep=";", *args):
 
 
 def load(path_in, config, sep=";", *args):
-    with open(path_in) as f:
+    with open(path_in, encoding="utf-8") as f:
         lines = f.readlines()
 
     new_lines = []

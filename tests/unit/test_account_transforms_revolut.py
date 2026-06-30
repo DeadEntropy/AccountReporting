@@ -93,3 +93,55 @@ class TestRevolutTransform:
         """Test that all transactions are preserved."""
         result = revolut_transform.load(revolut_gbp_csv_file, revolut_config, sep=' , ')
         assert len(result) == 4
+
+
+@pytest.fixture
+def revolut_gbp_csv_with_symbols(tmp_path):
+    """Revolut GBP CSV (UTF-8) whose Exchange/Description fields contain the GBP/EUR symbols
+    and an accented merchant name. Mirrors real Revolut exports."""
+    csv_content = (
+        "Completed Date , Description , Paid Out (GBP) , Paid In (GBP) , Exchange Out , "
+        "Exchange In , Balance (GBP) , Category , Notes\n"
+        "1 Jan 2024 , CAFÉ ORÉE , 10.00 ,  , £10.00 , €11.63 , 100.00 , Purchase , \n"
+        "2 Jan 2024 , SOLD GBP TO EUR , 20.00 ,  , £20.00 , €23.27 , 80.00 , Exchange , \n"
+    )
+    csv_path = os.path.join(tmp_path, "revolut_symbols.csv")
+    with open(csv_path, "w", encoding="utf-8") as f:
+        f.write(csv_content)
+    return csv_path
+
+
+class TestRevolutEncoding:
+    """Regression tests for the Windows->Linux encoding bug.
+
+    The Revolut source files are UTF-8 and contain GBP/EUR symbols. Reading them with the OS
+    default encoding (cp1252 on Windows) mis-decoded the pound sign and, after the symbol->code
+    replacement, left a stray 'Â' in the memo (e.g. 'ÂGBP'), breaking the memo->category lookup.
+    The transform must read as UTF-8 so the produced memo matches the pre-approved mapping.
+    """
+
+    def test_load_opens_file_as_utf8(self, monkeypatch, revolut_gbp_csv_with_symbols, revolut_config):
+        """`load` must open the source with an explicit utf-8 encoding (not the OS default)."""
+        captured = {}
+        real_open = open
+
+        def spy_open(path, *args, **kwargs):
+            captured["encoding"] = kwargs.get("encoding")
+            return real_open(path, *args, **kwargs)
+
+        monkeypatch.setattr(revolut_transform, "open", spy_open, raising=False)
+        revolut_transform.load(revolut_gbp_csv_with_symbols, revolut_config, sep=" , ")
+        assert captured["encoding"] == "utf-8"
+
+    def test_currency_symbols_become_clean_codes(self, revolut_gbp_csv_with_symbols, revolut_config):
+        """GBP/EUR symbols convert to 'GBP'/'EUR' with no mojibake 'Â' remnant."""
+        result = revolut_transform.load(revolut_gbp_csv_with_symbols, revolut_config, sep=" , ")
+        memos = " || ".join(result.Memo.astype(str))
+        assert "Â" not in memos, f"mojibake remnant found in memos: {memos}"
+        assert "£" not in memos and "€" not in memos
+        assert "GBP10.00" in memos and "EUR11.63" in memos
+
+    def test_accented_text_preserved(self, revolut_gbp_csv_with_symbols, revolut_config):
+        """Accented merchant names decode correctly under UTF-8 (e.g. 'CAFÉ ORÉE')."""
+        result = revolut_transform.load(revolut_gbp_csv_with_symbols, revolut_config, sep=" , ")
+        assert "CAFÉ ORÉE" in result.Memo.iloc[0]

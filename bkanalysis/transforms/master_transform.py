@@ -208,26 +208,19 @@ class Loader:
     @staticmethod
     def get_files(folder_lake, root=None, include_xls=True, include_json=True):
         print(f"Loading files from {os.path.abspath(folder_lake)}")
-        if root is None:
-            csv_files = glob.glob(os.path.join(folder_lake, "*.csv"))
-        else:
-            csv_files = glob.glob(os.path.join(root, folder_lake, "*.csv"))
+        base = folder_lake if root is None else os.path.join(root, folder_lake)
 
-        if include_xls:
-            if root is None:
-                xls_files = glob.glob(os.path.join(folder_lake, "*.xls"))
-            else:
-                xls_files = glob.glob(os.path.join(root, folder_lake, "*.xls"))
-        else:
-            xls_files = []
+        def find(extension):
+            # glob is case-sensitive on Linux but case-insensitive on Windows, so look up
+            # both the lowercase (e.g. *.csv) and uppercase (e.g. *.CSV) extensions and
+            # de-duplicate the result to cover either platform.
+            lower_case = glob.glob(os.path.join(base, f"*.{extension.lower()}"))
+            upper_case = glob.glob(os.path.join(base, f"*.{extension.upper()}"))
+            return sorted(set(lower_case) | set(upper_case))
 
-        if include_json:
-            if root is None:
-                json_files = glob.glob(os.path.join(folder_lake, "*.json"))
-            else:
-                json_files = glob.glob(os.path.join(root, folder_lake, "*.json"))
-        else:
-            json_files = []
+        csv_files = find("csv")
+        xls_files = find("xls") if include_xls else []
+        json_files = find("json") if include_json else []
 
         print(f"Loading {len(csv_files)} CSV file(s), {len(xls_files)} XLS file(s), and {len(json_files)} JSON file(s).")
         return csv_files + xls_files + json_files

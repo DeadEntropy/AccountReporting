@@ -21,7 +21,7 @@ def can_handle(path_in, config, *args):
 def load(path_in: str, config, *args):
     if os.path.exists(path_in):
         try:
-            with open(path_in, "r") as json_file:
+            with open(path_in, "r", encoding="utf-8") as json_file:
                 json_obj = json.load(json_file)
         except TypeError:
             raise TypeError(f"Failed to deserialise jSon file '{path_in}' {json_file}")
