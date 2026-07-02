@@ -5,7 +5,6 @@ import pandas as pd
 from datetime import datetime
 
 from bkanalysis.managers import data_manager, market_manager, transformation_manager
-from bkanalysis.managers.transformation_manager_cache import TransformationManagerCache
 from bkanalysis.managers import manager_helper
 
 
@@ -649,45 +648,20 @@ class TestTransformationManager:
         
         tm = transformation_manager.TransformationManager(dm, mm)
         flow_values = tm.get_flow_values(how='out')
-        
+
         assert isinstance(flow_values, pd.DataFrame)
 
 
-class TestTransformationManagerCache:
-    """Tests for TransformationManagerCache class."""
+class TestTransformationManagerCaching:
+    """Tests for the result cache inside TransformationManager."""
 
     @staticmethod
-    def _create_sample_transactions(num_rows=5):
-        """Helper to create sample transactions DataFrame."""
-        return pd.DataFrame({
-            'Account': ['Account1', 'Account1', 'Account2', 'Account1', 'Account2'],
-            'Asset': ['GBP', 'GBP', 'USD', 'EUR', 'USD'],
-            'Date': pd.date_range('2023-01-01', periods=num_rows),
-            'Amount': [100, 50, 200, 75, 150],
-            'Quantity': [100, 50, 200, 75, 150],
-            'MemoMapped': ['memo1', 'memo2', 'memo3', 'memo4', 'memo5'],
-            'Type': ['type1', 'type1', 'type2', 'type3', 'type2'],
-            'SubType': ['subtype1', 'subtype1', 'subtype2', 'subtype3', 'subtype2'],
-            'AssetPriceInRefCurrency': [1.0, 1.0, 1.25, 1.1, 1.25],
-            'AssetPriceChangeInRefCurrency': [0.0, 0.0, 0.05, 0.02, 0.05],
-            'FullMasterType': ['Income', 'Income', 'Expense', 'Expense', 'Expense'],
-            'FullType': ['Salary', 'Salary', 'Gas', 'Electric', 'Gas'],
-            'FullSubType': ['Base', 'Bonus', 'Petrol', 'Monthly', 'Petrol'],
-            'Subcategory': ['test', 'test', 'test', 'test', 'test'],
-            'Memo': ['memo1', 'memo2', 'memo3', 'memo4', 'memo5'],
-            'Currency': ['GBP', 'GBP', 'USD', 'EUR', 'USD'],
-            'MemoSimple': ['simple1', 'simple2', 'simple3', 'simple4', 'simple5'],
-            'AccountType': ['type_a', 'type_a', 'type_b', 'type_a', 'type_b'],
-            'FacingAccount': ['', '', '', '', ''],
-            'SourceFile': ['file1', 'file1', 'file2', 'file1', 'file2'],
-        })
-
-    def test_init_with_defaults(self, config):
-        """Test TransformationManagerCache initialization with defaults."""
+    def _create_manager(config):
+        """Helper to build a TransformationManager on the sample transactions."""
         dm = data_manager.DataManager(config)
         mm = market_manager.MarketManager(ref_currency='GBP', config=config)
-        
-        dm.transactions = self._create_sample_transactions()
+
+        dm.transactions = TestTransformationManager._create_sample_transactions()
         mm.asset_map = {'GBP': 'GBP', 'USD': 'USD', 'EUR': 'EUR'}
         mm.prices = pd.DataFrame({
             'AssetMapped': ['GBP', 'USD', 'EUR'],
@@ -695,107 +669,58 @@ class TestTransformationManagerCache:
             'AssetPriceInRefCurrency': [1.0, 1.25, 1.1],
             'AssetPriceChangeInRefCurrency': [0.0, 0.05, 0.02],
         }).set_index(['AssetMapped', 'Date'])
-        
-        tmc = TransformationManagerCache(dm, mm, year=2023)
-        
-        assert tmc._account is None
-        assert tmc._year == 2023
-        assert tmc._hows == ['both']
-        assert tmc._include_iat == False
-        assert tmc._include_full_types == True
 
-    def test_init_with_custom_params(self, config):
-        """Test TransformationManagerCache initialization with custom parameters."""
-        dm = data_manager.DataManager(config)
-        mm = market_manager.MarketManager(ref_currency='GBP', config=config)
-        
-        dm.transactions = self._create_sample_transactions()
-        mm.asset_map = {'GBP': 'GBP', 'USD': 'USD', 'EUR': 'EUR'}
-        mm.prices = pd.DataFrame({
-            'AssetMapped': ['GBP', 'USD', 'EUR'],
-            'Date': pd.date_range('2023-01-01', periods=3),
-            'AssetPriceInRefCurrency': [1.0, 1.25, 1.1],
-            'AssetPriceChangeInRefCurrency': [0.0, 0.05, 0.02],
-        }).set_index(['AssetMapped', 'Date'])
-        
-        tmc = TransformationManagerCache(dm, mm, year=2023, account='Account1', hows=['in', 'out'])
-        
-        assert tmc._account == 'Account1'
-        assert tmc._hows == ['in', 'out']
+        return transformation_manager.TransformationManager(dm, mm)
 
-    def test_get_flow_values_from_cache(self, config):
-        """Test get_flow_values retrieves from cache."""
-        dm = data_manager.DataManager(config)
-        mm = market_manager.MarketManager(ref_currency='GBP', config=config)
-        
-        dm.transactions = self._create_sample_transactions()
-        mm.asset_map = {'GBP': 'GBP', 'USD': 'USD', 'EUR': 'EUR'}
-        mm.prices = pd.DataFrame({
-            'AssetMapped': ['GBP', 'USD', 'EUR'],
-            'Date': pd.date_range('2023-01-01', periods=3),
-            'AssetPriceInRefCurrency': [1.0, 1.25, 1.1],
-            'AssetPriceChangeInRefCurrency': [0.0, 0.05, 0.02],
-        }).set_index(['AssetMapped', 'Date'])
-        
-        tmc = TransformationManagerCache(dm, mm, year=2023)
-        
-        # Should return copy from cache
-        flow_values = tmc.get_flow_values()
-        assert isinstance(flow_values, pd.DataFrame)
+    def test_cached_result_matches_fresh_compute(self, config):
+        """A cached call must return the same frame as a freshly computed one."""
+        tm1 = self._create_manager(config)
+        tm2 = self._create_manager(config)
 
-    def test_get_flow_values_invalid_account(self, config):
-        """Test get_flow_values raises error with invalid account."""
-        dm = data_manager.DataManager(config)
-        mm = market_manager.MarketManager(ref_currency='GBP', config=config)
-        
-        dm.transactions = self._create_sample_transactions()
-        mm.asset_map = {'GBP': 'GBP', 'USD': 'USD', 'EUR': 'EUR'}
-        mm.prices = pd.DataFrame({
-            'AssetMapped': ['GBP', 'USD', 'EUR'],
-            'Date': pd.date_range('2023-01-01', periods=3),
-            'AssetPriceInRefCurrency': [1.0, 1.25, 1.1],
-            'AssetPriceChangeInRefCurrency': [0.0, 0.05, 0.02],
-        }).set_index(['AssetMapped', 'Date'])
-        
-        tmc = TransformationManagerCache(dm, mm, year=2023, account='Account1')
-        
-        with pytest.raises(ValueError):
-            tmc.get_flow_values(date_start=pd.Timestamp('2023-01-01'), date_end=pd.Timestamp('2023-01-03'), account='Account2')
+        date_range = [pd.Timestamp('2023-01-01'), pd.Timestamp('2023-01-03')]
 
-    def test_get_flow_values_invalid_how(self, config):
-        """Test get_flow_values raises error with non-cached 'how' parameter."""
-        dm = data_manager.DataManager(config)
-        mm = market_manager.MarketManager(ref_currency='GBP', config=config)
-        
-        dm.transactions = self._create_sample_transactions()
-        mm.asset_map = {'GBP': 'GBP', 'USD': 'USD', 'EUR': 'EUR'}
-        mm.prices = pd.DataFrame({
-            'AssetMapped': ['GBP', 'USD', 'EUR'],
-            'Date': pd.date_range('2023-01-01', periods=3),
-            'AssetPriceInRefCurrency': [1.0, 1.25, 1.1],
-            'AssetPriceChangeInRefCurrency': [0.0, 0.05, 0.02],
-        }).set_index(['AssetMapped', 'Date'])
-        
-        tmc = TransformationManagerCache(dm, mm, year=2023, hows=['both'])
-        
-        with pytest.raises(ValueError):
-            tmc.get_flow_values(date_start=pd.Timestamp('2023-01-01'), date_end=pd.Timestamp('2023-01-03'), how='in')
+        first = tm1.get_values_by_asset(date_range=date_range)
+        cached = tm1.get_values_by_asset(date_range=date_range)
+        fresh = tm2.get_values_by_asset(date_range=date_range)
+        pd.testing.assert_frame_equal(cached, first)
+        pd.testing.assert_frame_equal(cached, fresh)
 
-    def test_get_flow_values_invalid_include_iat(self, config):
-        """Test get_flow_values raises error with mismatched include_iat."""
-        dm = data_manager.DataManager(config)
-        mm = market_manager.MarketManager(ref_currency='GBP', config=config)
-        
-        dm.transactions = self._create_sample_transactions()
-        mm.asset_map = {'GBP': 'GBP', 'USD': 'USD', 'EUR': 'EUR'}
-        mm.prices = pd.DataFrame({
-            'AssetMapped': ['GBP', 'USD', 'EUR'],
-            'Date': pd.date_range('2023-01-01', periods=3),
-            'AssetPriceInRefCurrency': [1.0, 1.25, 1.1],
-            'AssetPriceChangeInRefCurrency': [0.0, 0.05, 0.02],
-        }).set_index(['AssetMapped', 'Date'])
-        
-        tmc = TransformationManagerCache(dm, mm, year=2023, include_iat=False)
-        
-        with pytest.raises(ValueError):
-            tmc.get_flow_values(date_start=pd.Timestamp('2023-01-01'), date_end=pd.Timestamp('2023-01-03'), include_iat=True)
+        flow_first = tm1.get_flow_values(date_range[0], date_range[1])
+        flow_cached = tm1.get_flow_values(date_range[0], date_range[1])
+        pd.testing.assert_frame_equal(flow_cached, flow_first)
+
+        ts_first = tm1.get_values_timeseries(date_range)
+        ts_cached = tm1.get_values_timeseries(date_range)
+        pd.testing.assert_frame_equal(ts_cached, ts_first)
+
+    def test_returned_frame_is_a_copy(self, config):
+        """Mutating a returned frame must not corrupt the cached result."""
+        tm = self._create_manager(config)
+
+        first = tm.get_flow_values()
+        original_values = first["Value"].copy()
+        first["Value"] = 12345.0
+
+        second = tm.get_flow_values()
+        pd.testing.assert_series_equal(second["Value"], original_values)
+
+    def test_distinct_arguments_get_distinct_results(self, config):
+        """Different date ranges must not collide in the cache."""
+        tm = self._create_manager(config)
+
+        full = tm.get_values_by_asset()
+        sliced = tm.get_values_by_asset(date_range=[pd.Timestamp('2023-01-01'), pd.Timestamp('2023-01-02')])
+
+        assert len(sliced) < len(full)
+
+    def test_group_transaction_clears_cache(self, config):
+        """Re-grouping the transactions must invalidate all cached results."""
+        tm = self._create_manager(config)
+
+        tm.get_values_by_asset()
+        assert len(tm._cache) > 0
+
+        tm.group_transaction()
+        assert len(tm._cache) == 0
+
+

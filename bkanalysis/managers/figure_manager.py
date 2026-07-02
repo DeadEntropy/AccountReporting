@@ -489,7 +489,7 @@ class FigureManager:
         return steps
 
     def get_saving_ratio(self, year=2025, month=None, include_capital=False, include_bonus=False):
-        transactions = self.transformation_manager.data_manager.transactions.copy(deep=True)
+        transactions = self.transformation_manager.data_manager.transactions
         transactions = transactions[["Date", "Quantity", "FullType", "FullSubType", "FullMasterType"]]
         transactions = transactions[transactions.Date.dt.year == year]
         if month is not None:
@@ -536,7 +536,7 @@ class FigureManager:
 
     def get_income_vs_expenses(self, date_range: list = None, exclude_bonus: bool = True, exclude_iat: bool = True) -> go.Figure:
         """Generates a bar chart comparing income vs expenses"""
-        transactions = self.transformation_manager.data_manager.transactions.copy(deep=True)
+        transactions = self.transformation_manager.data_manager.transactions
         transactions = transactions[["Date", "Quantity", "FullType", "FullSubType", "FullMasterType"]]
         transactions = transactions[(transactions.Date >= date_range[0]) & (transactions.Date <= date_range[1])]
 

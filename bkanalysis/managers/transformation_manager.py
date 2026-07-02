@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pandas as pd
 
 from bkanalysis.managers.data_manager import DataManager
@@ -22,13 +24,28 @@ class TransformationManager:
 
         self._df_grouped_transactions = None
 
+        # result cache for the expensive transformations; only valid until the
+        # underlying data changes, i.e. cleared whenever group_transaction() re-runs.
+        # Not locked: concurrent computes of the same key produce identical values.
+        self._cache = {}
+
         self.index_names = ["Account", "Asset", "Date", "MemoMapped"]
         self.sum_names = ["Quantity"]
 
         self.group_transaction()
 
+    @staticmethod
+    def __key_part(value):
+        """normalize an argument into a hashable cache-key part"""
+        if isinstance(value, (list, tuple)):
+            return tuple(TransformationManager.__key_part(v) for v in value)
+        if isinstance(value, (datetime, pd.Timestamp)):
+            return value.isoformat()
+        return value
+
     def group_transaction(self):
         """group the transaction by ["Account", "AssetMapped", "Date"]"""
+        self._cache.clear()
         df_grouped_transactions = self.data_manager.transactions.groupby(["Account", "Asset", "Date"]).agg(
             {
                 k: TransformationManager.__agg_func[k]
@@ -87,7 +104,32 @@ class TransformationManager:
         return pd.concat([df_ft, df_st])["index"]
 
     def get_values_by_asset(self, date_range: list = None, account: str | list = None):
-        """Retrieve asset values and related financial metrics within a specified date range and/or for a specific account."""
+        """Retrieve asset values and related financial metrics within a specified date range and/or for a specific account.
+
+        Results are cached until group_transaction() re-runs; a copy is returned so callers can mutate it freely."""
+        key = ("values_by_asset", TransformationManager.__key_part(date_range), TransformationManager.__key_part(account))
+        if key not in self._cache:
+            self._cache[key] = self.__compute_values_by_asset(date_range, account)
+        return self._cache[key].copy()
+
+    def __compute_values_by_asset(self, date_range: list, account: str | list):
+        df_prices = self.__get_values_by_asset_full(account)
+
+        if date_range is not None:
+            if len(date_range) != 2:
+                raise ValueError("date_range must be a list of two dates")
+            df_prices = df_prices.reset_index()
+            df_prices = df_prices[(df_prices.Date >= date_range[0]) & (df_prices.Date <= date_range[1])]
+            return df_prices.set_index(["AssetMapped", "Date"])
+        return df_prices
+
+    def __get_values_by_asset_full(self, account: str | list):
+        """full-history asset values for the given account filter; cached separately because the
+        merge + cumsum is the expensive step and any date_range is a cheap slice of this frame"""
+        key = ("values_by_asset_full", TransformationManager.__key_part(account))
+        if key in self._cache:
+            return self._cache[key]
+
         assert (
             self._df_grouped_transactions is not None
         ), "Transactions were not grouped. have you called .group_transaction() before calling .get_values_by_asset()?"
@@ -113,12 +155,7 @@ class TransformationManager:
         df_prices["Type_list"] = df_prices["Type_list"].apply(lambda d: d if isinstance(d, list) else [])
         df_prices["SubType_list"] = df_prices["SubType_list"].apply(lambda d: d if isinstance(d, list) else [])
 
-        if date_range is not None:
-            if len(date_range) != 2:
-                raise ValueError("date_range must be a list of two dates")
-            df_prices = df_prices.reset_index()
-            df_prices = df_prices[(df_prices.Date >= date_range[0]) & (df_prices.Date <= date_range[1])]
-            return df_prices.set_index(["AssetMapped", "Date"])
+        self._cache[key] = df_prices
         return df_prices
 
     @staticmethod
@@ -149,7 +186,15 @@ class TransformationManager:
         return output
 
     def get_values_timeseries(self, date_range: list = None, account: str | list = None) -> pd.DataFrame:
-        """returns a timeseries of the values"""
+        """returns a timeseries of the values
+
+        Results are cached until group_transaction() re-runs; a copy is returned so callers can mutate it freely."""
+        key = ("values_timeseries", TransformationManager.__key_part(date_range), TransformationManager.__key_part(account))
+        if key not in self._cache:
+            self._cache[key] = self.__compute_values_timeseries(date_range, account)
+        return self._cache[key].copy()
+
+    def __compute_values_timeseries(self, date_range: list, account: str | list) -> pd.DataFrame:
         df_asset = self.get_values_by_asset(date_range, account)
 
         df_asset["TransactionValue_list"] = [
@@ -176,6 +221,31 @@ class TransformationManager:
         how: str = "both",
         include_iat: bool = False,
         include_full_types: bool = True,
+    ):
+        """returns the flow values (one row per transaction) for the given filters
+
+        Results are cached until group_transaction() re-runs; a copy is returned so callers can mutate it freely."""
+        key = (
+            "flow_values",
+            TransformationManager.__key_part(date_start),
+            TransformationManager.__key_part(date_end),
+            TransformationManager.__key_part(account),
+            how.lower(),
+            include_iat,
+            include_full_types,
+        )
+        if key not in self._cache:
+            self._cache[key] = self.__compute_flow_values(date_start, date_end, account, how, include_iat, include_full_types)
+        return self._cache[key].copy()
+
+    def __compute_flow_values(
+        self,
+        date_start,
+        date_end,
+        account: str,
+        how: str,
+        include_iat: bool,
+        include_full_types: bool,
     ):
         if date_end is None and date_start is None:
             date_range = None
