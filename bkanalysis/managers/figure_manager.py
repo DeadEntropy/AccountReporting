@@ -20,6 +20,10 @@ class FigureManager:
 
     __DATE_FORMAT = "%Y-%m-%d"
 
+    # label for the mark-to-market capital gain bar; must not collide with the "Capital Gain"
+    # FullType used for realised capital transactions
+    MARKET_CAPITAL_GAIN_LABEL = "Capital Gain (Market)"
+
     def __init__(self, transformation_manager: TransformationManager):
         self.transformation_manager = transformation_manager
         self._iat_types = IatIdentification.iat_types + ["C", "S"]
@@ -116,29 +120,49 @@ class FigureManager:
         return df_values_timeseries.loc[date]["Value"]
 
     @staticmethod
-    def __get_title_sunburst(dates, amounts):
+    def __get_title_sunburst(dates, total_spend):
         """returns the title of the sunburst chart"""
         if dates is not None:
             return (
                 f"Spending Breakdown for {min(dates).strftime(FigureManager.__DATE_FORMAT)} to "
                 f"{max(dates).strftime(FigureManager.__DATE_FORMAT)}"
-                f" (Total Spend: {amounts.sum():,.0f})"
+                f" (Total Spend: {total_spend:,.0f})"
             )
-        return f" (Total Spend: {amounts.sum():,.0f})"
+        return f" (Total Spend: {total_spend:,.0f})"
 
-    def get_figure_sunburst(self, date_range: list = None, account: str = None, include_iat=False, how="out") -> go.Figure:
-        """plots a sunburst of the account transactions"""
+    def get_figure_sunburst(
+        self,
+        date_range: list = None,
+        account: str = None,
+        include_iat=False,
+        how="out",
+        exclude_types: list = None,
+    ) -> go.Figure:
+        """plots a sunburst of the account transactions
+
+        exclude_types lists the FullTypes to leave out entirely (typically the income types); without it
+        an income category whose net is negative would be rendered as if it were spending.
+
+        The headline total is the *net* of every remaining category, so it reconciles with a
+        total-spend figure computed as `flows[~flows.FullType.isin(exclude_types)].Value.sum()`.
+        The wedges themselves can only show the categories that net negative (i.e. positive once
+        flipped), because a sunburst cannot render a negative slice; categories that net positive
+        (refunds, cash-back) are therefore excluded from the geometry but still counted in the title.
+        """
         df_expenses = self.transformation_manager.get_flow_values(
             date_range[0], date_range[1], account, how=how, include_iat=include_iat
         ).reset_index(drop=True)
-        df_expenses["Value"] = (-1) * df_expenses["Value"]
+        if exclude_types is not None:
+            df_expenses = df_expenses[~df_expenses["FullType"].isin(exclude_types)]
+        df_expenses["Value"] = (-1) * df_expenses["Value"].astype(float)
 
         path = ["FullType", "FullSubType", "MemoMapped"]
         df_expenses = pd.pivot_table(df_expenses, values="Value", index=path, aggfunc="sum").reset_index()
+        total_spend = df_expenses["Value"].sum()
         df_expenses = df_expenses[df_expenses.Value > 0]
         df_expenses["formatted_value"] = df_expenses["Value"].apply(lambda x: f"${x:,.0f}" if x < 10000 else f"${x/1000:,.0f}K")
 
-        title = self.__get_title_sunburst(date_range, df_expenses["Value"])
+        title = self.__get_title_sunburst(date_range, total_spend)
         fig = px.sunburst(df_expenses, path=path, values="Value", title=title)
 
         # Add custom hovertemplate
@@ -356,14 +380,20 @@ class FigureManager:
         categorised_flows.loc["Others"] = small_flows
 
         if include_capital_gain:
-            categorised_flows["Capital Gain"] = self.transformation_manager.get_values_by_asset(date_range=date_range, account=account)[
-                "CapitalGain"
-            ].sum()
+            # NB: a distinct label on purpose. "Capital Gain" already exists as a FullType (realised
+            # capital transactions booked as flows); writing to that key would silently overwrite it
+            # with the mark-to-market number and drop the realised amount from the waterfall.
+            categorised_flows[FigureManager.MARKET_CAPITAL_GAIN_LABEL] = self.transformation_manager.get_values_by_asset(
+                date_range=date_range, account=account
+            )["CapitalGain"].sum()
 
         categorised_flows = categorised_flows.sort_values(ascending=False)
+        # The "total" measure below is drawn by Plotly as the running sum of the preceding
+        # "relative" bars, regardless of the y value supplied for it; that supplied value still
+        # drives the hover text, so it must be the (positive) total, not its negation.
         incremental_values = [
             f"{x / 1000:,.0f}K" if abs(x) > 1000 else f"{x:,.0f}"
-            for x in list(categorised_flows.values) + [-categorised_flows.values.sum()]
+            for x in list(categorised_flows.values) + [categorised_flows.values.sum()]
         ]
 
         fig = go.Figure(
@@ -374,7 +404,7 @@ class FigureManager:
                 x=list(categorised_flows.index) + ["savings"],
                 textposition="outside",
                 text=list(categorised_flows.index) + ["Savings"],
-                y=list(categorised_flows.values) + [-categorised_flows.values.sum()],
+                y=list(categorised_flows.values) + [categorised_flows.values.sum()],
                 connector={"line": {"color": "rgb(63, 63, 63)"}},
                 customdata=incremental_values,
                 hovertemplate="Category: %{x}<br>Value: %{customdata}<extra></extra>",

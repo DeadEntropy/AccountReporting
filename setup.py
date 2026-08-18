@@ -11,7 +11,7 @@ setup(
         "numpy",
         "matplotlib",
         "mortgage",
-        "yfinance",
+        "yfinance>=1.6.0",
         "yahooquery",
         "cachetools",
     ],  # external packages as dependencies

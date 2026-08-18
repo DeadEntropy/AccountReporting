@@ -285,6 +285,35 @@ class TransformationManager:
 
         raise ValueError(f"Invalid 'how=' must be 'both', 'in', or 'out' but was {how}.")
 
+    def get_iat_imbalance(self, date_start=None, date_end=None, account: str = None, threshold: float = 1.0):
+        """returns the net of the intra-account-transfer legs over the period, plus the per-memo breakdown.
+
+        An intra-account transfer moves value between two tracked accounts, so its legs must sum to
+        zero. A non-zero net means one leg is missing or mis-paired: either a counterparty account is
+        absent from the data, a transaction is tagged IAT when it is really a flow, or the two legs
+        straddle the reporting cut-off. Because IAT legs are excluded from every flow-based figure
+        while still moving the account balances, that residual is exactly the amount by which the
+        flow-based view fails to reconcile to the change in wealth.
+
+        Returns (net, df_by_memo) where df_by_memo is sorted by absolute imbalance and only keeps
+        memos whose net exceeds `threshold`."""
+        df = self.get_flow_values(date_start, date_end, account, how="both", include_iat=True)
+        df_iat = df[df["Type"] == "IAT"]
+        if len(df_iat) == 0:
+            return 0.0, pd.DataFrame(columns=["MemoMapped", "Value", "Legs"])
+
+        value = df_iat["Value"].astype(float)
+        by_memo = (
+            pd.DataFrame({"MemoMapped": df_iat["MemoMapped"].values, "Value": value.values})
+            .groupby("MemoMapped")
+            .agg(Value=("Value", "sum"), Legs=("Value", "size"))
+            .reset_index()
+        )
+        by_memo = by_memo[by_memo["Value"].abs() > threshold]
+        by_memo = by_memo.reindex(by_memo["Value"].abs().sort_values(ascending=False).index).reset_index(drop=True)
+
+        return value.sum(), by_memo
+
     def __get_price_on_date(self, date: str, threshold: float = 100) -> pd.DataFrame:
         q_t = self._df_grouped_transactions.reset_index()
         q_t = q_t[q_t.Date <= date]

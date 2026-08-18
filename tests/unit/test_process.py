@@ -423,6 +423,28 @@ class TestProcessCleanMemo:
         assert Process._clean_amazon_memo('AMAZON MKTPL LONDON') == 'AMAZON'
         assert Process._clean_amazon_memo('AMAZON.COM SEATTLE') == 'AMAZON'
 
+    def test_clean_memo_withdrawal_variations(self):
+        """Test _clean_withdrawal_memo normalises Chase dated cash withdrawals to ATM."""
+        assert Process._clean_withdrawal_memo('WITHDRAWAL 02/10') == 'ATM'
+        assert Process._clean_withdrawal_memo('WITHDRAWAL 06/18') == 'ATM'
+        assert Process._clean_withdrawal_memo('withdrawal 05/22') == 'ATM'
+        assert Process._clean_withdrawal_memo('  WITHDRAWAL 12/31  ') == 'ATM'
+
+    def test_clean_memo_withdrawal_leaves_transfers_alone(self):
+        """Genuine intra-account transfers share the word but must keep mapping to IAT."""
+        assert Process._clean_withdrawal_memo('Withdrawal') == 'Withdrawal'
+        assert (
+            Process._clean_withdrawal_memo('WITHDRAWAL: FEDERAL FUNDS COMPLIMENTARY FED FUND WIRE')
+            == 'WITHDRAWAL: FEDERAL FUNDS COMPLIMENTARY FED FUND WIRE'
+        )
+        assert Process._clean_withdrawal_memo('COINBASE_WITHDRAWAL') == 'COINBASE_WITHDRAWAL'
+        assert Process._clean_withdrawal_memo('ACH WITHDRAWAL DISCOVER E-PAYMENT') == 'ACH WITHDRAWAL DISCOVER E-PAYMENT'
+
+    def test_clean_memo_applies_withdrawal_rule(self):
+        """__clean_memo routes dated withdrawals through to ATM."""
+        assert Process._Process__clean_memo('WITHDRAWAL 02/10') == 'ATM'
+        assert Process._Process__clean_memo('Withdrawal') == 'Withdrawal'
+
     def test_clean_memo_removes_asterisks(self):
         """Test __clean_memo removes asterisks."""
         result = Process._Process__clean_memo('SHOP * STORE')

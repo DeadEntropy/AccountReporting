@@ -263,9 +263,23 @@ class Process:
         return s
 
     @staticmethod
+    def _clean_withdrawal_memo(s: str) -> str:
+        """Chase books each cash withdrawal as "WITHDRAWAL MM/DD", so every one is a new memo
+        string and would otherwise need its own MemoMapping row. Normalise to ATM, which already
+        maps through to FullType ATM / FullMasterType Recreation.
+
+        Anchored on purpose: "Withdrawal" and "WITHDRAWAL: FEDERAL FUNDS ..." are genuine
+        intra-account transfers with a facing account, and must keep mapping to IAT."""
+        if isinstance(s, str):
+            if re.fullmatch(r"WITHDRAWAL \d{2}/\d{2}", s.strip().upper()):
+                return "ATM"
+        return s
+
+    @staticmethod
     def __clean_memo(s):
         if isinstance(s, str):
-            return Process._clean_amazon_memo(re.sub("\*", "", re.sub(" +", " ", s.split(" ON ")[0])).replace(",", "").strip())
+            cleaned = re.sub("\*", "", re.sub(" +", " ", s.split(" ON ")[0])).replace(",", "").strip()
+            return Process._clean_withdrawal_memo(Process._clean_amazon_memo(cleaned))
         return s
 
     def extend(self, df, ignore_overrides=True):
