@@ -518,7 +518,9 @@ class FigureManager:
             steps.append({"range": [i, i + 1], "color": color})
         return steps
 
-    def get_saving_ratio(self, year=2025, month=None, include_capital=False, include_bonus=False):
+    def get_saving_ratio(self, year=None, month=None, include_capital=False, include_bonus=False):
+        if year is None:
+            year = datetime.now().year
         transactions = self.transformation_manager.data_manager.transactions
         transactions = transactions[["Date", "Quantity", "FullType", "FullSubType", "FullMasterType"]]
         transactions = transactions[transactions.Date.dt.year == year]

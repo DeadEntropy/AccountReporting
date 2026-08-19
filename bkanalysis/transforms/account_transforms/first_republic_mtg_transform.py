@@ -71,7 +71,7 @@ def load(path_in, config, *args):
     df = pd.read_csv(path_in)
     expected_columns = parse_list(config["expected_columns"])
     assert set(df.columns) == set(expected_columns), (
-        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (First Republic)'
+        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (First Republic Mortgage)'
     )
 
     df_out = pd.DataFrame(columns=sd.target_columns)

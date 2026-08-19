@@ -69,7 +69,7 @@ def load(path_in, config, *args):
     df = pd.read_csv(path_in, parse_dates=["Completed Date"])
     expected_columns = parse_list(config["expected_columns"])
     assert set(df.columns) == set(expected_columns), (
-        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Lloyds Current)'
+        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Vault)'
     )
 
     df["Money in (GBP)"] = df["Money in (GBP)"].fillna(0)

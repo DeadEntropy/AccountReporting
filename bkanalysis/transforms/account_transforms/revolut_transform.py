@@ -47,7 +47,7 @@ def load(path_in, config, sep=";", *args):
 
     assert set(df.columns) == set(
         set([e.replace("CCY", currency).strip() for e in expected_columns])
-    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Nutmeg)'
+    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Revolut)'
 
     df[f"Paid In ({currency})"] = pd.to_numeric(
         df[f"Paid In ({currency})"].str.replace(",", "").str.replace('"', "").str.strip(), errors="coerce"

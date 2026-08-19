@@ -30,6 +30,12 @@ def load(path_in, config, *args):
 
     df_out.Date = pd.to_datetime(df_out.Date, format="%d/%m/%Y")
     account_currencies = ast.literal_eval(config["account_currencies"])
+    unmapped_accounts = set(df_out.Account) - set(account_currencies)
+    if unmapped_accounts:
+        raise KeyError(
+            f"Accounts {sorted(unmapped_accounts)} are missing from the 'account_currencies' config entry "
+            f"(known accounts: {sorted(account_currencies)})."
+        )
     df_out["Currency"] = [account_currencies[acc] for acc in df_out.Account]
     df_out["Memo"] = [re.sub(" +", " ", memo) for memo in df_out.Memo]
     df_out["AccountType"] = config["account_type"]

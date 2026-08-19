@@ -278,13 +278,15 @@ class Process:
     @staticmethod
     def __clean_memo(s):
         if isinstance(s, str):
-            cleaned = re.sub("\*", "", re.sub(" +", " ", s.split(" ON ")[0])).replace(",", "").strip()
+            cleaned = re.sub(r"\*", "", re.sub(" +", " ", s.split(" ON ")[0])).replace(",", "").strip()
             return Process._clean_withdrawal_memo(Process._clean_amazon_memo(cleaned))
         return s
 
     def extend(self, df, ignore_overrides=True):
         expected_columns = [n.strip() for n in ast.literal_eval(self.config["Mapping"]["expected_columns"])]
-        assert set(df.columns) == set(expected_columns), f"Columns do not match expectation. Expected: [{expected_columns}]"
+        assert set(df.columns) == set(
+            expected_columns
+        ), f"Columns do not match expectation. Expected: [{expected_columns}] but received: [{list(df.columns)}]"
 
         new_columns = [n.strip() for n in ast.literal_eval(self.config["Mapping"]["new_columns"])]
         df_out = pd.DataFrame(columns=list(new_columns))

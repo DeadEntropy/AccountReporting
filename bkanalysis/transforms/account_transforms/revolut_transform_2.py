@@ -43,7 +43,7 @@ def load(path_in, config, sep=";", *args):
 
     assert set(df.columns) == set(
         expected_columns
-    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Nutmeg 2)'
+    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Revolut 2)'
 
     if list(df.Currency).count(df.Currency[0]) == len(df.Currency):
         currency = df.Currency[0]

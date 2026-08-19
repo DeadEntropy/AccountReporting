@@ -1,4 +1,5 @@
 import datetime as dt
+import logging
 import pandas as pd
 from bkanalysis.market.price import Price
 from typing import Union
@@ -17,6 +18,9 @@ class Market:
             }
             for asset in dict_of_values
         }
+        dropped = sum(len(dict_of_values[asset]) for asset in dict_of_values) - sum(len(v) for v in self._dict.values())
+        if dropped > 0:
+            logging.warning(f"Market: dropped {dropped} non-positive price point(s).")
         self._dict_sorted_dates = {}
         self.linear_interpolation = linear_interpolation
 

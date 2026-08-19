@@ -18,9 +18,7 @@ def normalize_date_column(date_column):
 
 
 def is_ccy(asset):
-    """check is an asset in a currency in the yahoo nomenclature i.e. 'GBPUSD=X'"""
-    if len(asset) != 8:
+    """check if an asset is a currency pair in the yahoo nomenclature i.e. 'GBPUSD=X'"""
+    if not isinstance(asset, str):
         return False
-    if asset.upper().endswith("=X"):
-        return True
-    return False
+    return len(asset) == 8 and asset.upper().endswith("=X")
