@@ -1,0 +1,16 @@
+* text=auto
+
+*.py text
+*.md text
+*.csv text
+*.json text
+*.ini text
+*.yml text
+*.yaml text
+*.toml text
+*.ipynb text
+
+*.png binary
+*.jpg binary
+*.xlsx binary
+*.pickle binary
