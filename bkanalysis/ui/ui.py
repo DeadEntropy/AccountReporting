@@ -137,15 +137,15 @@ def transactions_to_values(df):
     )
     index = [(tupl[0], tupl[1], time) for (tupl, time) in index]
 
-    # set the new multi-index
+    # set the new multi-index; apply on an explicit column subset so the grouping
+    # columns are excluded on every pandas version (pandas 3 excludes them by default)
     df = (
         df.reindex(pd.MultiIndex.from_tuples(index, names=df.index.names))
         .reset_index()
-        .groupby(["Account", "Currency"])
+        .groupby(["Account", "Currency"])[[DATE, AMOUNT, MEMO_MAPPED, CUMULATED_AMOUNT]]
         .apply(__interpolate)
         .dropna()
-        .reset_index(drop=True)
-        .set_index(["Account", "Currency"])
+        .droplevel(-1)
     )
 
     return df
