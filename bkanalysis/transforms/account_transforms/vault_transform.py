@@ -46,23 +46,29 @@ def get_year(s):
     return s
 
 
+def _get_date_from_description(description):
+    """extracts the date embedded in the description, or returns None when there is none"""
+    if "\n" not in description:
+        return None
+    parts = description.split("\n")[1].split(" ")
+    if len(parts) != 3:
+        return None
+    try:
+        return pd.to_datetime(parts[2], format="%Y/%M/%d")
+    except (ValueError, TypeError):
+        return None
+
+
 def get_dates_from_description(df, fallback_year):
     results = []
     year = None
     for index, row in df.iterrows():
-        description = row["Description"]
-        date = row["Completed Date"]
-        if "\n" in description:
-            if len(description.split("\n")[1].split(" ")) == 3:
-                try:
-                    current_date = pd.to_datetime(description.split("\n")[1].split(" ")[2], format="%Y/%M/%d")
-                    results.append(current_date)
-                    year = current_date.year
-                except (ValueError, TypeError):
-                    results.append(pd.to_datetime(f"{date}, {fallback_year if (year is None) else year}", format="%b %d, %Y"))
-            else:
-                results.append(pd.to_datetime(f"{date}, {fallback_year if (year is None) else year}", format="%b %d, %Y"))
+        current_date = _get_date_from_description(row["Description"])
+        if current_date is not None:
+            results.append(current_date)
+            year = current_date.year
         else:
+            date = row["Completed Date"]
             results.append(pd.to_datetime(f"{date}, {fallback_year if (year is None) else year}", format="%b %d, %Y"))
 
     return results

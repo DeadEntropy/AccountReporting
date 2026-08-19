@@ -27,6 +27,16 @@ def get_year_to_date(dt):
     return int((datetime.date.today() - dt.date()).days / 365.25)
 
 
+def _confirm_similar_existing_value(value, mapping):
+    """offer to reuse an already existing mapping value that is very similar to the input"""
+    suggested_values = difflib.get_close_matches(value.upper(), [str(x) for x in mapping.values()], 1)
+    if len(suggested_values) > 0 and suggested_values.count(value) == 0:
+        replace = input(f'this is similar to already existing value: "{suggested_values[0]}", ' f"use that instead? (y/n)")
+        if replace.upper() == "Y":
+            return suggested_values[0]
+    return value
+
+
 def get_missing_map(memo, mapping):
     if memo == "" or memo == "000001":
         return ""
@@ -42,24 +52,13 @@ def get_missing_map(memo, mapping):
                 raise IndexError(f"there are only {len(suggestions)} choice(s), but you selected choice {index}.")
             value = suggestions[index - 1]
         except ValueError:
-            pass
-            # Check if something very similar already exists
-            suggested_values = difflib.get_close_matches(value.upper(), list([str(x) for x in mapping.values()]), 1)
-            if len(suggested_values) > 0 and suggested_values.count(value) == 0:
-                replace = input(f'this is similar to already existing value: "{suggested_values[0]}", ' f"use that instead? (y/n)")
-                if replace.upper() == "Y":
-                    value = suggested_values[0]
+            value = _confirm_similar_existing_value(value, mapping)
         except IndexError as e:
             print(f"\nIndexError: {e}")
             return get_missing_map(memo, mapping)
     else:
         value = input(f'Please enter the mapping for "{memo}:').upper()
-        # Check if something very similar already exists
-        suggested_values = difflib.get_close_matches(value, list([str(x) for x in mapping.values()]), 1)
-        if len(suggested_values) > 0 and suggested_values.count(value) == 0:
-            replace = input(f'this is similar to already existing value: "{suggested_values[0]}", ' f"use that instead? (y/n)")
-            if replace.upper() == "Y":
-                value = suggested_values[0]
+        value = _confirm_similar_existing_value(value, mapping)
 
     mapping[memo] = value
     return value.strip().upper()
