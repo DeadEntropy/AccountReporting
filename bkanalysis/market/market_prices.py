@@ -52,8 +52,8 @@ def get_spot_price(instr, currency):
             return get_history(symbol, "1y").sort_values("Date").iloc[-1].Close
         except JSONDecodeError as e:
             raise JSONDecodeError(f"failed to get spot for {symbol}:", e.doc, e.pos)
-        except:
-            raise Exception(f"failed to get spot for {symbol}.")
+        except Exception as e:
+            raise Exception(f"failed to get spot for {symbol}.") from e
     elif regex_ticker.search(instr) and len(instr) == 12:  # its an isin
         symbol = get_with_isin_map(instr)
         if symbol is None:

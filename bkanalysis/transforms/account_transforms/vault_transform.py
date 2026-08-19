@@ -55,7 +55,7 @@ def get_dates_from_description(df, fallback_year):
                     current_date = pd.to_datetime(description.split("\n")[1].split(" ")[2], format="%Y/%M/%d")
                     results.append(current_date)
                     year = current_date.year
-                except:
+                except (ValueError, TypeError):
                     results.append(pd.to_datetime(f"{date}, {fallback_year if (year is None) else year}", format="%b %d, %Y"))
             else:
                 results.append(pd.to_datetime(f"{date}, {fallback_year if (year is None) else year}", format="%b %d, %Y"))

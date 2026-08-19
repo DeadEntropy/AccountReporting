@@ -20,7 +20,7 @@ def can_handle(path_in, config, *args):
 def try_get_account_name(file_name, config):
     try:
         return " ".join([s.capitalize() for s in file_name.split("-")])
-    except:
+    except (AttributeError, TypeError):
         return config["account_name"]
 
 

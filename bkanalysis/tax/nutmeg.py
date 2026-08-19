@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 
 __EPSILON = 0.01
+# tolerance for treating a floating-point unit count as zero
+__ZERO_TOLERANCE = 1e-9
 
 
 def clean_nutmeg_activity_report(df_activity, fund_list: list = None, include_fund: bool = False):
@@ -14,7 +16,7 @@ def clean_nutmeg_activity_report(df_activity, fund_list: list = None, include_fu
     df["Units(S)"] = df["Units(S)"].str.replace(",", "").astype("float")
     df["Value(S)"] = df["Value(S)"].str.replace(",", "").astype("float")
 
-    df["Unitary Value"] = [v / u if u != 0.0 else 0.0 for (u, v) in zip(df["Units(S)"], df["Value(S)"])]
+    df["Unitary Value"] = [v / u if abs(u) > __ZERO_TOLERANCE else 0.0 for (u, v) in zip(df["Units(S)"], df["Value(S)"])]
     df = df.set_index("Date", drop=True).sort_index()
 
     index = ["Date", "Asset Code", "Type", "Narrative"]
@@ -261,7 +263,7 @@ def get_taxable_event_from_single_asset(df: pd.DataFrame) -> pd.DataFrame:
         assert abs(units_sold - sum([u for (d, u, v) in relevant_purchase])) < __EPSILON
 
         purchase_price = sum([u * v for (d, u, v) in relevant_purchase]) / units_sold
-        purchase_date = [d for d, u, v in relevant_purchase if u != 0.0][0]
+        purchase_date = [d for d, u, v in relevant_purchase if abs(u) > __ZERO_TOLERANCE][0]
 
         sales[transaction_date] = {
             "units_sold": units_sold,

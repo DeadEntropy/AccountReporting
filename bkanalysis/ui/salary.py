@@ -81,11 +81,11 @@ class Salary:
             .set_index("MONTH")
         )
 
-        self.other_payrolls = [p for p in self.monthly_salaries.columns if p not in payrolls_1 + payrolls_2]
+        self.other_payroll_columns = [p for p in self.monthly_salaries.columns if p not in payrolls_1 + payrolls_2]
 
         self.monthly_salaries[base_payroll_1] = self.monthly_salaries[payrolls_1].sum(axis=1)
         self.monthly_salaries[base_payroll_2] = self.monthly_salaries[payrolls_2].sum(axis=1)
-        self.monthly_salaries[Salary.OTHER_PAYROLLS] = self.monthly_salaries[self.other_payrolls].sum(axis=1)
+        self.monthly_salaries[Salary.OTHER_PAYROLLS] = self.monthly_salaries[self.other_payroll_columns].sum(axis=1)
 
         self.monthly_salaries = self.monthly_salaries[[base_payroll_1, base_payroll_2, Salary.OTHER_PAYROLLS]]
 

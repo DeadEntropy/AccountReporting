@@ -278,7 +278,7 @@ class Process:
     @staticmethod
     def __clean_memo(s):
         if isinstance(s, str):
-            cleaned = re.sub(r"\*", "", re.sub(" +", " ", s.split(" ON ")[0])).replace(",", "").strip()
+            cleaned = re.sub(" +", " ", s.split(" ON ")[0]).replace("*", "").replace(",", "").strip()
             return Process._clean_withdrawal_memo(Process._clean_amazon_memo(cleaned))
         return s
 
