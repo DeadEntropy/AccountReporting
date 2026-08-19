@@ -127,6 +127,8 @@ def get_tax_tbl(df_piv_no_div):
             tax_tbl = get_taxable_event_from_single_asset(df_mini)
             tax_tbl[ASSET_CODE] = asset_code
             tax_tables.append(tax_tbl)
+        except ValueError as e:
+            raise ValueError(f"Failed to process {asset_code}: {e}") from e
         except Exception as e:
             print(f"Failed to process: {asset_code}: {e}")
     return pd.concat(tax_tables).sort_index()
@@ -239,7 +241,7 @@ def get_taxable_event_from_single_asset(df: pd.DataFrame) -> pd.DataFrame:
         for transaction_date, transaction_unit in transactions["Units"].items():
             if transaction_unit > 0:
                 purchases[transaction_date] = transaction_unit
-            else:
+            elif transaction_unit < 0:
                 sales[transaction_date] = -transaction_unit
 
         transactions["Purchases"] = purchases
@@ -310,6 +312,8 @@ def get_capital_gain_table(df: pd.DataFrame) -> pd.DataFrame:
             tax_tbl = get_taxable_event_from_single_asset(df_mini)
             tax_tbl[ASSET_CODE] = asset_code
             tax_tables.append(tax_tbl)
+        except ValueError as e:
+            raise ValueError(f"Failed to process {asset_code}: {e}") from e
         except Exception as e:
             print(f"Failed to process: {asset_code}: {e}")
     return pd.concat(tax_tables).sort_index()

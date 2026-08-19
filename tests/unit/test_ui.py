@@ -202,13 +202,7 @@ class TestTransactionsToValues:
 
     def test_transactions_to_values_returns_result(self, sample_transactions_df):
         """Test that transactions_to_values returns a result without crashing."""
-        try:
-            result = ui.transactions_to_values(sample_transactions_df)
-        except Exception as e:
-            # Complex data transformation may have edge cases
-            # This is acceptable for early phase - full testing in Phase 5
-            pytest.skip(f"transactions_to_values requires specific data format: {str(e)[:50]}")
-        # If it doesn't crash, function is working
+        result = ui.transactions_to_values(sample_transactions_df)
         assert result is not None
 
 

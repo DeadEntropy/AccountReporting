@@ -48,13 +48,13 @@ def get_year(s):
 
 def _get_date_from_description(description):
     """extracts the date embedded in the description, or returns None when there is none"""
-    if "\n" not in description:
+    if not isinstance(description, str) or "\n" not in description:
         return None
     parts = description.split("\n")[1].split(" ")
     if len(parts) != 3:
         return None
     try:
-        return pd.to_datetime(parts[2], format="%Y/%M/%d")
+        return pd.to_datetime(parts[2], format="%Y/%m/%d")
     except (ValueError, TypeError):
         return None
 

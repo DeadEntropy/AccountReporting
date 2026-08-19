@@ -131,7 +131,10 @@ class MarketLoader:
         df = pd.read_csv(path)
         if len(df) == 0:
             raise ValueError(f"Market history file is empty: '{path}'.")
-        currencies = df["Currency code"].unique()
+        currencies = df["Currency code"].astype("string").str.strip()
+        if currencies.isna().any() or (currencies == "").any():
+            raise ValueError(f"Currency codes must be present in '{path}'.")
+        currencies = currencies.unique()
         if len(currencies) != 1:
             raise ValueError(f"Expected a single currency in '{path}' but found: {list(currencies)}.")
         currency = currencies[0]

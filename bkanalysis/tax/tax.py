@@ -146,7 +146,7 @@ def waterfall_chart(payroll, inflows):
     _measure = ["relative", "relative", "relative", "relative", "relative", "relative", "total"]
     _text = [f"{v:,.0f}" for v in _y]
 
-    if inflows is not None:
+    if inflows is not None and len(inflows) > 0:
         net_pay_discrepancy = inflows.get("Salary", 0.0) - payroll.net_pay
 
         _x = _x + ["Discrepancy"] + list(inflows.index)

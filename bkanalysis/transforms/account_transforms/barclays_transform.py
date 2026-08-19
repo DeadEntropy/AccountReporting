@@ -33,8 +33,8 @@ def load(path_in, config, *args):
     unmapped_accounts = set(df_out.Account) - set(account_currencies)
     if unmapped_accounts:
         raise KeyError(
-            f"Accounts {sorted(unmapped_accounts)} are missing from the 'account_currencies' config entry "
-            f"(known accounts: {sorted(account_currencies)})."
+            f"Accounts {sorted(unmapped_accounts, key=str)} are missing from the 'account_currencies' config entry "
+            f"(known accounts: {sorted(account_currencies, key=str)})."
         )
     df_out["Currency"] = [account_currencies[acc] for acc in df_out.Account]
     df_out["Memo"] = [re.sub(" +", " ", memo) for memo in df_out.Memo]

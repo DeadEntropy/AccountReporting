@@ -55,6 +55,7 @@ class IatIdentification:
             group_key = (row["Currency"], row["FullType"])
             date = row["Date"]
 
+            matched = False
             for entry in transaction_dict.get(group_key, []):
                 match_amount, match_index = entry
                 if abs(amount + match_amount) > self.relative_tolerance * max(abs(amount), abs(match_amount)):
@@ -67,8 +68,10 @@ class IatIdentification:
                         df.loc[match_index, "Date"] = adjusted_date
                         df.loc[i, "Date"] = adjusted_date
                     transaction_dict[group_key].remove(entry)
+                    matched = True
                     break
-            transaction_dict.setdefault(group_key, []).append((amount, i))
+            if not matched:
+                transaction_dict.setdefault(group_key, []).append((amount, i))
 
         return df
 
