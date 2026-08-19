@@ -51,6 +51,21 @@ class Salary:
         assert anchor_date.year < year, "anchor date is within the selected year, it must be before."
         self.anchor_date = anchor_date
 
+        if exclude is None:
+            exclude = []
+        missing = [
+            name
+            for name, value in [
+                ("payrolls_1", payrolls_1),
+                ("payrolls_2", payrolls_2),
+                ("base_payroll_1", base_payroll_1),
+                ("base_payroll_2", base_payroll_2),
+            ]
+            if value is None
+        ]
+        if missing:
+            raise ValueError(f"Salary requires the following arguments: {', '.join(missing)}.")
+
         df_exp["MONTH"] = df_exp.Date.dt.strftime("%Y-%m")
         self.monthly_salaries = (
             pd.DataFrame(

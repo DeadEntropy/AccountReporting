@@ -61,9 +61,10 @@ class Market:
             raise Exception(f"{date} is before the first available date for {instr} in the Market.")
 
         if previous:
-            return next(d for d in sorted_list if d < date)
+            return next((d for d in sorted_list if d <= date), min_date)
         else:
-            return next(d for d in sorted_list if d >= date)
+            # sorted_list is descending, so the last match is the closest following date
+            return next((d for d in reversed(sorted_list) if d >= date), sorted_list[0])
 
     def get_price(self, instr: str, date: dt.datetime):
         if instr not in self._dict.keys():

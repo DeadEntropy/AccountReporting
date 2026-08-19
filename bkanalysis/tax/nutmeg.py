@@ -59,7 +59,7 @@ def clean_nutmeg_investment_activity(df_investment, fund_list: list = None, incl
         axis=1,
     )
     df = df.set_index("Date", drop=True).sort_index()
-    df["Asset Code"].fillna("", inplace=True)
+    df["Asset Code"] = df["Asset Code"].fillna("")
 
     index = ["Date", "Asset Code", "Type", "Narrative"]
     if include_fund:
@@ -177,7 +177,7 @@ def get_report_small(tax_tbl, start, end, sedol_map, to_sedol=None):
 
 def get_relevant_purchases_for_sale(sale_units: float, purchases: dict) -> dict:
     if sale_units == 0:
-        return []
+        return {}
 
     relevant_purchases = {}
     remaining_sale_units = sale_units
@@ -190,13 +190,14 @@ def get_relevant_purchases_for_sale(sale_units: float, purchases: dict) -> dict:
             break
 
     relevant_sum = sum([v for k, v in relevant_purchases.items()])
-    assert abs(sale_units - relevant_sum) < __EPSILON, f"{sale_units} vs {relevant_sum}"
+    if abs(sale_units - relevant_sum) >= __EPSILON:
+        raise ValueError(f"Purchases do not cover the sale: sold {sale_units}, matched {relevant_sum}.")
     return relevant_purchases
 
 
 def get_remaining_purchases(relevant_purchases: dict, purchases: dict) -> dict:
     if len(relevant_purchases) == 0:
-        raise Exception(f"relevant_purchases is empty")
+        return dict(purchases)
 
     remaining_purchases = {}
     for purchase_date, purchase_unit in purchases.items():
@@ -207,7 +208,8 @@ def get_remaining_purchases(relevant_purchases: dict, purchases: dict) -> dict:
 
     purchase_sum = sum([v for k, v in purchases.items()])
     relevant_remaining_sum = sum([v for k, v in relevant_purchases.items()]) + sum([v for k, v in remaining_purchases.items()])
-    assert abs(purchase_sum - relevant_remaining_sum) < __EPSILON, f"{purchase_sum} vs {relevant_remaining_sum}"
+    if abs(purchase_sum - relevant_remaining_sum) >= __EPSILON:
+        raise ValueError(f"Purchase reconciliation failed: total purchased {purchase_sum}, matched + remaining {relevant_remaining_sum}.")
     return remaining_purchases
 
 

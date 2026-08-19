@@ -28,7 +28,7 @@ def process_stock(stocks, key="isin", period="1y", fallback_key=None, currency="
 
 
 def total_return(ts):
-    return (ts[len(ts) - 1] - ts[0]) / ts[0]
+    return (ts.iloc[-1] - ts.iloc[0]) / ts.iloc[0]
 
 
 def clean_time_series(stocks, period, currency="GBP"):
@@ -37,7 +37,7 @@ def clean_time_series(stocks, period, currency="GBP"):
         frame[str(index)] = ts
 
     result = pd.DataFrame(frame)
-    result = result.dropna(1, "all")
+    result = result.dropna(axis=1, how="all")
 
     for col in result.columns:
         if result[col].isna().sum() > len(result[col]) * 0.5:

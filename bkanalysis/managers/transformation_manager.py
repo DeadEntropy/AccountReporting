@@ -315,12 +315,14 @@ class TransformationManager:
         return value.sum(), by_memo
 
     def __get_price_on_date(self, date: str, threshold: float = 100) -> pd.DataFrame:
+        date = pd.Timestamp(date)
         q_t = self._df_grouped_transactions.reset_index()
         q_t = q_t[q_t.Date <= date]
         q_t = q_t.groupby(["Account", "AssetMapped"]).agg({"Quantity_sum": "sum"})
 
-        if date > self.market_manager.prices.index.levels[1].max():
-            date = self.market_manager.prices.index.levels[1].max()
+        max_date = self.market_manager.prices.index.levels[1].max()
+        if date > max_date:
+            date = max_date
 
         prices = self.market_manager.prices.xs(date, level="Date")
 
