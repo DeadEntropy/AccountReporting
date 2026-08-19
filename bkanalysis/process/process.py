@@ -14,6 +14,9 @@ from bkanalysis.process.process_helper import (
     get_year_to_date,
 )
 
+MEMO_MAPPED = "Memo Mapped"
+MEMO_SIMPLE = "Memo Simple"
+
 
 class Process:
     _use_old = False
@@ -49,12 +52,12 @@ class Process:
         self.map_simple = Process.__initialise_map(
             self.config["Mapping"],
             "path_map",
-            default_columns=["Memo Simple", "Memo Mapped"],
+            default_columns=[MEMO_SIMPLE, MEMO_MAPPED],
         )
         self.map_main = Process.__initialise_map(
             self.config["Mapping"],
             "path_map_type",
-            default_columns=["Memo Mapped", "Type", "SubType"],
+            default_columns=[MEMO_MAPPED, "Type", "SubType"],
         )
         self.map_full_type = Process.__initialise_map(
             self.config["Mapping"],
@@ -98,15 +101,15 @@ class Process:
             return get_missing_map(memo, mapping)
 
     def map_memo(self, memo_series):
-        self.map_simple["Memo Mapped"] = self.map_simple["Memo Mapped"].str.strip().str.upper()
-        self.map_simple["Memo Simple"] = self.map_simple["Memo Simple"].str.strip().str.upper()
+        self.map_simple[MEMO_MAPPED] = self.map_simple[MEMO_MAPPED].str.strip().str.upper()
+        self.map_simple[MEMO_SIMPLE] = self.map_simple[MEMO_SIMPLE].str.strip().str.upper()
 
-        mapping = pd.Series(self.map_simple["Memo Mapped"].values, index=self.map_simple["Memo Simple"]).to_dict()
+        mapping = pd.Series(self.map_simple[MEMO_MAPPED].values, index=self.map_simple[MEMO_SIMPLE]).to_dict()
 
         memo_series_upper = memo_series.str.upper()
         memo_mapped = memo_series_upper.map(lambda x: Process._mapping(x, mapping))
 
-        self.map_simple = pd.DataFrame(mapping.items(), columns=["Memo Simple", "Memo Mapped"])
+        self.map_simple = pd.DataFrame(mapping.items(), columns=[MEMO_SIMPLE, MEMO_MAPPED])
         return memo_mapped
 
     @staticmethod
@@ -134,14 +137,14 @@ class Process:
             return "N/A", "N/A"
 
     def map_type(self, memo_series):
-        self.map_main["Memo Mapped"] = self.map_main["Memo Mapped"].fillna("").str.strip().str.upper()
+        self.map_main[MEMO_MAPPED] = self.map_main[MEMO_MAPPED].fillna("").str.strip().str.upper()
         self.map_main["Type"] = self.map_main["Type"].fillna("").str.strip().str.upper()
         self.map_main["SubType"] = self.map_main["SubType"].fillna("").str.strip().str.upper()
 
         self.map_full_type["MasterType"] = self.map_full_type["MasterType"].fillna("").str.strip()
 
-        mapping_a = pd.Series(self.map_main["Type"].values, index=self.map_main["Memo Mapped"]).to_dict()
-        mapping_b = pd.Series(self.map_main["SubType"].values, index=self.map_main["Memo Mapped"]).to_dict()
+        mapping_a = pd.Series(self.map_main["Type"].values, index=self.map_main[MEMO_MAPPED]).to_dict()
+        mapping_b = pd.Series(self.map_main["SubType"].values, index=self.map_main[MEMO_MAPPED]).to_dict()
         type_mapping = pd.Series(self.map_full_type["FullType"].values, index=self.map_full_type["Type"]).to_dict()
         master_type_mapping = pd.Series(self.map_full_type["MasterType"].values, index=self.map_full_type["Type"]).to_dict()
         subtype_mapping = pd.Series(
@@ -185,7 +188,7 @@ class Process:
                 type.append(t)
                 subtype.append(st)
 
-                new_row = pd.DataFrame([[memo, t, st]], columns=["Memo Mapped", "Type", "SubType"])
+                new_row = pd.DataFrame([[memo, t, st]], columns=[MEMO_MAPPED, "Type", "SubType"])
                 self.map_main = pd.concat([self.map_main, new_row], ignore_index=True)
 
                 full_type.append(self.get_full_type(t, type_mapping))

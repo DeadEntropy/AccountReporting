@@ -7,6 +7,8 @@ from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
 
+NEW_VALUE = "New Value"
+
 
 def can_handle(path_in, config, sep=",", *args):
     if not path_in.endswith("csv"):
@@ -27,16 +29,16 @@ def load(path_in, config, sep=",", *args):
         expected_columns
     ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (UBS WM)'
 
-    df["New Value"] = [[q, a] for q, a in zip(df["Quantity"], df["Amount"])]
+    df[NEW_VALUE] = [[q, a] for q, a in zip(df["Quantity"], df["Amount"])]
     df["New Type"] = [["Investment", "Cash"] for a in df["Amount"]]
-    df = df.explode(["New Value", "New Type"]).dropna(subset=["New Value"])
-    df = df[df["New Value"] != 0]
+    df = df.explode([NEW_VALUE, "New Type"]).dropna(subset=[NEW_VALUE])
+    df = df[df[NEW_VALUE] != 0]
 
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Date"].str.strip(), format="%m/%d/%Y")
     df_out.Account = df["Account Number"]
     df_out.Currency = [s if t == "Investment" else "USD" for t, s in zip(df["New Type"], df["Symbol"])]
-    df_out.Amount = df["New Value"]
+    df_out.Amount = df[NEW_VALUE]
     df_out.Memo = [
         f"{a}: {d} ({s})" if s != "" else f"{a}: {d}"
         for a, d, s in zip(df["Activity"], df["Description"].str.replace(" ON ", " "), df["Symbol"].fillna(""))

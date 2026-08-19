@@ -30,6 +30,7 @@ MEMO_MAPPED = "MemoMapped"
 TYPE = "Type"
 CAPITAL_GAIN = "CapitalGain"
 CUMULATED_CAPITAL_GAIN = "CumulatedCapitalGain"
+LABEL_95_INTERVAL = "95% interval"
 
 
 def currency_sign(ccy):
@@ -451,7 +452,7 @@ def project(df, nb_years=11, projection_data={}):
             y=w_low_ex,
             fill=None,
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours[2],
             showlegend=False,
         )
@@ -462,7 +463,7 @@ def project(df, nb_years=11, projection_data={}):
             y=w_up_ex,
             fill="tonexty",
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours[2],
         )
     )
@@ -557,7 +558,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
             y=w1_low_ex,
             fill=None,
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours1[2],
             showlegend=False,
         )
@@ -568,7 +569,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
             y=w1_up_ex,
             fill="tonexty",
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours1[2],
         )
     )
@@ -590,7 +591,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
             y=w2_low_ex,
             fill=None,
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours2[2],
             showlegend=False,
         )
@@ -601,7 +602,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
             y=w2_up_ex,
             fill="tonexty",
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours2[2],
         )
     )

@@ -9,6 +9,9 @@ from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
 
+MONEY_IN = "Money in (GBP)"
+MONEY_OUT = "Money out (GBP)"
+
 
 def can_handle(path_in, config, *args):
     if not path_in.endswith("csv"):
@@ -72,19 +75,19 @@ def load(path_in, config, *args):
         f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Vault)'
     )
 
-    df["Money in (GBP)"] = df["Money in (GBP)"].fillna(0)
-    df["Money out (GBP)"] = df["Money out (GBP)"].fillna(0)
+    df[MONEY_IN] = df[MONEY_IN].fillna(0)
+    df[MONEY_OUT] = df[MONEY_OUT].fillna(0)
     df["Interest rate (AER)"] = df["Interest rate (AER)"].fillna("")
 
-    df["Money in (GBP)"] = [float(sub(r"[^\d\-.]", "", as_string(x))) for x in df["Money in (GBP)"]]
-    df["Money out (GBP)"] = [float(sub(r"[^\d\-.]", "", as_string(x))) for x in df["Money out (GBP)"]]
+    df[MONEY_IN] = [float(sub(r"[^\d\-.]", "", as_string(x))) for x in df[MONEY_IN]]
+    df[MONEY_OUT] = [float(sub(r"[^\d\-.]", "", as_string(x))) for x in df[MONEY_OUT]]
 
     df_out = pd.DataFrame(columns=sd.target_columns)
 
     df_out.Date = df["Completed Date"]
     df_out.Account = get_product_name(df["Product name"])
     df_out.Currency = config["currency"]
-    df_out.Amount = df["Money in (GBP)"] + df["Money out (GBP)"]
+    df_out.Amount = df[MONEY_IN] + df[MONEY_OUT]
     df_out.Subcategory = df["Description"].str.split("\n").str[0].str.strip()
     df_out.Memo = (df["Description"].str.split("\n").str[0].str.strip() + " " + df["Interest rate (AER)"].astype(str)).str.strip()
     df_out["AccountType"] = config["account_type"]
