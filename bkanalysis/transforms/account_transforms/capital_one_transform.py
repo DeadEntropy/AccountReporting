@@ -1,0 +1,37 @@
+# coding=utf8
+import configparser
+
+import pandas as pd
+import glob
+import os
+from bkanalysis.config.config_helper import parse_list
+from bkanalysis.transforms.account_transforms import static_data as sd
+from bkanalysis.config import config_helper as ch
+
+
+def can_handle(path_in, config, *args):
+    if not path_in.lower().endswith("csv"):
+        return False
+    df = pd.read_csv(path_in, nrows=1)
+    expected_columns = parse_list(config["expected_columns"])
+    return set(df.columns) == set(expected_columns)
+
+
+def load(path_in, config, *args):
+    df = pd.read_csv(path_in)
+    expected_columns = parse_list(config["expected_columns"])
+    assert set(df.columns) == set(expected_columns), (
+        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Capital One)'
+    )
+
+    df_out = pd.DataFrame(columns=sd.target_columns)
+
+    df_out.Date = pd.to_datetime(df["Transaction Date"], format="%m/%d/%y")
+    df_out.Account = [f"{config['account_name']}:{acc}" for acc in df["Account Number"]]
+    df_out.Currency = "USD"
+    df_out.Memo = df["Transaction Description"]
+    df_out.Subcategory = df["Transaction Type"]
+    df_out["AccountType"] = config["account_type"]
+    df_out.Amount = df["Transaction Amount"]
+
+    return df_out

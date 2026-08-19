@@ -1,0 +1,46 @@
+import configparser
+
+import pandas as pd
+import glob
+import os
+from bkanalysis.config.config_helper import parse_list
+from bkanalysis.transforms.account_transforms import static_data as sd
+from bkanalysis.config import config_helper as ch
+
+
+def __remove_accents(s):
+    return "".join(" " if e == "'" else (e if (e.isalnum() or e == " ") else "e") for e in s)
+
+
+def can_handle(path_in, config, *args):
+    if not path_in.endswith("csv"):
+        return False
+
+    try:
+        df = pd.read_csv(path_in)
+    except Exception:
+        return False
+
+    expected_columns = parse_list(config["expected_columns"], False)
+
+    return set(df.columns) == set(expected_columns)
+
+
+def load(path_in, config, *args):
+    df = pd.read_csv(path_in)
+    expected_columns = parse_list(config["expected_columns"], False)
+
+    assert set(df.columns) == set(
+        expected_columns
+    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (BNP Stock)'
+
+    df_out = pd.DataFrame(columns=sd.target_columns)
+    df_out.Date = pd.to_datetime(df["Date"], dayfirst=True)
+    df_out.Account = config["account_name"]
+    df_out.Currency = df["ISIN"]
+    df_out.Amount = df["Quantite"]
+    df_out.Subcategory = df["Statut"]
+    df_out.Memo = [f"BUY: {l}" if q > 0 else f"SALE: {l}" for (q, l) in zip(df["Quantite"], df["Libelle"])]
+    df_out["AccountType"] = config["account_type"]
+
+    return df_out

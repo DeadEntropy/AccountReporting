@@ -1,0 +1,44 @@
+import configparser
+
+import pandas as pd
+import glob
+import os
+from bkanalysis.config.config_helper import parse_list
+from bkanalysis.transforms.account_transforms import static_data as sd
+from bkanalysis.config import config_helper as ch
+
+
+def can_handle(path_in, config, sep=",", *args):
+    if not path_in.endswith("csv"):
+        return False
+    df = pd.read_csv(path_in, sep=sep, nrows=1)
+    expected_columns = parse_list(config["expected_columns"], False)
+
+    return set(df.columns) == set(expected_columns)
+
+
+def load(path_in, config, sep=",", *args):
+    df = pd.read_csv(path_in, sep=sep, parse_dates=["time"], keep_default_na=False)
+    df.columns = [s.strip() for s in df.columns]
+    expected_columns = parse_list(config["expected_columns"], False)
+
+    assert set(df.columns) == set(
+        expected_columns
+    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Coinbase)'
+
+    df["Date"] = [t.date() for t in df.time]
+
+    df_orders = df[df["order id"] != ""].groupby(["Date", "order id", "amount/balance unit"]).sum(numeric_only=True).reset_index()
+    df_orders["type"] = "match"
+    df = pd.concat([df[df["order id"] == ""], df_orders], axis=0).sort_values("Date").fillna("").reset_index()
+
+    df_out = pd.DataFrame(columns=sd.target_columns)
+    df_out.Date = pd.to_datetime(df["Date"])
+    df_out.Account = config["account_name"]
+    df_out.Currency = df["amount/balance unit"]
+    df_out.Amount = df["amount"]
+    df_out.Subcategory = [f"COINBASE_{t}" for t in df["type"]]
+    df_out.Memo = [f"COINBASE_{t}" for t in df["type"]]
+    df_out["AccountType"] = config["account_type"]
+
+    return df_out

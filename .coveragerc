@@ -1,0 +1,28 @@
+[run]
+branch = true
+source = bkanalysis
+omit =
+    */tests/*
+    */test_*.py
+    */__init__.py
+    setup.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    class.*\(Protocol\):
+    @.*\.abstractmethod
+    except ImportError
+    if sys.version_info
+
+precision = 2
+skip_covered = False
+
+[html]
+directory = htmlcov

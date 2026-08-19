@@ -1,0 +1,39 @@
+import configparser
+
+import pandas as pd
+import glob
+import os
+from bkanalysis.config.config_helper import parse_list
+from bkanalysis.transforms.account_transforms import static_data as sd
+from bkanalysis.config import config_helper as ch
+
+
+def can_handle(path_in, config, *args):
+    if not path_in.endswith("csv"):
+        return False
+    df = pd.read_csv(path_in, nrows=1)
+    expected_columns = parse_list(config["expected_columns"])
+    return set(df.columns) == set(expected_columns)
+
+
+def load(path_in, config, *args):
+    df = pd.read_csv(path_in)
+    expected_columns = parse_list(config["expected_columns"])
+    assert set(df.columns) == set(expected_columns), (
+        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Lloyds Current)'
+    )
+
+    df["Debit Amount"] = df["Debit Amount"].fillna(0)
+    df["Credit Amount"] = df["Credit Amount"].fillna(0)
+
+    df_out = pd.DataFrame(columns=sd.target_columns)
+
+    df_out.Date = pd.to_datetime(df["Transaction Date"], format="%d/%m/%Y")
+    df_out.Account = df["Sort Code"].astype(str).str.replace("'", "") + " " + df["Account Number"].astype(str)
+    df_out.Currency = config["currency"]
+    df_out.Amount = df["Credit Amount"] - df["Debit Amount"]
+    df_out.Subcategory = df["Transaction Type"]
+    df_out.Memo = df["Transaction Description"]
+    df_out["AccountType"] = config["account_type"]
+
+    return df_out
