@@ -28,7 +28,7 @@ def get_reimbursement(df, date_range=None, values="Amount"):
         & (df.FullType != "Intra-Account Transfert")
         & (df.FullMasterType != "Savings")
         & (df.MemoMapped != "PAYPAL")
-    ]
+    ].copy()
     df_expenses[values] = (-1) * df_expenses[values]
 
     return df_expenses
@@ -50,7 +50,7 @@ def get_expenses(df, date_range=None, values="Amount", inc_reimbursement=False):
         & ((df.FacingAccount == "") | [facc is None for facc in df.FacingAccount])
         & (df[values] < 0)
         & (df.FullType != "Intra-Account Transfert")
-    ]
+    ].copy()
     df_expenses[values] = (-1) * df_expenses[values]
 
     if inc_reimbursement:
@@ -82,5 +82,9 @@ def plot_sunburst(df, path, date_range=None, values="Amount", inc_reimbursement=
     df_expenses = get_expenses(df, date_range, values, inc_reimbursement)
     df_expenses["FullSubType"] = [fullSubType if fullSubType != "" else "Other" for fullSubType in df_expenses["FullSubType"]]
     title = get_title(df_expenses.Date, df_expenses[values])
-    sb = px.sunburst(df_expenses, path=path, values=values, title=title)
+    # sunburst does not support negative sector values (reimbursements are negative),
+    # so aggregate by chart path and keep only positive totals
+    df_plot = df_expenses.groupby(path, as_index=False)[values].sum()
+    df_plot = df_plot[df_plot[values] > 0]
+    sb = px.sunburst(df_plot, path=path, values=values, title=title)
     return sb

@@ -16,31 +16,33 @@ from bkanalysis.config import config_helper as ch
 ### There is an inacuracy inthe handling of interest with overpayment
 
 
+def _read_json(path_in: str):
+    if not os.path.exists(path_in):
+        raise FileNotFoundError(f"JSON file not found: '{path_in}'.")
+    with open(path_in, "r", encoding="utf-8") as json_file:
+        return json.load(json_file)
+
+
 def can_handle(path_in, config, *args):
     if not path_in.lower().endswith("json"):
         return False
 
-    if os.path.exists(path_in):
-        try:
-            with open(path_in, "r", encoding="utf-8") as json_file:
-                json_obj = json.load(json_file)
-        except TypeError:
-            raise TypeError(f"Failed to deserialise jSon file '{path_in}' {json_file}")
-    else:
-        raise TypeError(f"Failed to local jSon file '{path_in}' {json_file}")
+    try:
+        json_obj = _read_json(path_in)
+    except (OSError, ValueError):
+        return False
 
-    return "interest" in json_obj[list(json_obj.keys())[0]]
+    if not isinstance(json_obj, dict) or not json_obj:
+        return False
+    first_entry = next(iter(json_obj.values()))
+    return isinstance(first_entry, dict) and "interest" in first_entry
 
 
 def load(path_in: str, config, *args):
-    if os.path.exists(path_in):
-        try:
-            with open(path_in, "r", encoding="utf-8") as json_file:
-                json_obj = json.load(json_file)
-        except TypeError:
-            raise TypeError(f"Failed to deserialise jSon file '{path_in}' {json_file}")
-    else:
-        raise TypeError(f"Failed to local jSon file '{path_in}' {json_file}")
+    try:
+        json_obj = _read_json(path_in)
+    except ValueError as e:
+        raise ValueError(f"Failed to deserialise JSON file '{path_in}'") from e
 
     dfs = []
     for _, data in json_obj.items():
@@ -122,5 +124,8 @@ def get_cashflows(data):
         df_escrow.Memo = "Mortgage Escrow - Flood Insurance"
         df_escrow["AccountType"] = "mortgage"
 
-    df_mtg = pd.concat([df for df in [df_balance, df_payment, df_interest, df_escrow] if len(df) > 0], axis=0)
+    frames = [df for df in [df_balance, df_payment, df_interest, df_escrow] if len(df) > 0]
+    if not frames:
+        return df_payment
+    df_mtg = pd.concat(frames, axis=0)
     return df_mtg[df_mtg.Date <= datetime.now()]

@@ -12,6 +12,7 @@ def can_handle(path_in, config, sep=",", *args):
     if not path_in.endswith("csv"):
         return False
     df = pd.read_csv(path_in, sep=sep, nrows=1)
+    df.columns = [s.strip() for s in df.columns]
     expected_columns = parse_list(config["expected_columns"], False)
 
     return set(df.columns) == set(expected_columns)
@@ -24,7 +25,7 @@ def load(path_in, config, sep=",", *args):
 
     assert set(df.columns) == set(
         expected_columns
-    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Coinbase)'
+    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Coinbase Pro)'
 
     df["Date"] = [t.date() for t in df.time]
 

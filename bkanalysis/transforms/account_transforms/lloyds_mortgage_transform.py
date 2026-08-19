@@ -8,7 +8,7 @@ from bkanalysis.config import config_helper as ch
 import re
 
 
-regex = re.compile("\((.*?)\)")
+regex = re.compile(r"\((.*?)\)")
 
 
 def to_memo(row):

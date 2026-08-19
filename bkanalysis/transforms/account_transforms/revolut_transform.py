@@ -32,7 +32,7 @@ def load(path_in, config, sep=";", *args):
 
     new_lines = []
     for line in lines:
-        new_lines.append(re.sub(r"(\d+),( Fee)", r"\1\2", re.sub(r"(\d+),(\d+)", r"\1\2", line)))
+        new_lines.append(re.sub(r"(\d),( Fee)", r"\1\2", re.sub(r"(\d),(\d)", r"\1\2", line)))
 
     df = pd.DataFrame(
         [[v.strip().replace('"', "") for v in line.split(",")] for line in new_lines[1:]],
@@ -47,7 +47,7 @@ def load(path_in, config, sep=";", *args):
 
     assert set(df.columns) == set(
         set([e.replace("CCY", currency).strip() for e in expected_columns])
-    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Nutmeg)'
+    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Revolut)'
 
     df[f"Paid In ({currency})"] = pd.to_numeric(
         df[f"Paid In ({currency})"].str.replace(",", "").str.replace('"', "").str.strip(), errors="coerce"
@@ -57,7 +57,8 @@ def load(path_in, config, sep=";", *args):
 
     try:
         col = df[f"Paid Out ({currency})"].str.replace(",", "").str.replace('"', "").str.strip()
-    except:
+    except AttributeError:
+        # the column is already numeric
         col = df[f"Paid Out ({currency})"]
     df[f"Paid Out ({currency})"] = pd.to_numeric(col, errors="coerce").fillna(0)
 

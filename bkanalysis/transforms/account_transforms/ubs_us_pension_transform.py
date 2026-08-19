@@ -21,7 +21,7 @@ def load(path_in, config, market: Market, ref_currency: str):
     df = pd.read_csv(path_in)
     expected_columns = parse_list(config["expected_columns"])
     assert set(df.columns) == set(expected_columns), (
-        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (UBS Pensio Mortgage)'
+        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (UBS US Pension)'
     )
     df["VALUATION DATE"] = pd.to_datetime(df["VALUATION DATE"], format="%m-%d-%Y")
 

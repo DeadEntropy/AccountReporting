@@ -34,7 +34,7 @@ def load(path_in, config, market: Market, ref_currency: str):
         raise
     columns = [re.sub(regex, "", s) for s in df.columns]
     assert set(columns) == set(expected_columns), (
-        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Nutmeg)'
+        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Nutmeg ISA)'
     )
 
     df_out = pd.DataFrame(columns=sd.target_columns)

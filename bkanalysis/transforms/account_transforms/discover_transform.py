@@ -24,7 +24,7 @@ def load(path_in, config, sep=",", *args):
 
     assert set(df.columns) == set(
         expected_columns
-    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Discovery)'
+    ), f'Was expecting [{", ".join(expected_columns)}] but file columns are [{", ".join(df.columns)}]. (Discover)'
 
     df_out = pd.DataFrame(columns=sd.target_columns)
     df_out.Date = pd.to_datetime(df["Transaction Date"].str.strip(), format="%m/%d/%Y")

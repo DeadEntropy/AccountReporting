@@ -1,4 +1,5 @@
 import datetime as dt
+import logging
 import pandas as pd
 from bkanalysis.market.price import Price
 from typing import Union
@@ -17,6 +18,9 @@ class Market:
             }
             for asset in dict_of_values
         }
+        dropped = sum(len(dict_of_values[asset]) for asset in dict_of_values) - sum(len(v) for v in self._dict.values())
+        if dropped > 0:
+            logging.warning(f"Market: dropped {dropped} non-positive price point(s).")
         self._dict_sorted_dates = {}
         self.linear_interpolation = linear_interpolation
 
@@ -61,9 +65,10 @@ class Market:
             raise Exception(f"{date} is before the first available date for {instr} in the Market.")
 
         if previous:
-            return next(d for d in sorted_list if d < date)
+            return next((d for d in sorted_list if d <= date), min_date)
         else:
-            return next(d for d in sorted_list if d >= date)
+            # sorted_list is descending, so the last match is the closest following date
+            return next((d for d in reversed(sorted_list) if d >= date), sorted_list[0])
 
     def get_price(self, instr: str, date: dt.datetime):
         if instr not in self._dict.keys():

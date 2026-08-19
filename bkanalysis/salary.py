@@ -139,6 +139,8 @@ class Salary:
 
         # Filter relevant payrolls
         for payroll, info in self.salaries_info.items():
+            if payroll == Salary.OTHER_PAYROLLS or payroll in self.monthly_salaries.columns:
+                raise ValueError(f"Salary group name '{payroll}' collides with an existing payroll column; rename the group.")
             relevant_payrolls = [p for p in info["payrolls"] if p in self.monthly_salaries.columns]
             self.monthly_salaries[payroll] = self.monthly_salaries[relevant_payrolls].sum(axis=1)
             self.monthly_salaries[f"GAP_{payroll}"] = (
@@ -148,8 +150,8 @@ class Salary:
 
         # Determine other payrolls
         explicit_payrolls = [x for xs in [y["payrolls"] for y in self.salaries_info.values()] for x in xs]
-        self.other_payrolls = [p for p in df_salary.MemoMapped.unique() if p not in explicit_payrolls and p not in exclude]
-        self.monthly_salaries[Salary.OTHER_PAYROLLS] = self.monthly_salaries[self.other_payrolls].sum(axis=1)
+        self.other_payroll_columns = [p for p in df_salary.MemoMapped.unique() if p not in explicit_payrolls and p not in exclude]
+        self.monthly_salaries[Salary.OTHER_PAYROLLS] = self.monthly_salaries[self.other_payroll_columns].sum(axis=1)
 
         self.__prepare_scalar(year)
 
@@ -232,11 +234,11 @@ class SalaryLegacy:
         payrolls_1 = [p for p in payrolls_1 if p in self.monthly_salaries.columns]
         payrolls_2 = [p for p in payrolls_2 if p in self.monthly_salaries.columns]
 
-        self.other_payrolls = [p for p in self.monthly_salaries.columns if p not in payrolls_1 + payrolls_2]
+        self.other_payroll_columns = [p for p in self.monthly_salaries.columns if p not in payrolls_1 + payrolls_2]
 
         self.monthly_salaries[base_payroll_1] = self.monthly_salaries[payrolls_1].sum(axis=1)
         self.monthly_salaries[base_payroll_2] = self.monthly_salaries[payrolls_2].sum(axis=1)
-        self.monthly_salaries[Salary.OTHER_PAYROLLS] = self.monthly_salaries[self.other_payrolls].sum(axis=1)
+        self.monthly_salaries[Salary.OTHER_PAYROLLS] = self.monthly_salaries[self.other_payroll_columns].sum(axis=1)
 
         self.monthly_salaries = self.monthly_salaries[[base_payroll_1, base_payroll_2, SalaryLegacy.OTHER_PAYROLLS]].copy()
 

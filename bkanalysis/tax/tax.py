@@ -20,6 +20,8 @@ __tax_bands = {
 
 def compute_uk_tax_return(total_taxable, tax_already_paid, tax_year="2021", tax_bands=None):
     if tax_bands is None:
+        if tax_year not in __tax_bands:
+            raise ValueError(f"No tax bands defined for {tax_year}. Available years: {sorted(__tax_bands)}.")
         tax_bands = __tax_bands[tax_year]
 
     results = {}
@@ -144,12 +146,12 @@ def waterfall_chart(payroll, inflows):
     _measure = ["relative", "relative", "relative", "relative", "relative", "relative", "total"]
     _text = [f"{v:,.0f}" for v in _y]
 
-    if inflows is not None:
-        net_pay_discrepancy = inflows["Salary"] - payroll.net_pay
+    if inflows is not None and len(inflows) > 0:
+        net_pay_discrepancy = inflows.get("Salary", 0.0) - payroll.net_pay
 
         _x = _x + ["Discrepancy"] + list(inflows.index)
         _y = _y + [net_pay_discrepancy] + list(inflows.values)
-        _measure = _measure + ["relative", "total"] + ["relative" for _ in inflows[1:].index]
+        _measure = _measure + ["relative", "total"] + ["relative"] * (len(inflows) - 1)
         _text = _text + [f"{net_pay_discrepancy:,.0f}"] + [f"{v:,.0f}" for v in inflows.values]
 
     fig = go.Figure(

@@ -35,7 +35,7 @@ def load(path_in, config, *args):
         raise
     columns = [re.sub(regex, "", s) for s in df.columns]
     assert set(columns) == set(expected_columns), (
-        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Nutmeg)'
+        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Nutmeg Transaction)'
     )
 
     df_piv = tax_nut.clean_nutmeg_activity_report(df, include_fund=True)

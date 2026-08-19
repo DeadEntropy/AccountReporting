@@ -9,6 +9,9 @@ from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
 from bkanalysis.config import config_helper as ch
 
+MONEY_IN = "Money in (GBP)"
+MONEY_OUT = "Money out (GBP)"
+
 
 def can_handle(path_in, config, *args):
     if not path_in.endswith("csv"):
@@ -43,23 +46,29 @@ def get_year(s):
     return s
 
 
+def _get_date_from_description(description):
+    """extracts the date embedded in the description, or returns None when there is none"""
+    if not isinstance(description, str) or "\n" not in description:
+        return None
+    parts = description.split("\n")[1].split(" ")
+    if len(parts) != 3:
+        return None
+    try:
+        return pd.to_datetime(parts[2], format="%Y/%m/%d")
+    except (ValueError, TypeError):
+        return None
+
+
 def get_dates_from_description(df, fallback_year):
     results = []
     year = None
     for index, row in df.iterrows():
-        description = row["Description"]
-        date = row["Completed Date"]
-        if "\n" in description:
-            if len(description.split("\n")[1].split(" ")) == 3:
-                try:
-                    current_date = pd.to_datetime(description.split("\n")[1].split(" ")[2], format="%Y/%M/%d")
-                    results.append(current_date)
-                    year = current_date.year
-                except:
-                    results.append(pd.to_datetime(f"{date}, {fallback_year if (year is None) else year}", format="%b %d, %Y"))
-            else:
-                results.append(pd.to_datetime(f"{date}, {fallback_year if (year is None) else year}", format="%b %d, %Y"))
+        current_date = _get_date_from_description(row["Description"])
+        if current_date is not None:
+            results.append(current_date)
+            year = current_date.year
         else:
+            date = row["Completed Date"]
             results.append(pd.to_datetime(f"{date}, {fallback_year if (year is None) else year}", format="%b %d, %Y"))
 
     return results
@@ -69,22 +78,22 @@ def load(path_in, config, *args):
     df = pd.read_csv(path_in, parse_dates=["Completed Date"])
     expected_columns = parse_list(config["expected_columns"])
     assert set(df.columns) == set(expected_columns), (
-        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Lloyds Current)'
+        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Vault)'
     )
 
-    df["Money in (GBP)"] = df["Money in (GBP)"].fillna(0)
-    df["Money out (GBP)"] = df["Money out (GBP)"].fillna(0)
+    df[MONEY_IN] = df[MONEY_IN].fillna(0)
+    df[MONEY_OUT] = df[MONEY_OUT].fillna(0)
     df["Interest rate (AER)"] = df["Interest rate (AER)"].fillna("")
 
-    df["Money in (GBP)"] = [float(sub(r"[^\d\-.]", "", as_string(x))) for x in df["Money in (GBP)"]]
-    df["Money out (GBP)"] = [float(sub(r"[^\d\-.]", "", as_string(x))) for x in df["Money out (GBP)"]]
+    df[MONEY_IN] = [float(sub(r"[^\d\-.]", "", as_string(x))) for x in df[MONEY_IN]]
+    df[MONEY_OUT] = [float(sub(r"[^\d\-.]", "", as_string(x))) for x in df[MONEY_OUT]]
 
     df_out = pd.DataFrame(columns=sd.target_columns)
 
     df_out.Date = df["Completed Date"]
     df_out.Account = get_product_name(df["Product name"])
     df_out.Currency = config["currency"]
-    df_out.Amount = df["Money in (GBP)"] + df["Money out (GBP)"]
+    df_out.Amount = df[MONEY_IN] + df[MONEY_OUT]
     df_out.Subcategory = df["Description"].str.split("\n").str[0].str.strip()
     df_out.Memo = (df["Description"].str.split("\n").str[0].str.strip() + " " + df["Interest rate (AER)"].astype(str)).str.strip()
     df_out["AccountType"] = config["account_type"]

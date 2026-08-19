@@ -129,7 +129,15 @@ class MarketLoader:
     def get_history_from_file(path: str):
         logging.debug(f"Getting History from FILE from {path}")
         df = pd.read_csv(path)
-        currency = df["Currency code"][0]
+        if len(df) == 0:
+            raise ValueError(f"Market history file is empty: '{path}'.")
+        currencies = df["Currency code"].astype("string").str.strip()
+        if currencies.isna().any() or (currencies == "").any():
+            raise ValueError(f"Currency codes must be present in '{path}'.")
+        currencies = currencies.unique()
+        if len(currencies) != 1:
+            raise ValueError(f"Expected a single currency in '{path}' but found: {list(currencies)}.")
+        currency = currencies[0]
         df["Unit Price Date"] = pd.to_datetime(df["Unit Price Date"], format=MarketLoader._FILE_DATE_FORMAT)
         return {date: Price(close, currency) for (date, close) in df.set_index("Unit Price Date")["Unit Price"].items()}
 

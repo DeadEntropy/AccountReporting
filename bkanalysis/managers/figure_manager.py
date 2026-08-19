@@ -186,7 +186,7 @@ class FigureManager:
         """plots a bar chat showing the monthly spending by category"""
         df_expenses = self.transformation_manager.get_flow_values(date_range[0], date_range[1], account, how=how, include_iat=include_iat)
         df_expenses["Value"] = (-1) * df_expenses["Value"]
-        key = list(category.keys())[0]
+        key = next(iter(category))
 
         if key not in df_expenses.columns:
             return px.bar(
@@ -329,7 +329,7 @@ class FigureManager:
         self, category, label, row_limit: int = 5, date_range: list = None, account: str = None, how: str = "out", include_iat=False
     ):
         """Return the top categories based on the provided filter"""
-        key = list(category.keys())[0]
+        key = next(iter(category))
         df_expenses = self.transformation_manager.get_flow_values(date_range[0], date_range[1], account, how=how, include_iat=include_iat)
 
         if key not in df_expenses.columns:
@@ -518,7 +518,9 @@ class FigureManager:
             steps.append({"range": [i, i + 1], "color": color})
         return steps
 
-    def get_saving_ratio(self, year=2025, month=None, include_capital=False, include_bonus=False):
+    def get_saving_ratio(self, year=None, month=None, include_capital=False, include_bonus=False):
+        if year is None:
+            year = datetime.now().year
         transactions = self.transformation_manager.data_manager.transactions
         transactions = transactions[["Date", "Quantity", "FullType", "FullSubType", "FullMasterType"]]
         transactions = transactions[transactions.Date.dt.year == year]

@@ -20,7 +20,7 @@ def can_handle(path_in, config, *args):
 def try_get_account_name(file_name, config):
     try:
         return " ".join([s.capitalize() for s in file_name.split("-")])
-    except:
+    except (AttributeError, TypeError):
         return config["account_name"]
 
 
@@ -31,7 +31,7 @@ def load(path_in, config, *args):
 
     expected_columns = parse_list(config["expected_columns"])
     assert set(df.columns) == set(expected_columns), (
-        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Chase)'
+        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Chase Business)'
     )
 
     df_out = pd.DataFrame(columns=sd.target_columns)

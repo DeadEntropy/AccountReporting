@@ -30,6 +30,7 @@ MEMO_MAPPED = "MemoMapped"
 TYPE = "Type"
 CAPITAL_GAIN = "CapitalGain"
 CUMULATED_CAPITAL_GAIN = "CumulatedCapitalGain"
+LABEL_95_INTERVAL = "95% interval"
 
 
 def currency_sign(ccy):
@@ -136,15 +137,15 @@ def transactions_to_values(df):
     )
     index = [(tupl[0], tupl[1], time) for (tupl, time) in index]
 
-    # set the new multi-index
+    # set the new multi-index; apply on an explicit column subset so the grouping
+    # columns are excluded on every pandas version (pandas 3 excludes them by default)
     df = (
         df.reindex(pd.MultiIndex.from_tuples(index, names=df.index.names))
         .reset_index()
-        .groupby(["Account", "Currency"])
+        .groupby(["Account", "Currency"])[[DATE, AMOUNT, MEMO_MAPPED, CUMULATED_AMOUNT]]
         .apply(__interpolate)
         .dropna()
-        .reset_index(drop=True)
-        .set_index(["Account", "Currency"])
+        .droplevel(-1)
     )
 
     return df
@@ -263,7 +264,7 @@ def _get_plot_data(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
     values = df_on_dates[by]
     labels = [
         aggregate_memos(memo) + f"<br><br>TOTAL: {d:,.0f}" if d != 0 else ",".join(memo)
-        for (memo, d) in zip(df_on_dates[MEMO_MAPPED], df_on_dates[by].diff())
+        for (memo, d) in zip(df_on_dates[MEMO_MAPPED], df_on_dates[by].diff().fillna(0))
     ]
 
     return values, labels
@@ -451,7 +452,7 @@ def project(df, nb_years=11, projection_data={}):
             y=w_low_ex,
             fill=None,
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours[2],
             showlegend=False,
         )
@@ -462,7 +463,7 @@ def project(df, nb_years=11, projection_data={}):
             y=w_up_ex,
             fill="tonexty",
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours[2],
         )
     )
@@ -557,7 +558,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
             y=w1_low_ex,
             fill=None,
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours1[2],
             showlegend=False,
         )
@@ -568,7 +569,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
             y=w1_up_ex,
             fill="tonexty",
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours1[2],
         )
     )
@@ -590,7 +591,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
             y=w2_low_ex,
             fill=None,
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours2[2],
             showlegend=False,
         )
@@ -601,7 +602,7 @@ def project_compare(df, nb_years=11, projection_data_1={}, projection_data_2={})
             y=w2_up_ex,
             fill="tonexty",
             mode="lines",
-            name="95% interval",
+            name=LABEL_95_INTERVAL,
             line_color=colours2[2],
         )
     )

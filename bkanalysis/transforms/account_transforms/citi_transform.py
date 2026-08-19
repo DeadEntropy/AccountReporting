@@ -31,7 +31,7 @@ def simplify_memo(memo):
     if memo.startswith("Transfer From Money Market"):
         return "Transfer From Money Market"
     if memo.startswith("Transfer to Money Market"):
-        return "Transfer From to Market"
+        return "Transfer to Money Market"
     if memo.startswith("Transfer From Savings Plus"):
         return "Transfer From Savings Plus"
     if memo.startswith("Transfer to Savings Plus"):
