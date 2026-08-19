@@ -7,12 +7,12 @@ setup(
     packages=find_packages(),
     url="https://github.com/DeadEntropy/AccountReporting",
     install_requires=[
-        "pandas",
+        "pandas>=3.0",
         "numpy",
         "matplotlib",
         "mortgage",
         "yfinance>=1.6.0",
-        "yahooquery",
+        "yahooquery>=2.4.1",
         "cachetools",
     ],  # external packages as dependencies
 )
