@@ -9,11 +9,12 @@ def plot_waterfall(data: pd.Series, title: str):
         go.Waterfall(
             name="20",
             orientation="v",
-            measure=["relative" for b in data] + ["total"],
+            measure=["relative"] * len(data) + ["total"],
             x=list(data.index) + ["savings"],
             textposition="outside",
             text=list(data.index) + ["Savings"],
-            y=list(data.values) + [-data.values.sum()],
+            # Plotly computes a "total" bar from the preceding relative values; the y entry is a placeholder
+            y=list(data.values) + [data.values.sum()],
             connector={"line": {"color": "rgb(63, 63, 63)"}},
         )
     )

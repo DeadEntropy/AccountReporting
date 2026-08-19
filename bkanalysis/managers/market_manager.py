@@ -1,4 +1,6 @@
 from datetime import datetime
+from pathlib import Path
+
 import pandas as pd
 
 from bkanalysis.market import market_loader
@@ -17,16 +19,22 @@ class MarketManager:
         self.prices = None
         self.asset_map = None
 
+    @staticmethod
+    def _asset_map_path(path: str) -> str:
+        """derives the asset-map side-car path from the price file path"""
+        p = Path(path)
+        return str(p.with_name(f"{p.stem}_asset_map{p.suffix or '.csv'}"))
+
     def to_disk(self, path: str) -> None:
         """saves the transactions to disk"""
         self.prices.to_csv(path, index=True)
-        pd.Series(self.asset_map, name="AssetMap").to_csv(f"{path.replace('.csv', '_asset_map.csv')}")
+        pd.Series(self.asset_map, name="AssetMap").to_csv(MarketManager._asset_map_path(path))
 
     def load_pregenerated_data(self, path) -> None:
         """loads the pregenerated data from disk"""
         self.prices = pd.read_csv(path, parse_dates=["Date"])
         self.prices = self.prices.set_index(["AssetMapped", "Date"])
-        self.asset_map = pd.read_csv(f"{path.replace('.csv', '_asset_map.csv')}", index_col=0)["AssetMap"].to_dict()
+        self.asset_map = pd.read_csv(MarketManager._asset_map_path(path), index_col=0)["AssetMap"].to_dict()
 
     def get_asset_map(self, data_manager: DataManager) -> dict:
         """returns a map of the assets to their market symbol"""
@@ -48,7 +56,7 @@ class MarketManager:
 
         loader = market_loader.MarketLoader(self.config)
         assets = data_manager.assets
-        period = {a: "10y" if (datetime.today() - assets[a]).days / 356 < 10 else "max" for a in assets}
+        period = {a: "10y" if (datetime.today() - assets[a]).days / 365 < 10 else "max" for a in assets}
         market_prices = loader.load(assets, self.ref_currency, period)
 
         df_prices = MarketManager.dataframe_from_nested_dict(market_prices)

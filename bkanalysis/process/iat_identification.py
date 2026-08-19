@@ -44,30 +44,31 @@ class IatIdentification:
         # Create a new column for the offsetting account
         df["FacingAccount"] = None
 
-        # Create a dictionary to store potential matches
+        # Create a dictionary of candidate matches, keyed by currency and type;
+        # amounts are compared within self.relative_tolerance (0.0 means exact offset)
         transaction_dict = {}
         df_mini = df[df.FullType.isin(self.iat_full_types)]
         for i, row in df_mini.iterrows():
-            target_key = (row["Currency"], row["FullType"], -row[iat_value_col])
-            key_this_row = (row["Currency"], row["FullType"], row[iat_value_col])
+            amount = row[iat_value_col]
+            if amount == 0:
+                continue
+            group_key = (row["Currency"], row["FullType"])
             date = row["Date"]
 
-            # Check if there is a matching transaction in the dictionary
-            if target_key in transaction_dict:
-                for match_index in transaction_dict[target_key]:
-                    if abs((date - df.loc[match_index, "Date"]).days) < 7 and df.loc[match_index, "FacingAccount"] is None:
-                        df.loc[i, "FacingAccount"] = df.loc[match_index, "Account"]
-                        df.loc[match_index, "FacingAccount"] = row["Account"]
-                        if adjust_dates:
-                            adjusted_date = max(df.loc[match_index, "Date"], row["Date"])
-                            df.loc[match_index, "Date"] = adjusted_date
-                            df.loc[i, "Date"] = adjusted_date
-                        transaction_dict[target_key].remove(match_index)
-                        break
-            if key_this_row in transaction_dict:
-                transaction_dict[key_this_row].append(i)
-            else:
-                transaction_dict[key_this_row] = [i]
+            for entry in transaction_dict.get(group_key, []):
+                match_amount, match_index = entry
+                if abs(amount + match_amount) > self.relative_tolerance * max(abs(amount), abs(match_amount)):
+                    continue
+                if abs((date - df.loc[match_index, "Date"]).days) < 7 and df.loc[match_index, "FacingAccount"] is None:
+                    df.loc[i, "FacingAccount"] = df.loc[match_index, "Account"]
+                    df.loc[match_index, "FacingAccount"] = row["Account"]
+                    if adjust_dates:
+                        adjusted_date = max(df.loc[match_index, "Date"], row["Date"])
+                        df.loc[match_index, "Date"] = adjusted_date
+                        df.loc[i, "Date"] = adjusted_date
+                    transaction_dict[group_key].remove(entry)
+                    break
+            transaction_dict.setdefault(group_key, []).append((amount, i))
 
         return df
 

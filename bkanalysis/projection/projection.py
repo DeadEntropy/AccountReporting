@@ -4,7 +4,12 @@ from matplotlib.ticker import FuncFormatter
 
 
 def thousands(x, pos):
-    return "%1.1fM" % (x * 1e-6) if x >= 1e6 else "%1.1fK" % (x * 1e-3) if x >= 1e3 else "%1.1f" % x
+    magnitude = abs(x)
+    if magnitude >= 1e6:
+        return f"{x * 1e-6:.1f}M"
+    if magnitude >= 1e3:
+        return f"{x * 1e-3:.1f}K"
+    return f"{x:.1f}"
 
 
 def project(initial, year, growth, volatility, std_dev, contribution):
@@ -104,8 +109,8 @@ def project_plot(w, w_low, w_up, w_low_ex, w_up_ex, r):
     ax.set(xlabel="Years", ylabel="Wealth", title="Projected Wealth")
 
     ax.plot(r, w, "-o", label="Expected Wealth")
-    ax.fill_between(r, w_low, w_up, color="b", alpha=0.2, label="Less Likely")
-    ax.fill_between(r, w_low_ex, w_up_ex, color="b", alpha=0.1, label="Most Likely")
+    ax.fill_between(r, w_low, w_up, color="b", alpha=0.2, label="80% interval")
+    ax.fill_between(r, w_low_ex, w_up_ex, color="b", alpha=0.1, label="95% interval")
     plt.xticks(r, [f"{v}y" for v in r])
     ax.legend()
     ax.grid(True)
@@ -120,13 +125,13 @@ def project_plot_compare(w, w_low, w_up, w_low_ex, w_up_ex, w_2, w_low_2, w_up_2
 
     ax.plot(r, w, "-o", color="b", label="Expected Wealth")
     if not ignore_fill:
-        ax.fill_between(r, w_low, w_up, color="b", alpha=0.2, label="Less Likely")
-        ax.fill_between(r, w_low_ex, w_up_ex, color="b", alpha=0.1, label="Most Likely")
+        ax.fill_between(r, w_low, w_up, color="b", alpha=0.2, label="80% interval")
+        ax.fill_between(r, w_low_ex, w_up_ex, color="b", alpha=0.1, label="95% interval")
 
     ax.plot(r, w_2, "-x", color="g", label="Expected Wealth (Scenario)")
     if not ignore_fill:
-        ax.fill_between(r, w_low_2, w_up_2, color="g", alpha=0.2, label="Less Likely (Scenario)")
-        ax.fill_between(r, w_low_ex_2, w_up_ex_2, color="g", alpha=0.1, label="Most Likely (Scenario)")
+        ax.fill_between(r, w_low_2, w_up_2, color="g", alpha=0.2, label="80% interval (Scenario)")
+        ax.fill_between(r, w_low_ex_2, w_up_ex_2, color="g", alpha=0.1, label="95% interval (Scenario)")
 
     plt.xticks(r, [f"{v}y" for v in r])
     ax.legend()

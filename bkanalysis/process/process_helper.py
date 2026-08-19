@@ -17,7 +17,8 @@ def get_adjusted_year(dt):
 
 
 def get_fiscal_year(dt):
-    if dt < datetime.datetime(dt.year, 4, 5):
+    # the UK fiscal year runs from 6 April to 5 April
+    if dt < datetime.datetime(dt.year, 4, 6):
         return dt.year - 1
     return dt.year
 
@@ -37,7 +38,7 @@ def get_missing_map(memo, mapping):
         ).upper()
         try:
             index = int(value)
-            if index > len(suggestions):
+            if index < 1 or index > len(suggestions):
                 raise IndexError(f"there are only {len(suggestions)} choice(s), but you selected choice {index}.")
             value = suggestions[index - 1]
         except ValueError:
@@ -77,12 +78,14 @@ def get_missing_type(memo, mapping_a, mapping_b):
     except ValueError:
         pass
 
+    t = t.strip().upper()
     if " " not in t:
         mapping_a[memo] = t
         mapping_b[memo] = ""
         return t, ""
 
-    mapping_a[memo] = t.split(" ")[0]
-    mapping_b[memo] = t.split(" ")[1]
+    type_part, subtype_part = t.split(" ", 1)
+    mapping_a[memo] = type_part
+    mapping_b[memo] = subtype_part
 
-    return t.split(" ")[0].upper(), t.split(" ")[1].upper()
+    return type_part, subtype_part

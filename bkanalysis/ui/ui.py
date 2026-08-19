@@ -263,7 +263,7 @@ def _get_plot_data(df, date_range=None, by=CUMULATED_AMOUNT_CCY):
     values = df_on_dates[by]
     labels = [
         aggregate_memos(memo) + f"<br><br>TOTAL: {d:,.0f}" if d != 0 else ",".join(memo)
-        for (memo, d) in zip(df_on_dates[MEMO_MAPPED], df_on_dates[by].diff())
+        for (memo, d) in zip(df_on_dates[MEMO_MAPPED], df_on_dates[by].diff().fillna(0))
     ]
 
     return values, labels

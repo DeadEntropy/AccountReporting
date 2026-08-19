@@ -139,6 +139,8 @@ class Salary:
 
         # Filter relevant payrolls
         for payroll, info in self.salaries_info.items():
+            if payroll in self.monthly_salaries.columns:
+                raise ValueError(f"Salary group name '{payroll}' collides with an existing payroll column; rename the group.")
             relevant_payrolls = [p for p in info["payrolls"] if p in self.monthly_salaries.columns]
             self.monthly_salaries[payroll] = self.monthly_salaries[relevant_payrolls].sum(axis=1)
             self.monthly_salaries[f"GAP_{payroll}"] = (
