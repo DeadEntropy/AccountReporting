@@ -81,7 +81,8 @@ def get_transaction(df: str, market: Market, proportion: {}, switch: {}, ref_cur
 
 def can_handle_csv(path_in, config):
     """returns True if path_in is a csv whose columns are exactly config['expected_columns']"""
-    if not path_in.lower().endswith("csv"):
+    # the loader passes None when the transform's config section is absent
+    if config is None or not path_in.lower().endswith("csv"):
         return False
     df = pd.read_csv(path_in, nrows=1)
     return set(df.columns) == set(parse_list(config["expected_columns"]))

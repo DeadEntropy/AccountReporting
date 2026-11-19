@@ -54,6 +54,10 @@ class TestWellsFargoCreditTransform:
             f.write("Date,Description,Amount\n11/15/2026,Test,500")
         assert wells_fargo_credit_transform.can_handle(csv_path, wells_fargo_credit_config) is False
 
+    def test_can_handle_missing_config(self, wells_fargo_credit_csv_file):
+        """Test that can_handle returns False when the WellsFargoCredit config section is absent."""
+        assert wells_fargo_credit_transform.can_handle(wells_fargo_credit_csv_file, None) is False
+
     def test_load_preserves_all_transactions(self, wells_fargo_credit_csv_file, wells_fargo_credit_config):
         """Test all transactions are preserved."""
         result = wells_fargo_credit_transform.load(wells_fargo_credit_csv_file, wells_fargo_credit_config)

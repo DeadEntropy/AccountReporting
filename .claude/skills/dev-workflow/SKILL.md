@@ -30,10 +30,10 @@ git switch -c <short-kebab-name> origin/master
 
 - Run the same checks as CI before pushing:
   ```bash
-  flake8 bkanalysis tests --count --select=E9,F63,F7,F82 --show-source --statistics
-  python -m pytest -q tests/unit
+  flake8 . --exclude .venv --count --select=E9,F63,F7,F82 --show-source --statistics
+  python -m pytest -q
   ```
-  (CI runs `flake8 .`, but locally that also scans `.venv`, so lint the project folders instead. Install with `pip install flake8` if it's missing.)
+  These match CI: `flake8 .` and `pytest` over `tests/`. The `.venv` exclusion is only needed locally. Install with `pip install flake8` if it's missing.
 - Commit messages: a short imperative subject, plus a body explaining the why. End with the attribution line from the current session's system reminder, if there is one.
 
 ## 3. Push and open the PR
@@ -83,13 +83,13 @@ gh pr comment <pr> --body "@coderabbitai review"
 - The review takes a few minutes. Wait for a review on the current head commit rather than polling quickly. Run a background check or Monitor until it appears:
   ```bash
   HEAD=$(gh pr view <pr> --json headRefOid -q .headRefOid)
-  gh api repos/{owner}/{repo}/pulls/<pr>/reviews \
+  gh api --paginate repos/{owner}/{repo}/pulls/<pr>/reviews \
     -q ".[] | select(.user.login==\"coderabbitai[bot]\" and .commit_id==\"$HEAD\") | .state"
   ```
 - If nothing arrives after ~15 minutes, check the PR comments for a CodeRabbit message explaining why (e.g. a rate-limit notice). Re-trigger only once the hour has passed.
 - Read the review body (it lists **actionable** comments and **nitpicks**) and the inline comments:
   ```bash
-  gh api repos/{owner}/{repo}/pulls/<pr>/comments \
+  gh api --paginate repos/{owner}/{repo}/pulls/<pr>/comments \
     -q '.[] | select(.user.login=="coderabbitai[bot]") | {id, path, line, body}'
   ```
 
@@ -105,7 +105,9 @@ For each comment, decide whether it's right. Check it against the code, because 
 - **Nitpicks:** take the cheap, clearly-better ones. Otherwise note them for the user rather than gold-plating.
 - Ask the user before acting on anything that changes behaviour beyond the PR's scope.
 
-Batch all fixes into one commit (e.g. "Address CodeRabbit review on PR #N"), run the local checks again, and push. Then go back to step 4: get CI and SonarCloud green on the new head first. Only re-trigger CodeRabbit (step 5) if the fixes were substantial enough to need another look, and only once the hour has passed. Otherwise tell the user what changed and let them decide.
+If no files changed (no actionable comments, or all were declined), don't commit or push. Go straight to step 7 with the current head.
+
+Otherwise, batch all fixes into one commit (e.g. "Address CodeRabbit review on PR #N"), run the local checks again, and push. Then go back to step 4: get CI and SonarCloud green on the new head first. Only re-trigger CodeRabbit (step 5) if the fixes were substantial enough to need another look, and only once the hour has passed. Otherwise tell the user what changed and let them decide.
 
 ## 7. Get the user's approval
 
@@ -118,10 +120,15 @@ Then **stop and wait for the user to explicitly approve the merge in chat.** CI 
 
 ## 8. Merge and clean up
 
-After the user approves:
+When asking for approval in step 7, record the head SHA you're presenting (`gh pr view <pr> --json headRefOid -q .headRefOid`). After the user approves, merge only that commit:
 
 ```bash
-gh pr merge <pr> --merge --delete-branch
+gh pr merge <pr> --merge --delete-branch --match-head-commit <approved-sha>
+```
+
+If the head has changed since approval, the merge is refused. Repeat steps 4–7 for the new head.
+
+```bash
 git switch master && git pull --ff-only origin master
 ```
 
