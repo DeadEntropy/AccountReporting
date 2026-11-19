@@ -1,23 +1,15 @@
 # coding=utf8
 import pandas as pd
-from bkanalysis.config.config_helper import parse_list
 from bkanalysis.transforms.account_transforms import static_data as sd
+from bkanalysis.transforms.account_transforms.transformation_helper import can_handle_csv, read_csv_with_expected_columns
 
 
 def can_handle(path_in, config, *args):
-    if not path_in.lower().endswith("csv"):
-        return False
-    df = pd.read_csv(path_in, nrows=1)
-    expected_columns = parse_list(config["expected_columns"])
-    return set(df.columns) == set(expected_columns)
+    return can_handle_csv(path_in, config)
 
 
 def load(path_in, config, *args):
-    df = pd.read_csv(path_in)
-    expected_columns = parse_list(config["expected_columns"])
-    assert set(df.columns) == set(expected_columns), (
-        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. (Wells Fargo Credit)'
-    )
+    df = read_csv_with_expected_columns(path_in, config, "Wells Fargo Credit")
 
     df_out = pd.DataFrame(columns=sd.target_columns)
 
