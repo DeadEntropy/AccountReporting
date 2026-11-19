@@ -1,5 +1,6 @@
 import pandas as pd
 import datetime as dt
+from bkanalysis.config.config_helper import parse_list
 from bkanalysis.market.market import Market
 
 
@@ -76,3 +77,22 @@ def get_transaction(df: str, market: Market, proportion: {}, switch: {}, ref_cur
     result = result.sort_values("Date", ascending=False).reset_index(drop=True)
 
     return result
+
+
+def can_handle_csv(path_in, config):
+    """returns True if path_in is a csv whose columns are exactly config['expected_columns']"""
+    # the loader passes None when the transform's config section is absent
+    if config is None or not path_in.lower().endswith("csv"):
+        return False
+    df = pd.read_csv(path_in, nrows=1)
+    return set(df.columns) == set(parse_list(config["expected_columns"]))
+
+
+def read_csv_with_expected_columns(path_in, config, source):
+    """reads path_in and asserts its columns are exactly config['expected_columns']"""
+    df = pd.read_csv(path_in)
+    expected_columns = parse_list(config["expected_columns"])
+    assert set(df.columns) == set(expected_columns), (
+        f'Was expecting [{", ".join(expected_columns)}] but file columns ' f'are [{", ".join(df.columns)}]. ({source})'
+    )
+    return df

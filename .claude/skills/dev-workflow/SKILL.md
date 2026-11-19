@@ -1,0 +1,135 @@
+---
+name: dev-workflow
+description: The required git/GitHub workflow for all development work in this repo — feature branch, PR to master, CI pipeline, CodeRabbit review, address comments, merge only after the user approves. Use for any code change that will be committed, pushed, or merged.
+---
+
+# Dev workflow
+
+Every change goes through a PR. Never commit or push directly to `master`.
+
+```
+branch from master → commit → push → open PR → CI + SonarCloud green → CodeRabbit review
+   → address comments → (repeat until clean) → user approves → merge → clean up
+```
+
+Use `gh` for everything on GitHub. If `gh auth status` shows you are not logged in, stop and ask the user to run `gh auth login`. Don't try to get around it with git credential helpers or tokens.
+
+## 1. Start a feature branch
+
+One feature per branch, always branched from an up-to-date `master`:
+
+```bash
+git fetch origin
+git switch -c <short-kebab-name> origin/master
+```
+
+- Before reusing an existing branch, check it isn't already merged or closed: `gh pr list --head <branch> --state all`. If its PR is merged or closed, start a new branch. Pushing to it would land commits nowhere useful.
+- If the working tree has changes that aren't part of this feature (e.g. notebooks, `.bak` files, `.claude/`), leave them unstaged. Stage files explicitly by path, never `git add -A` / `git add .`.
+
+## 2. Commit and verify locally
+
+- Run the same checks as CI before pushing:
+  ```bash
+  flake8 . --exclude .venv --count --select=E9,F63,F7,F82 --show-source --statistics
+  python -m pytest -q
+  ```
+  These match CI: `flake8 .` and `pytest` over `tests/`. The `.venv` exclusion is only needed locally. Install with `pip install flake8` if it's missing.
+- Commit messages: a short imperative subject, plus a body explaining the why. End with the attribution line from the current session's system reminder, if there is one.
+
+## 3. Push and open the PR
+
+```bash
+git push -u origin <branch>
+gh pr create --base master --head <branch> --title "<title>" --body-file <file>
+```
+
+- Push with `-u origin <branch>` so the upstream is the feature branch, not `master`.
+- PR body sections: **Summary** (what and why), **Config / manual steps** (e.g. `config.ini` sections, since `*.ini` is gitignored), and **Testing** (what was run, results). End with the PR attribution line from the session's system reminder, if there is one.
+- Tell the user the PR URL.
+
+## 4. Pipeline and SonarCloud must be green first
+
+Two checks run on every PR to `master`: the `Python package` workflow (`.github/workflows/python-package.yml`, flake8 + pytest) and **SonarCloud Code Analysis**. Both must be green before CodeRabbit is called (step 5).
+
+```bash
+gh pr checks <pr> --watch
+```
+
+Use `--watch` without `--fail-fast`, so you see the final state of every check. If a check fails, read the log (`gh run view <run-id> --log-failed`) or the Sonar details, fix the problem on the branch, push, and watch again. Repeat until both are green.
+
+(`test-coverage.yml` targets `main`/`develop`, so it doesn't run on this repo's PRs.)
+
+SonarCloud's quality gate can fail, e.g. on "Duplication on New Code" above 3%. The bot comment links the details. Duplicated blocks can be listed without auth:
+
+```bash
+curl -s "https://sonarcloud.io/api/duplications/show?key=DeadEntropy_AccountReporting:<path>&pullRequest=<pr>"
+```
+
+Fix it on the branch, typically by reusing shared helpers such as `transformation_helper.can_handle_csv` / `read_csv_with_expected_columns` for transforms.
+
+## 5. CodeRabbit review
+
+CodeRabbit (`coderabbitai[bot]`) does **not** review automatically on this repo. It skips the review ("fewer than 10 stars" / "manual review required for this OSS repository"), so it has to be triggered manually:
+
+```bash
+gh pr comment <pr> --body "@coderabbitai review"
+```
+
+**CodeRabbit is rate-limited (about one review per hour), so don't spam it:**
+- Trigger it only **after CI and SonarCloud are both green** on the current head (step 4), so the review covers code that is otherwise ready.
+- Trigger it once per round. Never re-trigger while a review is still pending, and never within an hour of the last trigger. Check when it was last triggered: `gh api repos/{owner}/{repo}/issues/<pr>/comments -q '.[] | select(.body=="@coderabbitai review") | .created_at'`.
+- If a trigger is needed sooner, tell the user and wait instead.
+
+- The review takes a few minutes. Wait for a review on the current head commit rather than polling quickly. Run a background check or Monitor until it appears:
+  ```bash
+  HEAD=$(gh pr view <pr> --json headRefOid -q .headRefOid)
+  gh api --paginate repos/{owner}/{repo}/pulls/<pr>/reviews \
+    -q ".[] | select(.user.login==\"coderabbitai[bot]\" and .commit_id==\"$HEAD\") | .state"
+  ```
+- If nothing arrives after ~15 minutes, check the PR comments for a CodeRabbit message explaining why (e.g. a rate-limit notice). Re-trigger only once the hour has passed.
+- Read the review body (it lists **actionable** comments and **nitpicks**) and the inline comments:
+  ```bash
+  gh api --paginate repos/{owner}/{repo}/pulls/<pr>/comments \
+    -q '.[] | select(.user.login=="coderabbitai[bot]") | {id, path, line, body}'
+  ```
+
+## 6. Address the comments
+
+For each comment, decide whether it's right. Check it against the code, because CodeRabbit is sometimes wrong.
+
+- **Valid:** fix it on the branch. Add or adjust tests where it makes sense.
+- **Not valid / out of scope:** don't change code. Reply on the thread with a short reason:
+  ```bash
+  gh api repos/{owner}/{repo}/pulls/<pr>/comments/<comment-id>/replies -f body="..."
+  ```
+- **Nitpicks:** take the cheap, clearly-better ones. Otherwise note them for the user rather than gold-plating.
+- Ask the user before acting on anything that changes behaviour beyond the PR's scope.
+
+If no files changed (no actionable comments, or all were declined), don't commit or push. Go straight to step 7 with the current head.
+
+Otherwise, batch all fixes into one commit (e.g. "Address CodeRabbit review on PR #N"), run the local checks again, and push. Then go back to step 4: get CI and SonarCloud green on the new head first. Only re-trigger CodeRabbit (step 5) if the fixes were substantial enough to need another look, and only once the hour has passed. Otherwise tell the user what changed and let them decide.
+
+## 7. Get the user's approval
+
+Give the user a summary first:
+- PR link and CI status
+- each CodeRabbit comment and what was done about it (fixed / declined and why)
+- any nitpicks or follow-ups that were left
+
+Then **stop and wait for the user to explicitly approve the merge in chat.** CI passing or CodeRabbit approving is not approval. An approval covers that PR only.
+
+## 8. Merge and clean up
+
+When asking for approval in step 7, record the head SHA you're presenting (`gh pr view <pr> --json headRefOid -q .headRefOid`). After the user approves, merge only that commit:
+
+```bash
+gh pr merge <pr> --merge --delete-branch --match-head-commit <approved-sha>
+```
+
+If the head has changed since approval, the merge is refused. Repeat steps 4–7 for the new head.
+
+```bash
+git switch master && git pull --ff-only origin master
+```
+
+Use a merge commit (`--merge`), as the repo's history does. Confirm the merge to the user with the resulting `master` commit.
